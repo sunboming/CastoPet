@@ -5,6 +5,13 @@ namespace CastoPet.Core;
 
 public sealed class TrayService : IDisposable
 {
+    public const string ShowOrRestoreText = "显示/恢复";
+    public const string AlwaysOnTopText = "始终置顶";
+    public const string MouseClickThroughText = "鼠标穿透";
+    public const string ShowTaskbarIconText = "显示任务栏图标";
+    public const string StartWithWindowsText = "开机自启动";
+    public const string ExitText = "退出";
+
     private readonly MenuCommandService _commands;
     private readonly Forms.NotifyIcon _notifyIcon;
     private readonly Forms.ToolStripMenuItem _topmostItem;
@@ -15,20 +22,20 @@ public sealed class TrayService : IDisposable
     public TrayService(MenuCommandService commands)
     {
         _commands = commands;
-        _topmostItem = CreateCheckedItem("Always on top", _commands.ToggleTopmost);
-        _clickThroughItem = CreateCheckedItem("Mouse click-through", _commands.ToggleClickThrough);
-        _taskbarItem = CreateCheckedItem("Show taskbar icon", _commands.ToggleShowInTaskbar);
-        _startupItem = CreateCheckedItem("Start with Windows", _commands.ToggleStartWithWindows);
+        _topmostItem = CreateCheckedItem(AlwaysOnTopText, _commands.ToggleTopmost);
+        _clickThroughItem = CreateCheckedItem(MouseClickThroughText, _commands.ToggleClickThrough);
+        _taskbarItem = CreateCheckedItem(ShowTaskbarIconText, _commands.ToggleShowInTaskbar);
+        _startupItem = CreateCheckedItem(StartWithWindowsText, _commands.ToggleStartWithWindows);
 
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Show/restore", null, (_, _) => _commands.ShowOrRestore());
+        menu.Items.Add(ShowOrRestoreText, null, (_, _) => _commands.ShowOrRestore());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_topmostItem);
         menu.Items.Add(_clickThroughItem);
         menu.Items.Add(_taskbarItem);
         menu.Items.Add(_startupItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => _commands.Exit());
+        menu.Items.Add(ExitText, null, (_, _) => _commands.Exit());
 
         _notifyIcon = new Forms.NotifyIcon
         {

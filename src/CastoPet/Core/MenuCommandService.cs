@@ -60,7 +60,7 @@ public sealed class MenuCommandService
         if (!_startupService.SetEnabled(target, _executablePath))
         {
             Wpf.MessageBox.Show(
-                "CastoPet could not update the Start with Windows setting.",
+                "CastoPet 无法更新开机自启动设置。",
                 "CastoPet",
                 Wpf.MessageBoxButton.OK,
                 Wpf.MessageBoxImage.Warning);

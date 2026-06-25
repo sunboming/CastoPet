@@ -23,7 +23,7 @@ public partial class PetWindow : Window
         catch
         {
             System.Windows.MessageBox.Show(
-                "CastoPet could not load the built-in character image Castorice.png.",
+                "CastoPet 无法加载内置角色图片 Castorice.png。",
                 "CastoPet",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -56,14 +56,14 @@ public partial class PetWindow : Window
     {
         var menu = new WpfControls.ContextMenu();
 
-        menu.Items.Add(CreateMenuItem("Show/restore", commands.ShowOrRestore));
+        menu.Items.Add(CreateMenuItem(TrayService.ShowOrRestoreText, commands.ShowOrRestore));
         menu.Items.Add(new WpfControls.Separator());
-        menu.Items.Add(CreateCheckedMenuItem("Always on top", () => commands.Settings.Topmost, commands.ToggleTopmost));
-        menu.Items.Add(CreateCheckedMenuItem("Mouse click-through", () => commands.Settings.ClickThrough, commands.ToggleClickThrough));
-        menu.Items.Add(CreateCheckedMenuItem("Show taskbar icon", () => commands.Settings.ShowInTaskbar, commands.ToggleShowInTaskbar));
-        menu.Items.Add(CreateCheckedMenuItem("Start with Windows", () => commands.Settings.StartWithWindows, commands.ToggleStartWithWindows));
+        menu.Items.Add(CreateCheckedMenuItem(TrayService.AlwaysOnTopText, () => commands.Settings.Topmost, commands.ToggleTopmost));
+        menu.Items.Add(CreateCheckedMenuItem(TrayService.MouseClickThroughText, () => commands.Settings.ClickThrough, commands.ToggleClickThrough));
+        menu.Items.Add(CreateCheckedMenuItem(TrayService.ShowTaskbarIconText, () => commands.Settings.ShowInTaskbar, commands.ToggleShowInTaskbar));
+        menu.Items.Add(CreateCheckedMenuItem(TrayService.StartWithWindowsText, () => commands.Settings.StartWithWindows, commands.ToggleStartWithWindows));
         menu.Items.Add(new WpfControls.Separator());
-        menu.Items.Add(CreateMenuItem("Exit", commands.Exit));
+        menu.Items.Add(CreateMenuItem(TrayService.ExitText, commands.Exit));
 
         menu.Opened += (_, _) => RefreshContextMenuChecks(menu, commands);
         ContextMenu = menu;
@@ -122,10 +122,10 @@ public partial class PetWindow : Window
             var header = item.Header as string;
             item.IsChecked = header switch
             {
-                "Always on top" => commands.Settings.Topmost,
-                "Mouse click-through" => commands.Settings.ClickThrough,
-                "Show taskbar icon" => commands.Settings.ShowInTaskbar,
-                "Start with Windows" => commands.Settings.StartWithWindows,
+                TrayService.AlwaysOnTopText => commands.Settings.Topmost,
+                TrayService.MouseClickThroughText => commands.Settings.ClickThrough,
+                TrayService.ShowTaskbarIconText => commands.Settings.ShowInTaskbar,
+                TrayService.StartWithWindowsText => commands.Settings.StartWithWindows,
                 _ => item.IsChecked,
             };
         }
