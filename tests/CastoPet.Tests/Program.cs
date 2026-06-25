@@ -6,6 +6,9 @@ var tests = new (string Name, Action Test)[]
     ("Settings round trip as JSON", SettingsRoundTripAsJson),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
     ("Logging writes a dated log file", LoggingWritesDatedLogFile),
+    ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
+    ("Startup value name is CastoPet", StartupValueNameIsCastoPet),
+    ("Single instance rejects a second owner", SingleInstanceRejectsSecondOwner),
 };
 
 var failures = 0;
@@ -87,6 +90,40 @@ static void LoggingWritesDatedLogFile()
     Assert.Contains(text, "hello", "Log file should include message.");
 }
 
+static void BottomRightPlacementUsesWorkAreaMargin()
+{
+    var bounds = WindowPlacementService.CalculateBottomRight(
+        workAreaLeft: 0,
+        workAreaTop: 0,
+        workAreaWidth: 1920,
+        workAreaHeight: 1080,
+        windowWidth: 320,
+        windowHeight: 420,
+        margin: 24);
+
+    Assert.Equal(1576, (int)bounds.Left, "Left should place window near the right edge.");
+    Assert.Equal(636, (int)bounds.Top, "Top should place window near the bottom edge.");
+}
+
+static void StartupValueNameIsCastoPet()
+{
+    Assert.Equal("CastoPet", StartupService.ValueName, "Startup registry value should use app name.");
+}
+
+static void SingleInstanceRejectsSecondOwner()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var scope = "CastoPet.Tests." + Guid.NewGuid().ToString("N");
+
+    using var first = new SingleInstanceService(logger, scope);
+    using var second = new SingleInstanceService(logger, scope);
+
+    Assert.True(first.IsPrimaryInstance, "First service should own the instance mutex.");
+    Assert.False(second.IsPrimaryInstance, "Second service should not own the same instance mutex.");
+}
+
 static class Assert
 {
     public static void True(bool value, string message)
@@ -102,6 +139,14 @@ static class Assert
     public static void Contains(string text, string expected, string message)
     {
         if (!text.Contains(expected, StringComparison.Ordinal)) throw new InvalidOperationException(message);
+    }
+
+    public static void Equal<T>(T expected, T actual, string message)
+    {
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"{message} Expected {expected}, got {actual}.");
+        }
     }
 }
 
