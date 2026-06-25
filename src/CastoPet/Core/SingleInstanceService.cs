@@ -70,6 +70,8 @@ public sealed class SingleInstanceService : IDisposable
                     PipeOptions.Asynchronous);
 
                 await pipe.WaitForConnectionAsync(cancellationToken);
+                var buffer = new byte[16];
+                await pipe.ReadAtLeastAsync(buffer, minimumBytes: 1, throwOnEndOfStream: false, cancellationToken);
                 restore();
             }
             catch (OperationCanceledException)

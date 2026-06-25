@@ -9,6 +9,7 @@ var tests = new (string Name, Action Test)[]
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
     ("Startup value name is CastoPet", StartupValueNameIsCastoPet),
     ("Single instance rejects a second owner", SingleInstanceRejectsSecondOwner),
+    ("Single instance restore signal reaches primary", SingleInstanceRestoreSignalReachesPrimary),
 };
 
 var failures = 0;
@@ -122,6 +123,24 @@ static void SingleInstanceRejectsSecondOwner()
 
     Assert.True(first.IsPrimaryInstance, "First service should own the instance mutex.");
     Assert.False(second.IsPrimaryInstance, "Second service should not own the same instance mutex.");
+}
+
+static void SingleInstanceRestoreSignalReachesPrimary()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var scope = "CastoPet.Tests." + Guid.NewGuid().ToString("N");
+    using var first = new SingleInstanceService(logger, scope);
+    using var second = new SingleInstanceService(logger, scope);
+    using var restored = new ManualResetEventSlim(false);
+
+    first.StartRestoreServer(() => restored.Set());
+
+    var signaled = second.SignalRestoreAsync().GetAwaiter().GetResult();
+
+    Assert.True(signaled, "Second instance should signal primary without pipe errors.");
+    Assert.True(restored.Wait(TimeSpan.FromSeconds(2)), "Primary should receive restore signal.");
 }
 
 static class Assert
