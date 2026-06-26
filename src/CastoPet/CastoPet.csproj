@@ -11,5 +11,8 @@
 
   <ItemGroup>
     <Resource Include="Assets\Castorice.png" />
+    <Resource Include="Assets\States\Castorice.Happy.png" />
+    <Resource Include="Assets\States\Castorice.Sleepy.png" />
+    <Resource Include="Assets\States\Castorice.Surprised.png" />
   </ItemGroup>
 </Project>
