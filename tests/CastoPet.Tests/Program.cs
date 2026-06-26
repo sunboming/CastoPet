@@ -15,6 +15,8 @@ var tests = new (string Name, Action Test)[]
     ("Show restore keeps hidden position but resets visible position", ShowRestoreKeepsHiddenPositionButResetsVisiblePosition),
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
+    ("Expression wheel defines eight items", ExpressionWheelDefinesEightItems),
+    ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
@@ -197,6 +199,30 @@ static void BlinkFrameSequenceDefinesRandomBlinkFrames()
     Assert.Equal(TimeSpan.FromSeconds(7), BlinkFrameSequence.MaxScheduleDelay, "Blink should remain occasional.");
     Assert.Equal("Assets/States/Blink/Castorice.Blink.00.png", BlinkFrameSequence.FramePaths[0], "First blink frame path should be zero padded.");
     Assert.Equal("Assets/States/Blink/Castorice.Blink.02.png", BlinkFrameSequence.FramePaths[^1], "Last blink frame path should be zero padded.");
+}
+
+static void ExpressionWheelDefinesEightItems()
+{
+    Assert.Equal(8, ExpressionWheelCatalog.Items.Count, "Expression wheel should use eight first-version items.");
+    Assert.Equal("Happy", ExpressionWheelCatalog.Items[0].Label, "First expression should be Happy.");
+    Assert.Equal("Shy", ExpressionWheelCatalog.Items[1].Label, "Second expression should be Shy.");
+    Assert.Equal("Sleepy", ExpressionWheelCatalog.Items[2].Label, "Third expression should be Sleepy.");
+    Assert.Equal("Surprised", ExpressionWheelCatalog.Items[3].Label, "Fourth expression should be Surprised.");
+    Assert.Equal("Pouting", ExpressionWheelCatalog.Items[4].Label, "Fifth expression should be Pouting.");
+    Assert.Equal("Confused", ExpressionWheelCatalog.Items[5].Label, "Sixth expression should be Confused.");
+    Assert.Equal("Proud", ExpressionWheelCatalog.Items[6].Label, "Seventh expression should be Proud.");
+    Assert.Equal("Crying", ExpressionWheelCatalog.Items[7].Label, "Eighth expression should be Crying.");
+    Assert.Equal(TimeSpan.FromMilliseconds(250), ExpressionWheelCatalog.HoldDelay, "Wheel hold delay should be short but deliberate.");
+    Assert.Equal(TimeSpan.FromSeconds(2), ExpressionWheelCatalog.ExpressionDuration, "Selected expression should be temporary.");
+}
+
+static void ExpressionWheelPathsUseAppResources()
+{
+    foreach (var item in ExpressionWheelCatalog.Items)
+    {
+        var expected = $"Assets/Expressions/Castorice.Expression.{item.Label}.png";
+        Assert.Equal(expected, item.ResourcePath, $"{item.Label} should use the expression resource path convention.");
+    }
 }
 
 static void CharacterAssetsDecodeAtPetDisplayWidth()
