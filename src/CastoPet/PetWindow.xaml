@@ -11,10 +11,33 @@
         ShowInTaskbar="False"
         Topmost="True"
         SizeToContent="Manual">
-    <Grid Background="Transparent">
+    <Grid x:Name="RootGrid" Background="Transparent">
         <Image x:Name="CharacterImage"
                Stretch="Uniform"
                SnapsToDevicePixels="True"
                RenderOptions.BitmapScalingMode="HighQuality" />
+
+        <Canvas x:Name="ExpressionWheelOverlay"
+                Visibility="Collapsed"
+                IsHitTestVisible="False">
+            <Canvas x:Name="ExpressionWheelSurface"
+                    Width="280"
+                    Height="280">
+                <Ellipse Width="248"
+                         Height="248"
+                         Canvas.Left="16"
+                         Canvas.Top="16"
+                         Fill="#66352A48"
+                         Stroke="#99D9C8FF"
+                         StrokeThickness="1.5" />
+                <Ellipse Width="72"
+                         Height="72"
+                         Canvas.Left="104"
+                         Canvas.Top="104"
+                         Fill="#55352A48"
+                         Stroke="#66FFFFFF"
+                         StrokeThickness="1" />
+            </Canvas>
+        </Canvas>
     </Grid>
 </Window>
