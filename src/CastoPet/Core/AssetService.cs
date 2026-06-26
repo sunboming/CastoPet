@@ -1,4 +1,5 @@
 using System.Windows.Media.Imaging;
+using System.Windows.Media;
 
 namespace CastoPet.Core;
 
@@ -22,6 +23,11 @@ public sealed class AssetService
     public BitmapImage LoadDraggingCharacter()
     {
         return LoadCharacter(DraggingCharacterPath);
+    }
+
+    public IReadOnlyList<ImageSource> LoadIdleFrames()
+    {
+        return IdleFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
     }
 
     private BitmapImage LoadCharacter(string resourcePath)

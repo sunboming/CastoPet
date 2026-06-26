@@ -15,5 +15,13 @@
     <Resource Include="Assets\States\Castorice.Sleepy.png" />
     <Resource Include="Assets\States\Castorice.Surprised.png" />
     <Resource Include="Assets\States\Castorice.Dragging.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.00.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.01.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.02.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.03.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.04.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.05.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.06.png" />
+    <Resource Include="Assets\States\Idle\Castorice.Idle.07.png" />
   </ItemGroup>
 </Project>

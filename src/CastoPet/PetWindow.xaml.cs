@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using CastoPet.Core;
 using WpfControls = System.Windows.Controls;
@@ -14,16 +13,21 @@ public partial class PetWindow : Window
     private readonly PetRuntimeState _runtimeState = new();
     private readonly ImageSource _defaultCharacter;
     private readonly ImageSource _draggingCharacter;
+    private readonly IReadOnlyList<ImageSource> _idleFrames;
+    private readonly DispatcherTimer _idleFrameTimer;
     private readonly DispatcherTimer _dragRestoreTimer;
     private AppSettings? _pendingSettings;
     private bool _applySettingsOnSourceInitialized;
     private bool _isClickThrough;
     private bool _isDragging;
+    private int _idleFrameIndex;
 
     public PetWindow(AssetService assets, LoggingService logger)
     {
         InitializeComponent();
         _logger = logger;
+        _idleFrameTimer = new DispatcherTimer { Interval = IdleFrameSequence.FrameInterval };
+        _idleFrameTimer.Tick += (_, _) => AdvanceIdleFrame();
         _dragRestoreTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _dragRestoreTimer.Tick += (_, _) => RestoreAfterDrag();
 
@@ -31,12 +35,14 @@ public partial class PetWindow : Window
         {
             _defaultCharacter = assets.LoadDefaultCharacter();
             _draggingCharacter = assets.LoadDraggingCharacter();
-            CharacterImage.Source = _defaultCharacter;
+            _idleFrames = assets.LoadIdleFrames();
+            CharacterImage.Source = GetCurrentIdleFrame();
         }
         catch
         {
             _defaultCharacter = CharacterImage.Source;
             _draggingCharacter = CharacterImage.Source;
+            _idleFrames = Array.Empty<ImageSource>();
             System.Windows.MessageBox.Show(
                 "CastoPet 无法加载内置角色图片 Castorice.png。",
                 "CastoPet",
@@ -175,84 +181,40 @@ public partial class PetWindow : Window
     private void RestoreAfterDrag()
     {
         _dragRestoreTimer.Stop();
-        CharacterImage.Source = _defaultCharacter;
+        _idleFrameIndex = 0;
+        CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
     }
 
     private void StartIdleAnimation()
     {
-        if (_isDragging)
+        if (_isDragging || _idleFrames.Count == 0)
         {
             return;
         }
 
-        var verticalFloat = new DoubleAnimation
-        {
-            From = -4,
-            To = 2,
-            Duration = TimeSpan.FromSeconds(2.8),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-        };
-        var horizontalSway = new DoubleAnimation
-        {
-            From = -1.5,
-            To = 1.5,
-            Duration = TimeSpan.FromSeconds(3.6),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-        };
-        var rotateAnimation = new DoubleAnimation
-        {
-            From = -0.8,
-            To = 0.8,
-            Duration = TimeSpan.FromSeconds(4.2),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-        };
-        var scaleXAnimation = new DoubleAnimation
-        {
-            From = 0.996,
-            To = 1.004,
-            Duration = TimeSpan.FromSeconds(3.1),
-            BeginTime = TimeSpan.FromMilliseconds(220),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-        };
-        var scaleYAnimation = new DoubleAnimation
-        {
-            From = 1.002,
-            To = 0.996,
-            Duration = TimeSpan.FromSeconds(2.9),
-            BeginTime = TimeSpan.FromMilliseconds(80),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-        };
-
-        IdleTranslateTransform.BeginAnimation(TranslateTransform.YProperty, verticalFloat);
-        IdleTranslateTransform.BeginAnimation(TranslateTransform.XProperty, horizontalSway);
-        IdleRotateTransform.BeginAnimation(RotateTransform.AngleProperty, rotateAnimation);
-        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnimation);
-        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnimation);
+        _idleFrameTimer.Start();
     }
 
     private void StopIdleAnimation()
     {
-        IdleTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-        IdleTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
-        IdleRotateTransform.BeginAnimation(RotateTransform.AngleProperty, null);
-        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        IdleTranslateTransform.X = 0;
-        IdleTranslateTransform.Y = 0;
-        IdleRotateTransform.Angle = 0;
-        IdleScaleTransform.ScaleX = 1;
-        IdleScaleTransform.ScaleY = 1;
+        _idleFrameTimer.Stop();
+    }
+
+    private void AdvanceIdleFrame()
+    {
+        if (_isDragging || _idleFrames.Count == 0)
+        {
+            return;
+        }
+
+        _idleFrameIndex = (_idleFrameIndex + 1) % _idleFrames.Count;
+        CharacterImage.Source = GetCurrentIdleFrame();
+    }
+
+    private ImageSource GetCurrentIdleFrame()
+    {
+        return _idleFrames.Count == 0 ? _defaultCharacter : _idleFrames[_idleFrameIndex];
     }
 
     private static WpfControls.MenuItem CreateMenuItem(string header, Action action)

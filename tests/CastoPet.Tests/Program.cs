@@ -13,6 +13,7 @@ var tests = new (string Name, Action Test)[]
     ("Runtime position starts at default", RuntimePositionStartsAtDefault),
     ("Runtime position tracks drag for current run only", RuntimePositionTracksDragForCurrentRunOnly),
     ("Show restore keeps hidden position but resets visible position", ShowRestoreKeepsHiddenPositionButResetsVisiblePosition),
+    ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
 };
 
 var failures = 0;
@@ -175,6 +176,14 @@ static void ShowRestoreKeepsHiddenPositionButResetsVisiblePosition()
     Assert.Equal(PetShowRestoreAction.ShowAtRuntimePosition, hiddenAction, "Hidden pet should reappear at current runtime position.");
     Assert.Equal(PetShowRestoreAction.RestoreDefaultPosition, visibleAction, "Visible pet should restore to default position.");
     Assert.False(state.HasRuntimePosition, "Restoring visible pet to default should clear runtime position.");
+}
+
+static void IdleFrameSequenceDefinesEightSlowFramePaths()
+{
+    Assert.Equal(8, IdleFrameSequence.FrameCount, "Idle should use eight frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(200), IdleFrameSequence.FrameInterval, "Idle frames should advance slowly.");
+    Assert.Equal("Assets/States/Idle/Castorice.Idle.00.png", IdleFrameSequence.FramePaths[0], "First idle frame path should be zero padded.");
+    Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", IdleFrameSequence.FramePaths[^1], "Last idle frame path should be zero padded.");
 }
 
 static class Assert
