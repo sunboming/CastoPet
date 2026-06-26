@@ -36,6 +36,25 @@ public sealed class AssetService
         return BlinkFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
     }
 
+    public IReadOnlyDictionary<ExpressionWheelItem, ImageSource> LoadExpressionWheelImages()
+    {
+        var images = new Dictionary<ExpressionWheelItem, ImageSource>();
+
+        foreach (var item in ExpressionWheelCatalog.Items)
+        {
+            try
+            {
+                images[item] = LoadCharacter(item.ResourcePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to load expression wheel image {item.ResourcePath}.", ex);
+            }
+        }
+
+        return images;
+    }
+
     private BitmapImage LoadCharacter(string resourcePath)
     {
         try
