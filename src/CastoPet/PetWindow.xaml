@@ -20,7 +20,8 @@
             <Image.RenderTransform>
                 <TransformGroup>
                     <ScaleTransform x:Name="IdleScaleTransform" ScaleX="1" ScaleY="1" />
-                    <TranslateTransform x:Name="IdleTranslateTransform" Y="0" />
+                    <RotateTransform x:Name="IdleRotateTransform" Angle="0" />
+                    <TranslateTransform x:Name="IdleTranslateTransform" X="0" Y="0" />
                 </TransformGroup>
             </Image.RenderTransform>
         </Image>

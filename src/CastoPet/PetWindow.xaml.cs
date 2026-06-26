@@ -186,36 +186,71 @@ public partial class PetWindow : Window
             return;
         }
 
-        var floatAnimation = new DoubleAnimation
+        var verticalFloat = new DoubleAnimation
         {
-            From = -3,
-            To = 3,
-            Duration = TimeSpan.FromSeconds(1.8),
+            From = -4,
+            To = 2,
+            Duration = TimeSpan.FromSeconds(2.8),
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
         };
-        var scaleAnimation = new DoubleAnimation
+        var horizontalSway = new DoubleAnimation
         {
-            From = 0.992,
-            To = 1.008,
-            Duration = TimeSpan.FromSeconds(1.8),
+            From = -1.5,
+            To = 1.5,
+            Duration = TimeSpan.FromSeconds(3.6),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
+        };
+        var rotateAnimation = new DoubleAnimation
+        {
+            From = -0.8,
+            To = 0.8,
+            Duration = TimeSpan.FromSeconds(4.2),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
+        };
+        var scaleXAnimation = new DoubleAnimation
+        {
+            From = 0.996,
+            To = 1.004,
+            Duration = TimeSpan.FromSeconds(3.1),
+            BeginTime = TimeSpan.FromMilliseconds(220),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
+        };
+        var scaleYAnimation = new DoubleAnimation
+        {
+            From = 1.002,
+            To = 0.996,
+            Duration = TimeSpan.FromSeconds(2.9),
+            BeginTime = TimeSpan.FromMilliseconds(80),
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
         };
 
-        IdleTranslateTransform.BeginAnimation(TranslateTransform.YProperty, floatAnimation);
-        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnimation);
-        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
+        IdleTranslateTransform.BeginAnimation(TranslateTransform.YProperty, verticalFloat);
+        IdleTranslateTransform.BeginAnimation(TranslateTransform.XProperty, horizontalSway);
+        IdleRotateTransform.BeginAnimation(RotateTransform.AngleProperty, rotateAnimation);
+        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnimation);
+        IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnimation);
     }
 
     private void StopIdleAnimation()
     {
         IdleTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+        IdleTranslateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+        IdleRotateTransform.BeginAnimation(RotateTransform.AngleProperty, null);
         IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         IdleScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        IdleTranslateTransform.X = 0;
         IdleTranslateTransform.Y = 0;
+        IdleRotateTransform.Angle = 0;
         IdleScaleTransform.ScaleX = 1;
         IdleScaleTransform.ScaleY = 1;
     }
