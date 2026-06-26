@@ -14,5 +14,6 @@
     <Resource Include="Assets\States\Castorice.Happy.png" />
     <Resource Include="Assets\States\Castorice.Sleepy.png" />
     <Resource Include="Assets\States\Castorice.Surprised.png" />
+    <Resource Include="Assets\States\Castorice.Dragging.png" />
   </ItemGroup>
 </Project>

@@ -10,6 +10,9 @@ var tests = new (string Name, Action Test)[]
     ("Startup value name is CastoPet", StartupValueNameIsCastoPet),
     ("Single instance rejects a second owner", SingleInstanceRejectsSecondOwner),
     ("Single instance restore signal reaches primary", SingleInstanceRestoreSignalReachesPrimary),
+    ("Runtime position starts at default", RuntimePositionStartsAtDefault),
+    ("Runtime position tracks drag for current run only", RuntimePositionTracksDragForCurrentRunOnly),
+    ("Show restore keeps hidden position but resets visible position", ShowRestoreKeepsHiddenPositionButResetsVisiblePosition),
 };
 
 var failures = 0;
@@ -141,6 +144,37 @@ static void SingleInstanceRestoreSignalReachesPrimary()
 
     Assert.True(signaled, "Second instance should signal primary without pipe errors.");
     Assert.True(restored.Wait(TimeSpan.FromSeconds(2)), "Primary should receive restore signal.");
+}
+
+static void RuntimePositionStartsAtDefault()
+{
+    var state = new PetRuntimeState();
+
+    Assert.False(state.HasRuntimePosition, "New runtime state should not have a dragged position.");
+}
+
+static void RuntimePositionTracksDragForCurrentRunOnly()
+{
+    var state = new PetRuntimeState();
+
+    state.SetRuntimePosition(120, 240);
+
+    Assert.True(state.HasRuntimePosition, "Dragged position should be tracked during this run.");
+    Assert.Equal(120d, state.Left, "Dragged left should be stored.");
+    Assert.Equal(240d, state.Top, "Dragged top should be stored.");
+}
+
+static void ShowRestoreKeepsHiddenPositionButResetsVisiblePosition()
+{
+    var state = new PetRuntimeState();
+    state.SetRuntimePosition(120, 240);
+
+    var hiddenAction = state.GetShowRestoreAction(isVisible: false);
+    var visibleAction = state.GetShowRestoreAction(isVisible: true);
+
+    Assert.Equal(PetShowRestoreAction.ShowAtRuntimePosition, hiddenAction, "Hidden pet should reappear at current runtime position.");
+    Assert.Equal(PetShowRestoreAction.RestoreDefaultPosition, visibleAction, "Visible pet should restore to default position.");
+    Assert.False(state.HasRuntimePosition, "Restoring visible pet to default should clear runtime position.");
 }
 
 static class Assert

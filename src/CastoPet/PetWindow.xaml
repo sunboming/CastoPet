@@ -15,6 +15,14 @@
         <Image x:Name="CharacterImage"
                Stretch="Uniform"
                SnapsToDevicePixels="True"
-               RenderOptions.BitmapScalingMode="HighQuality" />
+               RenderOptions.BitmapScalingMode="HighQuality"
+               RenderTransformOrigin="0.5,0.55">
+            <Image.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="IdleScaleTransform" ScaleX="1" ScaleY="1" />
+                    <TranslateTransform x:Name="IdleTranslateTransform" Y="0" />
+                </TransformGroup>
+            </Image.RenderTransform>
+        </Image>
     </Grid>
 </Window>
