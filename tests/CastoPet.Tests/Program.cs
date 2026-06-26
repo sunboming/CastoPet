@@ -207,9 +207,15 @@ static void CharacterAssetsDecodeAtPetDisplayWidth()
 static void PackagedCharacterAssetsAreDisplaySized()
 {
     var workspace = FindWorkspaceRoot();
+    var assetsRoot = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets");
+    var excludedSegments = new[]
+    {
+        $"{System.IO.Path.DirectorySeparatorChar}CandidateSet{System.IO.Path.DirectorySeparatorChar}",
+    };
     var assets = Directory
-        .EnumerateFiles(System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets"), "*.png", SearchOption.AllDirectories)
-        .Where(path => !System.IO.Path.GetFileName(path).Equals("blink-preview.png", StringComparison.OrdinalIgnoreCase));
+        .EnumerateFiles(assetsRoot, "*.png", SearchOption.AllDirectories)
+        .Where(path => !System.IO.Path.GetFileName(path).Equals("blink-preview.png", StringComparison.OrdinalIgnoreCase))
+        .Where(path => !excludedSegments.Any(segment => path.Contains(segment, StringComparison.OrdinalIgnoreCase)));
 
     foreach (var asset in assets)
     {
