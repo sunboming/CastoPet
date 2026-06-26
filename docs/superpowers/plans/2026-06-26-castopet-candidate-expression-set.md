@@ -98,7 +98,7 @@ Avoid: extra characters, props, speech bubbles, captions, subtitles, watermark, 
 **Files:**
 - Modify: `tests/CastoPet.Tests/Program.cs`
 
-- [ ] **Step 1: Update the production asset enumeration**
+- [x] **Step 1: Update the production asset enumeration**
 
 Replace the `assets` declaration inside `PackagedCharacterAssetsAreDisplaySized` with:
 
@@ -114,7 +114,7 @@ var assets = Directory
     .Where(path => !excludedSegments.Any(segment => path.Contains(segment, StringComparison.OrdinalIgnoreCase)));
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run:
 
@@ -124,7 +124,7 @@ dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
 
 Expected: all existing tests still print `PASS`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add tests/CastoPet.Tests/Program.cs
@@ -138,7 +138,7 @@ Skip this commit only if git is unavailable.
 **Files:**
 - Create: `tools/candidate-assets/validate_candidate_set.py`
 
-- [ ] **Step 1: Create the validation script**
+- [x] **Step 1: Create the validation script**
 
 Write `tools/candidate-assets/validate_candidate_set.py`:
 
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 2: Run validation before assets exist**
+- [x] **Step 2: Run validation before assets exist**
 
 Run:
 
@@ -252,7 +252,7 @@ Run:
 
 Expected: it fails with `missing:` lines because candidate assets have not been generated yet.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add tools/candidate-assets/validate_candidate_set.py
@@ -264,7 +264,7 @@ git commit -m "chore: add candidate sprite validation script"
 **Files:**
 - Create: `tools/candidate-assets/make_contact_sheet.py`
 
-- [ ] **Step 1: Create the contact sheet script**
+- [x] **Step 1: Create the contact sheet script**
 
 Write `tools/candidate-assets/make_contact_sheet.py`:
 
@@ -322,7 +322,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 2: Run contact sheet before assets exist**
+- [x] **Step 2: Run contact sheet before assets exist**
 
 Run:
 
@@ -332,7 +332,7 @@ Run:
 
 Expected: it fails with `FAIL no png files`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add tools/candidate-assets/make_contact_sheet.py
@@ -359,7 +359,7 @@ git commit -m "chore: add candidate sprite contact sheet script"
 - Create: `src/CastoPet/Assets/CandidateSet/Source/States/Blink/Castorice.Blink.01.png`
 - Create: `src/CastoPet/Assets/CandidateSet/Source/States/Blink/Castorice.Blink.02.png`
 
-- [ ] **Step 1: Generate these built-in image prompts one asset at a time**
+- [x] **Step 1: Generate these built-in image prompts one asset at a time**
 
 Use the shared prompt constraints from this plan and append one state-specific line:
 
@@ -404,11 +404,11 @@ State: blink frame 01, same default pose, eyes fully closed.
 State: blink frame 02, same default pose, eyes reopening half open.
 ```
 
-- [ ] **Step 2: Save generated files into the Source tree**
+- [x] **Step 2: Save generated files into the Source tree**
 
 Copy each accepted generated image from Codex's generated image directory into the exact matching core path listed in this task's **Files** section.
 
-- [ ] **Step 3: Inspect the source tree**
+- [x] **Step 3: Inspect the source tree**
 
 Run:
 
@@ -439,7 +439,7 @@ Expected: 16 PNG files exist for the core set.
 - Create: `src/CastoPet/Assets/CandidateSet/Transparent/States/Blink/Castorice.Blink.02.png`
 - Create: `src/CastoPet/Assets/CandidateSet/core-preview.png`
 
-- [ ] **Step 1: Remove chroma key and resize core files**
+- [x] **Step 1: Remove chroma key and resize core files**
 
 Run this PowerShell command to process every core source PNG except expression files:
 
@@ -460,7 +460,7 @@ Get-ChildItem -LiteralPath $sourceRoot -Recurse -Filter *.png |
     }
 ```
 
-- [ ] **Step 2: Validate core transparent files**
+- [x] **Step 2: Validate core transparent files**
 
 Run:
 
@@ -474,7 +474,7 @@ Expected:
 PASS validated 16 candidate PNG files
 ```
 
-- [ ] **Step 3: Generate core contact sheet**
+- [x] **Step 3: Generate core contact sheet**
 
 Run:
 
@@ -484,7 +484,7 @@ Run:
 
 Expected: `PASS wrote src\CastoPet\Assets\CandidateSet\core-preview.png`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add src/CastoPet/Assets/CandidateSet/Source src/CastoPet/Assets/CandidateSet/Transparent src/CastoPet/Assets/CandidateSet/core-preview.png
@@ -507,7 +507,7 @@ git commit -m "art: add candidate core Castorice sprites"
 - Create: `src/CastoPet/Assets/CandidateSet/Source/Expressions/Castorice.Expression.Bored.png`
 - Create: `src/CastoPet/Assets/CandidateSet/Source/Expressions/Castorice.Expression.Affection.png`
 
-- [ ] **Step 1: Generate these built-in image prompts one asset at a time**
+- [x] **Step 1: Generate these built-in image prompts one asset at a time**
 
 Use the shared prompt constraints from this plan and append one expression-specific line:
 
@@ -526,11 +526,11 @@ Expression: Bored, unimpressed flat expression, low-energy idle posture.
 Expression: Affection, soft affectionate smile, clingy or caring mood, no extra character.
 ```
 
-- [ ] **Step 2: Save generated files into the Source expression tree**
+- [x] **Step 2: Save generated files into the Source expression tree**
 
 Copy each accepted generated image from Codex's generated image directory into the exact matching expression path listed in this task's **Files** section.
 
-- [ ] **Step 3: Inspect expression source files**
+- [x] **Step 3: Inspect expression source files**
 
 Run:
 
@@ -547,7 +547,7 @@ Expected: 12 expression PNG files exist.
 - Create: `src/CastoPet/Assets/CandidateSet/expressions-preview.png`
 - Create: `src/CastoPet/Assets/CandidateSet/full-preview.png`
 
-- [ ] **Step 1: Remove chroma key and resize expression files**
+- [x] **Step 1: Remove chroma key and resize expression files**
 
 Run this PowerShell command to process every expression source PNG:
 
@@ -567,7 +567,7 @@ Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'Expressions') -Recurse -Filte
     }
 ```
 
-- [ ] **Step 2: Validate all candidate files**
+- [x] **Step 2: Validate all candidate files**
 
 Run:
 
@@ -581,7 +581,7 @@ Expected:
 PASS validated 28 candidate PNG files
 ```
 
-- [ ] **Step 3: Generate expression contact sheet**
+- [x] **Step 3: Generate expression contact sheet**
 
 Run:
 
@@ -591,7 +591,7 @@ Run:
 
 Expected: `PASS wrote src\CastoPet\Assets\CandidateSet\expressions-preview.png`.
 
-- [ ] **Step 4: Generate full contact sheet**
+- [x] **Step 4: Generate full contact sheet**
 
 Run:
 
@@ -601,7 +601,7 @@ Run:
 
 Expected: `PASS wrote src\CastoPet\Assets\CandidateSet\full-preview.png`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/CastoPet/Assets/CandidateSet tools/candidate-assets
@@ -613,7 +613,7 @@ git commit -m "art: add candidate Castorice expression sprites"
 **Files:**
 - Modify only files required to fix failed checks.
 
-- [ ] **Step 1: Run candidate validator**
+- [x] **Step 1: Run candidate validator**
 
 Run:
 
@@ -627,7 +627,7 @@ Expected:
 PASS validated 28 candidate PNG files
 ```
 
-- [ ] **Step 2: Run app tests**
+- [x] **Step 2: Run app tests**
 
 Run:
 
@@ -637,7 +637,7 @@ dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
 
 Expected: every test prints `PASS`.
 
-- [ ] **Step 3: Build release**
+- [x] **Step 3: Build release**
 
 Run:
 
@@ -647,7 +647,7 @@ dotnet build CastoPet.sln -c Release
 
 Expected: `0 个警告`, `0 个错误`.
 
-- [ ] **Step 4: Confirm production resources were not changed**
+- [x] **Step 4: Confirm production resources were not changed**
 
 Run:
 
@@ -666,7 +666,7 @@ src/CastoPet/PetWindow.xaml
 src/CastoPet/PetWindow.xaml.cs
 ```
 
-- [ ] **Step 5: Show preview paths to the user**
+- [x] **Step 5: Show preview paths to the user**
 
 Report these files:
 
