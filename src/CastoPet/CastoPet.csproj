@@ -23,5 +23,8 @@
     <Resource Include="Assets\States\Idle\Castorice.Idle.05.png" />
     <Resource Include="Assets\States\Idle\Castorice.Idle.06.png" />
     <Resource Include="Assets\States\Idle\Castorice.Idle.07.png" />
+    <Resource Include="Assets\States\Blink\Castorice.Blink.00.png" />
+    <Resource Include="Assets\States\Blink\Castorice.Blink.01.png" />
+    <Resource Include="Assets\States\Blink\Castorice.Blink.02.png" />
   </ItemGroup>
 </Project>

@@ -7,6 +7,7 @@ public sealed class AssetService
 {
     public const string DefaultCharacterPath = "Assets/Castorice.png";
     public const string DraggingCharacterPath = "Assets/States/Castorice.Dragging.png";
+    public const int CharacterDecodePixelWidth = 320;
 
     private readonly LoggingService _logger;
 
@@ -30,6 +31,11 @@ public sealed class AssetService
         return IdleFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
     }
 
+    public IReadOnlyList<ImageSource> LoadBlinkFrames()
+    {
+        return BlinkFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
+    }
+
     private BitmapImage LoadCharacter(string resourcePath)
     {
         try
@@ -37,6 +43,7 @@ public sealed class AssetService
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = CharacterDecodePixelWidth;
             image.UriSource = new Uri($"pack://application:,,,/{resourcePath}", UriKind.Absolute);
             image.EndInit();
             image.Freeze();

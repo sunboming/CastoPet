@@ -14,6 +14,9 @@ var tests = new (string Name, Action Test)[]
     ("Runtime position tracks drag for current run only", RuntimePositionTracksDragForCurrentRunOnly),
     ("Show restore keeps hidden position but resets visible position", ShowRestoreKeepsHiddenPositionButResetsVisiblePosition),
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
+    ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
+    ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
+    ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
 
 var failures = 0;
@@ -184,6 +187,73 @@ static void IdleFrameSequenceDefinesEightSlowFramePaths()
     Assert.Equal(TimeSpan.FromMilliseconds(200), IdleFrameSequence.FrameInterval, "Idle frames should advance slowly.");
     Assert.Equal("Assets/States/Idle/Castorice.Idle.00.png", IdleFrameSequence.FramePaths[0], "First idle frame path should be zero padded.");
     Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", IdleFrameSequence.FramePaths[^1], "Last idle frame path should be zero padded.");
+}
+
+static void BlinkFrameSequenceDefinesRandomBlinkFrames()
+{
+    Assert.Equal(3, BlinkFrameSequence.FrameCount, "Blink should use three frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(90), BlinkFrameSequence.FrameInterval, "Blink frames should advance quickly.");
+    Assert.Equal(TimeSpan.FromSeconds(3), BlinkFrameSequence.MinScheduleDelay, "Blink should not repeat too frequently.");
+    Assert.Equal(TimeSpan.FromSeconds(7), BlinkFrameSequence.MaxScheduleDelay, "Blink should remain occasional.");
+    Assert.Equal("Assets/States/Blink/Castorice.Blink.00.png", BlinkFrameSequence.FramePaths[0], "First blink frame path should be zero padded.");
+    Assert.Equal("Assets/States/Blink/Castorice.Blink.02.png", BlinkFrameSequence.FramePaths[^1], "Last blink frame path should be zero padded.");
+}
+
+static void CharacterAssetsDecodeAtPetDisplayWidth()
+{
+    Assert.Equal(320, AssetService.CharacterDecodePixelWidth, "Character assets should decode near their display width to avoid full-size frame memory.");
+}
+
+static void PackagedCharacterAssetsAreDisplaySized()
+{
+    var workspace = FindWorkspaceRoot();
+    var assets = Directory
+        .EnumerateFiles(System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets"), "*.png", SearchOption.AllDirectories)
+        .Where(path => !System.IO.Path.GetFileName(path).Equals("blink-preview.png", StringComparison.OrdinalIgnoreCase));
+
+    foreach (var asset in assets)
+    {
+        var (width, height) = ReadPngSize(asset);
+
+        Assert.True(
+            width <= AssetService.CharacterDecodePixelWidth && height <= AssetService.CharacterDecodePixelWidth,
+            $"{asset} should be no larger than {AssetService.CharacterDecodePixelWidth}px, got {width}x{height}.");
+    }
+}
+
+static string FindWorkspaceRoot()
+{
+    var current = new DirectoryInfo(Environment.CurrentDirectory);
+    while (current is not null)
+    {
+        if (File.Exists(System.IO.Path.Combine(current.FullName, "CastoPet.sln")))
+        {
+            return current.FullName;
+        }
+
+        current = current.Parent;
+    }
+
+    throw new InvalidOperationException("Could not find workspace root.");
+}
+
+static (int Width, int Height) ReadPngSize(string path)
+{
+    Span<byte> header = stackalloc byte[24];
+    using var stream = File.OpenRead(path);
+    if (stream.Read(header) != header.Length)
+    {
+        throw new InvalidOperationException($"{path} is not a valid PNG.");
+    }
+
+    var width = ReadBigEndianInt32(header[16..20]);
+    var height = ReadBigEndianInt32(header[20..24]);
+    return (width, height);
+}
+
+static int ReadBigEndianInt32(ReadOnlySpan<byte> bytes)
+{
+    return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
 }
 
 static class Assert

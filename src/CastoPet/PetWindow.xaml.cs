@@ -14,13 +14,19 @@ public partial class PetWindow : Window
     private readonly ImageSource _defaultCharacter;
     private readonly ImageSource _draggingCharacter;
     private readonly IReadOnlyList<ImageSource> _idleFrames;
+    private readonly IReadOnlyList<ImageSource> _blinkFrames;
     private readonly DispatcherTimer _idleFrameTimer;
+    private readonly DispatcherTimer _blinkScheduleTimer;
+    private readonly DispatcherTimer _blinkFrameTimer;
     private readonly DispatcherTimer _dragRestoreTimer;
+    private readonly Random _blinkRandom = new();
     private AppSettings? _pendingSettings;
     private bool _applySettingsOnSourceInitialized;
     private bool _isClickThrough;
     private bool _isDragging;
+    private bool _isBlinking;
     private int _idleFrameIndex;
+    private int _blinkFrameIndex;
 
     public PetWindow(AssetService assets, LoggingService logger)
     {
@@ -28,6 +34,10 @@ public partial class PetWindow : Window
         _logger = logger;
         _idleFrameTimer = new DispatcherTimer { Interval = IdleFrameSequence.FrameInterval };
         _idleFrameTimer.Tick += (_, _) => AdvanceIdleFrame();
+        _blinkScheduleTimer = new DispatcherTimer();
+        _blinkScheduleTimer.Tick += (_, _) => BeginBlink();
+        _blinkFrameTimer = new DispatcherTimer { Interval = BlinkFrameSequence.FrameInterval };
+        _blinkFrameTimer.Tick += (_, _) => AdvanceBlinkFrame();
         _dragRestoreTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _dragRestoreTimer.Tick += (_, _) => RestoreAfterDrag();
 
@@ -36,6 +46,7 @@ public partial class PetWindow : Window
             _defaultCharacter = assets.LoadDefaultCharacter();
             _draggingCharacter = assets.LoadDraggingCharacter();
             _idleFrames = assets.LoadIdleFrames();
+            _blinkFrames = assets.LoadBlinkFrames();
             CharacterImage.Source = GetCurrentIdleFrame();
         }
         catch
@@ -43,6 +54,7 @@ public partial class PetWindow : Window
             _defaultCharacter = CharacterImage.Source;
             _draggingCharacter = CharacterImage.Source;
             _idleFrames = Array.Empty<ImageSource>();
+            _blinkFrames = Array.Empty<ImageSource>();
             System.Windows.MessageBox.Show(
                 "CastoPet 无法加载内置角色图片 Castorice.png。",
                 "CastoPet",
@@ -54,6 +66,7 @@ public partial class PetWindow : Window
         {
             WindowPlacementService.MoveToBottomRight(this);
             StartIdleAnimation();
+            ScheduleNextBlink();
         };
         MouseLeftButtonDown += OnMouseLeftButtonDown;
     }
@@ -163,6 +176,7 @@ public partial class PetWindow : Window
         _isDragging = true;
         _dragRestoreTimer.Stop();
         StopIdleAnimation();
+        StopBlinkAnimation();
         CharacterImage.Source = _draggingCharacter;
     }
 
@@ -184,6 +198,7 @@ public partial class PetWindow : Window
         _idleFrameIndex = 0;
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
+        ScheduleNextBlink();
     }
 
     private void StartIdleAnimation()
@@ -209,12 +224,71 @@ public partial class PetWindow : Window
         }
 
         _idleFrameIndex = (_idleFrameIndex + 1) % _idleFrames.Count;
-        CharacterImage.Source = GetCurrentIdleFrame();
+        if (!_isBlinking)
+        {
+            CharacterImage.Source = GetCurrentIdleFrame();
+        }
     }
 
     private ImageSource GetCurrentIdleFrame()
     {
         return _idleFrames.Count == 0 ? _defaultCharacter : _idleFrames[_idleFrameIndex];
+    }
+
+    private void ScheduleNextBlink()
+    {
+        _blinkScheduleTimer.Stop();
+        if (_isDragging || _isBlinking || _blinkFrames.Count == 0)
+        {
+            return;
+        }
+
+        var minMs = (int)BlinkFrameSequence.MinScheduleDelay.TotalMilliseconds;
+        var maxMs = (int)BlinkFrameSequence.MaxScheduleDelay.TotalMilliseconds;
+        _blinkScheduleTimer.Interval = TimeSpan.FromMilliseconds(_blinkRandom.Next(minMs, maxMs + 1));
+        _blinkScheduleTimer.Start();
+    }
+
+    private void BeginBlink()
+    {
+        _blinkScheduleTimer.Stop();
+        if (_isDragging || _isBlinking || _blinkFrames.Count == 0)
+        {
+            return;
+        }
+
+        _isBlinking = true;
+        _blinkFrameIndex = 0;
+        CharacterImage.Source = _blinkFrames[_blinkFrameIndex];
+        _blinkFrameTimer.Start();
+    }
+
+    private void AdvanceBlinkFrame()
+    {
+        if (_isDragging || !_isBlinking)
+        {
+            StopBlinkAnimation();
+            return;
+        }
+
+        _blinkFrameIndex++;
+        if (_blinkFrameIndex >= _blinkFrames.Count)
+        {
+            StopBlinkAnimation();
+            CharacterImage.Source = GetCurrentIdleFrame();
+            ScheduleNextBlink();
+            return;
+        }
+
+        CharacterImage.Source = _blinkFrames[_blinkFrameIndex];
+    }
+
+    private void StopBlinkAnimation()
+    {
+        _blinkScheduleTimer.Stop();
+        _blinkFrameTimer.Stop();
+        _isBlinking = false;
+        _blinkFrameIndex = 0;
     }
 
     private static WpfControls.MenuItem CreateMenuItem(string header, Action action)
