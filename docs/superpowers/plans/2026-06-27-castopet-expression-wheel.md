@@ -50,7 +50,7 @@ Responsibilities:
 - Modify: `src/CastoPet/CastoPet.csproj`
 - Test: `tests/CastoPet.Tests/Program.cs`
 
-- [ ] **Step 1: Copy the selected expression PNGs**
+- [x] **Step 1: Copy the selected expression PNGs**
 
 Run:
 
@@ -69,7 +69,7 @@ Copy-Item -LiteralPath 'src\CastoPet\Assets\CandidateSet\Transparent\Expressions
 
 Expected: `src\CastoPet\Assets\Expressions` contains exactly the eight copied PNGs.
 
-- [ ] **Step 2: Add expression resources to the project file**
+- [x] **Step 2: Add expression resources to the project file**
 
 Add these entries to the existing `ItemGroup` in `src/CastoPet/CastoPet.csproj`, after the state resources:
 
@@ -84,7 +84,7 @@ Add these entries to the existing `ItemGroup` in `src/CastoPet/CastoPet.csproj`,
     <Resource Include="Assets\Expressions\Castorice.Expression.Crying.png" />
 ```
 
-- [ ] **Step 3: Run the existing test harness**
+- [x] **Step 3: Run the existing test harness**
 
 Run:
 
@@ -94,7 +94,7 @@ dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
 
 Expected: every existing test prints `PASS`. The packaged asset size test should include the new `Assets/Expressions` files and pass because each file is 320x320.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add src/CastoPet/CastoPet.csproj src/CastoPet/Assets/Expressions
@@ -108,7 +108,7 @@ git commit -m "art: promote expression wheel assets"
 - Create: `src/CastoPet/Core/ExpressionWheelCatalog.cs`
 - Modify: `tests/CastoPet.Tests/Program.cs`
 
-- [ ] **Step 1: Add failing tests for expression metadata**
+- [x] **Step 1: Add failing tests for expression metadata**
 
 In `tests/CastoPet.Tests/Program.cs`, add these tests to the `tests` array after `Blink frame sequence defines random blink frames`:
 
@@ -145,7 +145,7 @@ static void ExpressionWheelPathsUseAppResources()
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -155,7 +155,7 @@ dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
 
 Expected: build fails because `ExpressionWheelCatalog` does not exist yet.
 
-- [ ] **Step 3: Create `ExpressionWheelItem`**
+- [x] **Step 3: Create `ExpressionWheelItem`**
 
 Create `src/CastoPet/Core/ExpressionWheelItem.cs`:
 
@@ -165,7 +165,7 @@ namespace CastoPet.Core;
 public sealed record ExpressionWheelItem(string Label, string ResourcePath);
 ```
 
-- [ ] **Step 4: Create `ExpressionWheelCatalog`**
+- [x] **Step 4: Create `ExpressionWheelCatalog`**
 
 Create `src/CastoPet/Core/ExpressionWheelCatalog.cs`:
 
@@ -199,7 +199,7 @@ public static class ExpressionWheelCatalog
 }
 ```
 
-- [ ] **Step 5: Run tests to verify metadata passes**
+- [x] **Step 5: Run tests to verify metadata passes**
 
 Run:
 
@@ -209,7 +209,7 @@ dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
 
 Expected: every test prints `PASS`, including the two expression wheel tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/CastoPet/Core/ExpressionWheelItem.cs src/CastoPet/Core/ExpressionWheelCatalog.cs tests/CastoPet.Tests/Program.cs
@@ -221,7 +221,7 @@ git commit -m "feat: add expression wheel metadata"
 **Files:**
 - Modify: `src/CastoPet/Core/AssetService.cs`
 
-- [ ] **Step 1: Add expression loading API**
+- [x] **Step 1: Add expression loading API**
 
 In `src/CastoPet/Core/AssetService.cs`, add this method after `LoadBlinkFrames`:
 
@@ -246,7 +246,7 @@ In `src/CastoPet/Core/AssetService.cs`, add this method after `LoadBlinkFrames`:
     }
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run:
 
@@ -256,7 +256,7 @@ dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
 
 Expected: every test prints `PASS`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add src/CastoPet/Core/AssetService.cs
@@ -268,7 +268,7 @@ git commit -m "feat: load expression wheel assets"
 **Files:**
 - Modify: `src/CastoPet/PetWindow.xaml`
 
-- [ ] **Step 1: Replace the root grid content**
+- [x] **Step 1: Replace the root grid content**
 
 In `src/CastoPet/PetWindow.xaml`, keep the existing `Window` attributes and replace the inner `<Grid Background="Transparent">...</Grid>` with:
 
@@ -306,7 +306,7 @@ In `src/CastoPet/PetWindow.xaml`, keep the existing `Window` attributes and repl
 
 The code-behind will populate eight item visuals into `ExpressionWheelOverlay` after assets load.
 
-- [ ] **Step 2: Build to verify XAML compiles**
+- [x] **Step 2: Build to verify XAML compiles**
 
 Run:
 
@@ -316,7 +316,7 @@ dotnet build CastoPet.sln -c Release
 
 Expected: build succeeds with `0 个错误`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add src/CastoPet/PetWindow.xaml
@@ -328,7 +328,7 @@ git commit -m "feat: add expression wheel overlay"
 **Files:**
 - Modify: `src/CastoPet/PetWindow.xaml.cs`
 
-- [ ] **Step 1: Add required usings**
+- [x] **Step 1: Add required usings**
 
 At the top of `src/CastoPet/PetWindow.xaml.cs`, add:
 
@@ -339,7 +339,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 ```
 
-- [ ] **Step 2: Add fields**
+- [x] **Step 2: Add fields**
 
 Inside `PetWindow`, add these fields after `_dragRestoreTimer`:
 
@@ -354,7 +354,7 @@ Inside `PetWindow`, add these fields after `_dragRestoreTimer`:
     private int? _selectedExpressionWheelIndex;
 ```
 
-- [ ] **Step 3: Initialize timers, load images, and wire mouse events**
+- [x] **Step 3: Initialize timers, load images, and wire mouse events**
 
 In the constructor, after `_dragRestoreTimer` initialization, add:
 
@@ -386,7 +386,7 @@ After `MouseLeftButtonDown += OnMouseLeftButtonDown;`, add:
         MouseMove += OnMouseMove;
 ```
 
-- [ ] **Step 4: Add right-button handlers**
+- [x] **Step 4: Add right-button handlers**
 
 Add these methods before `BeginDrag`:
 
@@ -435,7 +435,7 @@ Add these methods before `BeginDrag`:
     }
 ```
 
-- [ ] **Step 5: Add wheel visual construction**
+- [x] **Step 5: Add wheel visual construction**
 
 Add these methods after `ApplyPendingSettings`:
 
@@ -522,7 +522,7 @@ Add these methods after `ApplyPendingSettings`:
     }
 ```
 
-- [ ] **Step 6: Add wheel open, close, and selection logic**
+- [x] **Step 6: Add wheel open, close, and selection logic**
 
 Add these methods after `PositionExpressionWheelItems`:
 
@@ -596,7 +596,7 @@ Add these methods after `PositionExpressionWheelItems`:
     }
 ```
 
-- [ ] **Step 7: Add temporary expression logic**
+- [x] **Step 7: Add temporary expression logic**
 
 Add these methods before `StartIdleAnimation`:
 
@@ -642,7 +642,7 @@ Update `BeginDrag` so the first line of the method body is:
         CancelTemporaryExpression();
 ```
 
-- [ ] **Step 8: Run tests and build**
+- [x] **Step 8: Run tests and build**
 
 Run:
 
@@ -653,7 +653,7 @@ dotnet build CastoPet.sln -c Release
 
 Expected: all tests print `PASS`; release build reports `0 个错误`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add src/CastoPet/PetWindow.xaml.cs
@@ -665,7 +665,7 @@ git commit -m "feat: add expression wheel interaction"
 **Files:**
 - Modify only files required to fix failed checks.
 
-- [ ] **Step 1: Run the app test harness**
+- [x] **Step 1: Run the app test harness**
 
 Run:
 
@@ -675,7 +675,7 @@ dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
 
 Expected: every test prints `PASS`.
 
-- [ ] **Step 2: Build release**
+- [x] **Step 2: Build release**
 
 Run:
 
@@ -685,7 +685,7 @@ dotnet build CastoPet.sln -c Release
 
 Expected: `0 个警告`, `0 个错误`.
 
-- [ ] **Step 3: Inspect git status**
+- [x] **Step 3: Inspect git status**
 
 Run:
 
@@ -718,7 +718,7 @@ Expected manual behavior:
 - Releasing near the center or outside the wheel closes the wheel without changing expression.
 - Left-click dragging still moves the pet.
 
-- [ ] **Step 5: Commit any final fixes**
+- [x] **Step 5: Commit any final fixes**
 
 If Step 1, Step 2, or Step 4 required changes, commit them:
 
