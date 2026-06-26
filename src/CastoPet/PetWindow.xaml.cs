@@ -4,6 +4,8 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CastoPet.Core;
 using WpfControls = System.Windows.Controls;
+using WpfInput = System.Windows.Input;
+using WpfPoint = System.Windows.Point;
 
 namespace CastoPet;
 
@@ -19,12 +21,20 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _blinkScheduleTimer;
     private readonly DispatcherTimer _blinkFrameTimer;
     private readonly DispatcherTimer _dragRestoreTimer;
+    private readonly DispatcherTimer _expressionWheelHoldTimer;
+    private readonly DispatcherTimer _temporaryExpressionTimer;
+    private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
+    private readonly List<ExpressionWheelItem> _expressionWheelItems = new();
+    private readonly List<FrameworkElement> _expressionWheelItemVisuals = new();
     private readonly Random _blinkRandom = new();
     private AppSettings? _pendingSettings;
+    private WpfPoint _expressionWheelOrigin;
     private bool _applySettingsOnSourceInitialized;
     private bool _isClickThrough;
     private bool _isDragging;
     private bool _isBlinking;
+    private bool _isExpressionWheelOpen;
+    private int? _selectedExpressionWheelIndex;
     private int _idleFrameIndex;
     private int _blinkFrameIndex;
 
@@ -40,6 +50,10 @@ public partial class PetWindow : Window
         _blinkFrameTimer.Tick += (_, _) => AdvanceBlinkFrame();
         _dragRestoreTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _dragRestoreTimer.Tick += (_, _) => RestoreAfterDrag();
+        _expressionWheelHoldTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.HoldDelay };
+        _expressionWheelHoldTimer.Tick += (_, _) => OpenExpressionWheel();
+        _temporaryExpressionTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.ExpressionDuration };
+        _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
 
         try
         {
@@ -47,6 +61,8 @@ public partial class PetWindow : Window
             _draggingCharacter = assets.LoadDraggingCharacter();
             _idleFrames = assets.LoadIdleFrames();
             _blinkFrames = assets.LoadBlinkFrames();
+            _expressionImages = assets.LoadExpressionWheelImages();
+            BuildExpressionWheel();
             CharacterImage.Source = GetCurrentIdleFrame();
         }
         catch
@@ -55,6 +71,7 @@ public partial class PetWindow : Window
             _draggingCharacter = CharacterImage.Source;
             _idleFrames = Array.Empty<ImageSource>();
             _blinkFrames = Array.Empty<ImageSource>();
+            _expressionImages = new Dictionary<ExpressionWheelItem, ImageSource>();
             System.Windows.MessageBox.Show(
                 "CastoPet 无法加载内置角色图片 Castorice.png。",
                 "CastoPet",
@@ -69,6 +86,9 @@ public partial class PetWindow : Window
             ScheduleNextBlink();
         };
         MouseLeftButtonDown += OnMouseLeftButtonDown;
+        MouseRightButtonDown += OnMouseRightButtonDown;
+        MouseRightButtonUp += OnMouseRightButtonUp;
+        MouseMove += OnMouseMove;
     }
 
     public void ApplySettings(AppSettings settings)
@@ -148,9 +168,9 @@ public partial class PetWindow : Window
         }
     }
 
-    private void OnMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void OnMouseLeftButtonDown(object sender, WpfInput.MouseButtonEventArgs e)
     {
-        if (_isClickThrough || e.ButtonState != System.Windows.Input.MouseButtonState.Pressed)
+        if (_isClickThrough || e.ButtonState != WpfInput.MouseButtonState.Pressed)
         {
             return;
         }
@@ -171,8 +191,53 @@ public partial class PetWindow : Window
         }
     }
 
+    private void OnMouseRightButtonDown(object sender, WpfInput.MouseButtonEventArgs e)
+    {
+        if (_isClickThrough || e.ButtonState != WpfInput.MouseButtonState.Pressed || _expressionWheelItems.Count == 0)
+        {
+            return;
+        }
+
+        _expressionWheelOrigin = e.GetPosition(RootGrid);
+        _selectedExpressionWheelIndex = null;
+        _expressionWheelHoldTimer.Stop();
+        _expressionWheelHoldTimer.Start();
+    }
+
+    private void OnMouseMove(object sender, WpfInput.MouseEventArgs e)
+    {
+        if (!_isExpressionWheelOpen)
+        {
+            return;
+        }
+
+        UpdateExpressionWheelSelection(e.GetPosition(RootGrid));
+    }
+
+    private void OnMouseRightButtonUp(object sender, WpfInput.MouseButtonEventArgs e)
+    {
+        _expressionWheelHoldTimer.Stop();
+
+        if (!_isExpressionWheelOpen)
+        {
+            return;
+        }
+
+        UpdateExpressionWheelSelection(e.GetPosition(RootGrid));
+        var selectedIndex = _selectedExpressionWheelIndex;
+        CloseExpressionWheel();
+        ReleaseMouseCapture();
+        e.Handled = true;
+
+        if (selectedIndex is int index)
+        {
+            ApplyTemporaryExpression(index);
+        }
+    }
+
     private void BeginDrag()
     {
+        CancelTemporaryExpression();
         _isDragging = true;
         _dragRestoreTimer.Stop();
         StopIdleAnimation();
@@ -195,6 +260,194 @@ public partial class PetWindow : Window
     private void RestoreAfterDrag()
     {
         _dragRestoreTimer.Stop();
+        _idleFrameIndex = 0;
+        CharacterImage.Source = GetCurrentIdleFrame();
+        StartIdleAnimation();
+        ScheduleNextBlink();
+    }
+
+    private void BuildExpressionWheel()
+    {
+        foreach (var item in ExpressionWheelCatalog.Items)
+        {
+            if (!_expressionImages.ContainsKey(item))
+            {
+                continue;
+            }
+
+            var visual = CreateExpressionWheelItemVisual(item);
+            _expressionWheelItems.Add(item);
+            _expressionWheelItemVisuals.Add(visual);
+            ExpressionWheelSurface.Children.Add(visual);
+        }
+
+        PositionExpressionWheelItems();
+    }
+
+    private FrameworkElement CreateExpressionWheelItemVisual(ExpressionWheelItem item)
+    {
+        var panel = new WpfControls.StackPanel
+        {
+            Width = 58,
+            Height = 68,
+            RenderTransformOrigin = new WpfPoint(0.5, 0.5),
+            RenderTransform = new ScaleTransform(1, 1),
+            Opacity = 0.78,
+        };
+
+        panel.Children.Add(new WpfControls.Border
+        {
+            Width = 46,
+            Height = 46,
+            CornerRadius = new CornerRadius(23),
+            Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(118, 53, 42, 72)),
+            BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(150, 217, 200, 255)),
+            BorderThickness = new Thickness(1),
+            Child = new WpfControls.Image
+            {
+                Source = _expressionImages[item],
+                Stretch = Stretch.Uniform,
+                Margin = new Thickness(3),
+            },
+        });
+
+        panel.Children.Add(new WpfControls.TextBlock
+        {
+            Text = item.Label,
+            Foreground = System.Windows.Media.Brushes.White,
+            FontSize = 10,
+            TextAlignment = TextAlignment.Center,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+        });
+
+        return panel;
+    }
+
+    private void PositionExpressionWheelItems()
+    {
+        var center = ExpressionWheelSurface.Width / 2;
+        var radius = 96d;
+
+        for (var index = 0; index < _expressionWheelItemVisuals.Count; index++)
+        {
+            var angle = -Math.PI / 2 + index * 2 * Math.PI / _expressionWheelItemVisuals.Count;
+            var visual = _expressionWheelItemVisuals[index];
+            var x = center + Math.Cos(angle) * radius - visual.Width / 2;
+            var y = center + Math.Sin(angle) * radius - visual.Height / 2;
+            WpfControls.Canvas.SetLeft(visual, x);
+            WpfControls.Canvas.SetTop(visual, y);
+        }
+    }
+
+    private void PositionExpressionWheelOverlay(WpfPoint origin)
+    {
+        var maxLeft = Math.Max(0, RootGrid.ActualWidth - ExpressionWheelSurface.Width);
+        var maxTop = Math.Max(0, RootGrid.ActualHeight - ExpressionWheelSurface.Height);
+        var left = Math.Clamp(origin.X - ExpressionWheelSurface.Width / 2, 0, maxLeft);
+        var top = Math.Clamp(origin.Y - ExpressionWheelSurface.Height / 2, 0, maxTop);
+        WpfControls.Canvas.SetLeft(ExpressionWheelSurface, left);
+        WpfControls.Canvas.SetTop(ExpressionWheelSurface, top);
+        _expressionWheelOrigin = new WpfPoint(left + ExpressionWheelSurface.Width / 2, top + ExpressionWheelSurface.Height / 2);
+    }
+
+    private void OpenExpressionWheel()
+    {
+        _expressionWheelHoldTimer.Stop();
+        if (_expressionWheelItems.Count == 0 || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        CancelTemporaryExpression();
+        StopIdleAnimation();
+        StopBlinkAnimation();
+        _isExpressionWheelOpen = true;
+        _selectedExpressionWheelIndex = null;
+        PositionExpressionWheelOverlay(_expressionWheelOrigin);
+        ExpressionWheelOverlay.Visibility = Visibility.Visible;
+        CaptureMouse();
+        UpdateExpressionWheelVisualSelection();
+    }
+
+    private void CloseExpressionWheel()
+    {
+        _isExpressionWheelOpen = false;
+        _selectedExpressionWheelIndex = null;
+        ExpressionWheelOverlay.Visibility = Visibility.Collapsed;
+        UpdateExpressionWheelVisualSelection();
+        StartIdleAnimation();
+        ScheduleNextBlink();
+    }
+
+    private void UpdateExpressionWheelSelection(WpfPoint position)
+    {
+        var vector = position - _expressionWheelOrigin;
+        var distance = vector.Length;
+
+        if (distance < ExpressionWheelCatalog.InnerRadius || distance > ExpressionWheelCatalog.OuterRadius)
+        {
+            _selectedExpressionWheelIndex = null;
+            UpdateExpressionWheelVisualSelection();
+            return;
+        }
+
+        var count = _expressionWheelItems.Count;
+        if (count == 0)
+        {
+            _selectedExpressionWheelIndex = null;
+            UpdateExpressionWheelVisualSelection();
+            return;
+        }
+
+        var angle = Math.Atan2(vector.Y, vector.X) + Math.PI / 2;
+        if (angle < 0)
+        {
+            angle += 2 * Math.PI;
+        }
+
+        _selectedExpressionWheelIndex = (int)Math.Round(angle / (2 * Math.PI / count)) % count;
+        UpdateExpressionWheelVisualSelection();
+    }
+
+    private void UpdateExpressionWheelVisualSelection()
+    {
+        for (var index = 0; index < _expressionWheelItemVisuals.Count; index++)
+        {
+            var isSelected = _selectedExpressionWheelIndex == index;
+            var scale = isSelected ? 1.18 : 1;
+            _expressionWheelItemVisuals[index].Opacity = isSelected ? 1 : 0.78;
+            _expressionWheelItemVisuals[index].RenderTransform = new ScaleTransform(scale, scale);
+        }
+    }
+
+    private void ApplyTemporaryExpression(int index)
+    {
+        if (index < 0 || index >= _expressionWheelItems.Count)
+        {
+            return;
+        }
+
+        var item = _expressionWheelItems[index];
+        if (!_expressionImages.TryGetValue(item, out var image))
+        {
+            return;
+        }
+
+        _temporaryExpressionTimer.Stop();
+        StopIdleAnimation();
+        StopBlinkAnimation();
+        CharacterImage.Source = image;
+        _temporaryExpressionTimer.Start();
+    }
+
+    private void CancelTemporaryExpression()
+    {
+        _temporaryExpressionTimer.Stop();
+    }
+
+    private void RestoreAfterTemporaryExpression()
+    {
+        _temporaryExpressionTimer.Stop();
         _idleFrameIndex = 0;
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
