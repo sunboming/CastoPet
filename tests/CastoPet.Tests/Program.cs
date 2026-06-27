@@ -19,7 +19,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
-    ("Idle breathing values are subtle", IdleBreathingValuesAreSubtle),
+    ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
@@ -246,11 +246,11 @@ static void PetAnimationTimingsAreResponsive()
     Assert.Equal(TimeSpan.FromMilliseconds(90), PetAnimationTimings.WheelSelectionDuration, "Selection emphasis should respond quickly.");
 }
 
-static void IdleBreathingValuesAreSubtle()
+static void IdleBreathingValuesAreNeutralDuringStabilization()
 {
-    Assert.Equal(TimeSpan.FromMilliseconds(1900), PetAnimationTimings.IdleBreathingCycleDuration, "Idle breathing should be slow.");
-    Assert.True(PetAnimationTimings.IdleBreathingTranslateY <= 4, "Idle breathing vertical movement should remain subtle.");
-    Assert.True(PetAnimationTimings.IdleBreathingScaleDelta <= 0.02, "Idle breathing scale should remain subtle.");
+    Assert.Equal(TimeSpan.FromMilliseconds(1900), PetAnimationTimings.IdleBreathingCycleDuration, "Idle breathing cycle duration should stay available for later tuning.");
+    Assert.Equal(0d, PetAnimationTimings.IdleBreathingTranslateY, "Idle breathing vertical movement should be disabled while stabilizing frame anchors.");
+    Assert.Equal(0d, PetAnimationTimings.IdleBreathingScaleDelta, "Idle breathing scale should be disabled while stabilizing frame anchors.");
     Assert.Equal(0.96, PetAnimationTimings.ExpressionDimmedOpacity, "Expression transition should only slightly dim during swaps.");
     Assert.Equal(0.92, PetAnimationTimings.WheelOpenStartScale, "Wheel should open from a small scale change.");
 }
