@@ -3,6 +3,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using CastoPet.Core;
+using Forms = System.Windows.Forms;
 using WpfControls = System.Windows.Controls;
 using WpfInput = System.Windows.Input;
 using WpfAnimation = System.Windows.Media.Animation;
@@ -28,6 +29,7 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _expressionWheelHoldTimer;
     private readonly DispatcherTimer _temporaryExpressionTimer;
     private readonly DispatcherTimer _expressionTransitionFrameTimer;
+    private readonly DispatcherTimer _activeMovementTimer;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
@@ -37,19 +39,25 @@ public partial class PetWindow : Window
     private readonly List<WpfControls.TextBlock> _expressionWheelLabelVisuals = new();
     private readonly List<WpfShapes.Line> _expressionWheelDividerVisuals = new();
     private readonly Random _blinkRandom = new();
+    private readonly Random _movementRandom = new();
     private AppSettings? _pendingSettings;
+    private PetMovementTarget _activeMovementTarget;
+    private DateTime _nextWanderDecisionUtc = DateTime.MinValue;
     private WpfPoint _expressionWheelOrigin;
     private bool _applySettingsOnSourceInitialized;
     private bool _isClickThrough;
     private bool _isDragging;
     private bool _isBlinking;
     private bool _isExpressionWheelOpen;
+    private bool _activeMovementEnabled;
+    private bool _hasActiveMovementTarget;
     private int? _selectedExpressionWheelIndex;
     private ImageSource? _pendingExpressionImage;
     private ExpressionTransitionMode _expressionTransitionMode;
     private int _expressionTransitionFrameIndex;
     private int _idleFrameIndex;
     private int _blinkFrameIndex;
+    private double _lastMovementDeltaX;
 
     private enum ExpressionTransitionMode
     {
@@ -76,6 +84,8 @@ public partial class PetWindow : Window
         _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
         _expressionTransitionFrameTimer = new DispatcherTimer { Interval = ExpressionTransitionSequence.FrameInterval };
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
+        _activeMovementTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
+        _activeMovementTimer.Tick += (_, _) => AdvanceActiveMovement();
 
         try
         {
@@ -110,7 +120,9 @@ public partial class PetWindow : Window
             WindowPlacementService.MoveToBottomRight(this);
             StartIdleAnimation();
             ScheduleNextBlink();
+            UpdateActiveMovementTimer();
         };
+        IsVisibleChanged += (_, _) => UpdateActiveMovementTimer();
         MouseLeftButtonDown += OnMouseLeftButtonDown;
         MouseRightButtonDown += OnMouseRightButtonDown;
         MouseRightButtonUp += OnMouseRightButtonUp;
@@ -122,6 +134,8 @@ public partial class PetWindow : Window
         Topmost = settings.Topmost;
         ShowInTaskbar = settings.ShowInTaskbar;
         _isClickThrough = settings.ClickThrough;
+        _activeMovementEnabled = settings.ActiveMovement;
+        UpdateActiveMovementTimer();
 
         if (new WindowInteropHelper(this).Handle == IntPtr.Zero)
         {
@@ -265,11 +279,14 @@ public partial class PetWindow : Window
     private void BeginDrag()
     {
         CancelTemporaryExpression();
+        _activeMovementTimer.Stop();
+        _hasActiveMovementTarget = false;
         _isDragging = true;
         _dragRestoreTimer.Stop();
         StopIdleAnimation();
         StopBlinkAnimation();
         ResetCharacterTransitionAnimations();
+        ApplyDragMovementVisual();
         CharacterImage.Source = _draggingCharacter;
     }
 
@@ -283,15 +300,160 @@ public partial class PetWindow : Window
         _isDragging = false;
         _dragRestoreTimer.Stop();
         _dragRestoreTimer.Start();
+        UpdateActiveMovementTimer();
     }
 
     private void RestoreAfterDrag()
     {
         _dragRestoreTimer.Stop();
         _idleFrameIndex = 0;
+        ResetActiveMovementVisual();
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
         ScheduleNextBlink();
+        UpdateActiveMovementTimer();
+    }
+
+    private bool CanRunActiveMovement()
+    {
+        return _activeMovementEnabled
+            && IsVisible
+            && !_isClickThrough
+            && !_isDragging
+            && !_dragRestoreTimer.IsEnabled
+            && !_isExpressionWheelOpen
+            && !_temporaryExpressionTimer.IsEnabled
+            && _expressionTransitionMode == ExpressionTransitionMode.None;
+    }
+
+    private void UpdateActiveMovementTimer()
+    {
+        if (CanRunActiveMovement())
+        {
+            _activeMovementTimer.Start();
+            return;
+        }
+
+        _activeMovementTimer.Stop();
+        _hasActiveMovementTarget = false;
+        ResetActiveMovementVisual();
+    }
+
+    private void AdvanceActiveMovement()
+    {
+        if (!CanRunActiveMovement())
+        {
+            UpdateActiveMovementTimer();
+            return;
+        }
+
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var bounds = GetCurrentMovementBounds();
+        var cursor = GetCursorScreenPosition();
+        var petCenterX = Left + width / 2;
+        var petCenterY = Top + height / 2;
+        var cursorDistance = Math.Sqrt(Math.Pow(cursor.X - petCenterX, 2) + Math.Pow(cursor.Y - petCenterY, 2));
+
+        if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
+        {
+            _activeMovementTarget = PetMovementPlanner.CalculateMouseApproachTarget(
+                Left,
+                Top,
+                width,
+                height,
+                cursor.X,
+                cursor.Y,
+                bounds);
+            _hasActiveMovementTarget = true;
+        }
+        else if (!_hasActiveMovementTarget || PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
+        {
+            ChooseWanderTarget(width, height, bounds);
+        }
+
+        if (!_hasActiveMovementTarget)
+        {
+            ResetActiveMovementVisual();
+            return;
+        }
+
+        var next = PetMovementPlanner.StepToward(Left, Top, _activeMovementTarget);
+        _lastMovementDeltaX = next.Left - Left;
+        Left = next.Left;
+        Top = next.Top;
+        _runtimeState.SetRuntimePosition(Left, Top);
+        ApplyActiveMovementVisual();
+
+        if (PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
+        {
+            _hasActiveMovementTarget = false;
+            _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+        }
+    }
+
+    private PetMovementBounds GetCurrentMovementBounds()
+    {
+        return new PetMovementBounds(
+            SystemParameters.WorkArea.Left,
+            SystemParameters.WorkArea.Top,
+            SystemParameters.WorkArea.Width,
+            SystemParameters.WorkArea.Height);
+    }
+
+    private WpfPoint GetCursorScreenPosition()
+    {
+        var cursor = Forms.Cursor.Position;
+        var point = new WpfPoint(cursor.X, cursor.Y);
+        var source = PresentationSource.FromVisual(this);
+
+        return source?.CompositionTarget is null
+            ? point
+            : source.CompositionTarget.TransformFromDevice.Transform(point);
+    }
+
+    private void ChooseWanderTarget(double width, double height, PetMovementBounds bounds)
+    {
+        if (DateTime.UtcNow < _nextWanderDecisionUtc)
+        {
+            return;
+        }
+
+        const double range = 160;
+        var targetLeft = Left + _movementRandom.NextDouble() * range * 2 - range;
+        var targetTop = Top + _movementRandom.NextDouble() * range * 2 - range;
+
+        _activeMovementTarget = PetMovementPlanner.ClampTarget(targetLeft, targetTop, width, height, bounds);
+        _hasActiveMovementTarget = true;
+    }
+
+    private void ApplyActiveMovementVisual()
+    {
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        CharacterScaleTransform.ScaleX = _lastMovementDeltaX < 0 ? 0.992 : 1.008;
+        CharacterScaleTransform.ScaleY = 1.004;
+    }
+
+    private void ApplyDragMovementVisual()
+    {
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        CharacterScaleTransform.ScaleX = 1.018;
+        CharacterScaleTransform.ScaleY = 0.986;
+    }
+
+    private void ResetActiveMovementVisual()
+    {
+        if (_isDragging || _temporaryExpressionTimer.IsEnabled || _expressionTransitionMode != ExpressionTransitionMode.None)
+        {
+            return;
+        }
+
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        CharacterScaleTransform.ScaleX = 1;
+        CharacterScaleTransform.ScaleY = 1;
     }
 
     private void BuildExpressionWheel()
@@ -485,6 +647,7 @@ public partial class PetWindow : Window
         StopIdleAnimation();
         StopBlinkAnimation();
         _isExpressionWheelOpen = true;
+        UpdateActiveMovementTimer();
         _selectedExpressionWheelIndex = null;
         PositionExpressionWheelOverlay(_expressionWheelOrigin);
         ExpressionWheelOverlay.Visibility = Visibility.Visible;
@@ -507,6 +670,7 @@ public partial class PetWindow : Window
         UpdateExpressionWheelVisualSelection();
         StartIdleAnimation();
         ScheduleNextBlink();
+        UpdateActiveMovementTimer();
     }
 
     private void UpdateExpressionWheelSelection(WpfPoint position)
@@ -601,6 +765,7 @@ public partial class PetWindow : Window
         StopBlinkAnimation();
         _pendingExpressionImage = image;
         PlayExpressionTransitionIn();
+        UpdateActiveMovementTimer();
     }
 
     private void CancelTemporaryExpression()
@@ -609,6 +774,7 @@ public partial class PetWindow : Window
         StopExpressionTransition();
         _pendingExpressionImage = null;
         ResetCharacterTransitionAnimations();
+        UpdateActiveMovementTimer();
     }
 
     private void ResetCharacterTransitionAnimations()
@@ -628,6 +794,7 @@ public partial class PetWindow : Window
         StopIdleAnimation();
         StopBlinkAnimation();
         PlayExpressionTransitionOut();
+        UpdateActiveMovementTimer();
     }
 
     private void PlayExpressionTransitionIn()
@@ -704,6 +871,7 @@ public partial class PetWindow : Window
         _pendingExpressionImage = null;
         AnimateCharacterImageSwap(image);
         _temporaryExpressionTimer.Start();
+        UpdateActiveMovementTimer();
     }
 
     private void CompleteExpressionRestore()
@@ -718,6 +886,7 @@ public partial class PetWindow : Window
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
         ScheduleNextBlink();
+        UpdateActiveMovementTimer();
     }
 
     private void StopExpressionTransition()
