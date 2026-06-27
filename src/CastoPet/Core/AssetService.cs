@@ -36,6 +36,16 @@ public sealed class AssetService
         return BlinkFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
     }
 
+    public IReadOnlyList<ImageSource> LoadExpressionTransitionInFrames()
+    {
+        return ExpressionTransitionSequence.InFramePaths.Select(LoadCharacter).ToArray();
+    }
+
+    public IReadOnlyList<ImageSource> LoadExpressionTransitionOutFrames()
+    {
+        return ExpressionTransitionSequence.OutFramePaths.Select(LoadCharacter).ToArray();
+    }
+
     public IReadOnlyDictionary<ExpressionWheelItem, ImageSource> LoadExpressionWheelImages()
     {
         var images = new Dictionary<ExpressionWheelItem, ImageSource>();
