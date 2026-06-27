@@ -23,6 +23,14 @@
     <Resource Include="Assets\States\Idle\Castorice.Idle.05.png" />
     <Resource Include="Assets\States\Idle\Castorice.Idle.06.png" />
     <Resource Include="Assets\States\Idle\Castorice.Idle.07.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.00.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.01.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.02.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.03.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.04.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.05.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.06.png" />
+    <Resource Include="Assets\States\Move\Castorice.Move.07.png" />
     <Resource Include="Assets\States\Blink\Castorice.Blink.00.png" />
     <Resource Include="Assets\States\Blink\Castorice.Blink.01.png" />
     <Resource Include="Assets\States\Blink\Castorice.Blink.02.png" />

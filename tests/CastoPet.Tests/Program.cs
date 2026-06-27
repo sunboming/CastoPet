@@ -19,6 +19,9 @@ var tests = new (string Name, Action Test)[]
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
+    ("Move frame sequence defines eight distance-driven paths", MoveFrameSequenceDefinesEightDistanceDrivenPaths),
+    ("Move frame paths use app resources", MoveFramePathsUseAppResources),
+    ("Move speed constants stay in smooth range", MoveSpeedConstantsStayInSmoothRange),
     ("Expression wheel defines eight items", ExpressionWheelDefinesEightItems),
     ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
     ("Expression transition sequence defines shared frames", ExpressionTransitionSequenceDefinesSharedFrames),
@@ -260,6 +263,30 @@ static void BlinkFrameSequenceDefinesRandomBlinkFrames()
     Assert.Equal(TimeSpan.FromSeconds(7), BlinkFrameSequence.MaxScheduleDelay, "Blink should remain occasional.");
     Assert.Equal("Assets/States/Blink/Castorice.Blink.00.png", BlinkFrameSequence.FramePaths[0], "First blink frame path should be zero padded.");
     Assert.Equal("Assets/States/Blink/Castorice.Blink.02.png", BlinkFrameSequence.FramePaths[^1], "Last blink frame path should be zero padded.");
+}
+
+static void MoveFrameSequenceDefinesEightDistanceDrivenPaths()
+{
+    Assert.Equal(8, MoveFrameSequence.FrameCount, "Move should use eight frames.");
+    Assert.Equal(10d, MoveFrameSequence.DistancePerFrame, "Move frames should advance by travel distance.");
+    Assert.Equal("Assets/States/Move/Castorice.Move.00.png", MoveFrameSequence.FramePaths[0], "First move frame path should be zero padded.");
+    Assert.Equal("Assets/States/Move/Castorice.Move.07.png", MoveFrameSequence.FramePaths[^1], "Last move frame path should be zero padded.");
+}
+
+static void MoveFramePathsUseAppResources()
+{
+    for (var index = 0; index < MoveFrameSequence.FrameCount; index++)
+    {
+        Assert.Equal($"Assets/States/Move/Castorice.Move.{index:00}.png", MoveFrameSequence.FramePaths[index], "Move frame should use the resource path convention.");
+    }
+}
+
+static void MoveSpeedConstantsStayInSmoothRange()
+{
+    Assert.Equal(90d, MoveFrameSequence.BaseSpeedPixelsPerSecond, "Move speed should have a stable base.");
+    Assert.Equal(80d, MoveFrameSequence.MinSpeedPixelsPerSecond, "Move speed lower bound should stay near the base.");
+    Assert.Equal(105d, MoveFrameSequence.MaxSpeedPixelsPerSecond, "Move speed upper bound should stay near the base.");
+    Assert.Equal(9d, MoveFrameSequence.StepDistance(TimeSpan.FromMilliseconds(100), distanceToTarget: 200), "100ms at base speed should move 9px.");
 }
 
 static void ExpressionWheelDefinesEightItems()

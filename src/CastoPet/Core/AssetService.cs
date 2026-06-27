@@ -36,6 +36,11 @@ public sealed class AssetService
         return BlinkFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
     }
 
+    public IReadOnlyList<ImageSource> LoadMoveFrames()
+    {
+        return MoveFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
+    }
+
     public IReadOnlyList<ImageSource> LoadExpressionTransitionInFrames()
     {
         return ExpressionTransitionSequence.InFramePaths.Select(LoadCharacter).ToArray();
