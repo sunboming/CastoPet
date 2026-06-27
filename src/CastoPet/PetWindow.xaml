@@ -15,14 +15,26 @@
         <Image x:Name="CharacterImage"
                Stretch="Uniform"
                SnapsToDevicePixels="True"
-               RenderOptions.BitmapScalingMode="HighQuality" />
+               RenderOptions.BitmapScalingMode="HighQuality"
+               RenderTransformOrigin="0.5,0.5">
+            <Image.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="CharacterScaleTransform" ScaleX="1" ScaleY="1" />
+                    <TranslateTransform x:Name="CharacterTranslateTransform" X="0" Y="0" />
+                </TransformGroup>
+            </Image.RenderTransform>
+        </Image>
 
         <Canvas x:Name="ExpressionWheelOverlay"
                 Visibility="Collapsed"
                 IsHitTestVisible="False">
             <Canvas x:Name="ExpressionWheelSurface"
                     Width="280"
-                    Height="280">
+                    Height="280"
+                    RenderTransformOrigin="0.5,0.5">
+                <Canvas.RenderTransform>
+                    <ScaleTransform x:Name="ExpressionWheelScaleTransform" ScaleX="1" ScaleY="1" />
+                </Canvas.RenderTransform>
                 <Ellipse Width="256"
                          Height="256"
                          Canvas.Left="12"

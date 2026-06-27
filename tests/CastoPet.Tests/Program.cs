@@ -18,6 +18,8 @@ var tests = new (string Name, Action Test)[]
     ("Expression wheel defines eight items", ExpressionWheelDefinesEightItems),
     ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
+    ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
+    ("Idle breathing values are subtle", IdleBreathingValuesAreSubtle),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
@@ -234,6 +236,23 @@ static void ExpressionWheelStyleIsTextOnlyWithDividers()
     Assert.Equal(256d, ExpressionWheelCatalog.WheelOuterDiameter, "Outer background should fit inside the wheel surface.");
     Assert.Equal(84d, ExpressionWheelCatalog.WheelInnerDiameter, "Inner no-selection zone should remain visible.");
     Assert.Equal(1.18d, ExpressionWheelCatalog.SelectedScale, "Selected wheel item should still scale up visibly.");
+}
+
+static void PetAnimationTimingsAreResponsive()
+{
+    Assert.Equal(TimeSpan.FromMilliseconds(120), PetAnimationTimings.ExpressionEnterDuration, "Expression enter should be quick.");
+    Assert.Equal(TimeSpan.FromMilliseconds(180), PetAnimationTimings.ExpressionExitDuration, "Expression exit should be smooth but short.");
+    Assert.Equal(TimeSpan.FromMilliseconds(120), PetAnimationTimings.WheelOpenDuration, "Wheel open should feel immediate.");
+    Assert.Equal(TimeSpan.FromMilliseconds(90), PetAnimationTimings.WheelSelectionDuration, "Selection emphasis should respond quickly.");
+}
+
+static void IdleBreathingValuesAreSubtle()
+{
+    Assert.Equal(TimeSpan.FromMilliseconds(1900), PetAnimationTimings.IdleBreathingCycleDuration, "Idle breathing should be slow.");
+    Assert.True(PetAnimationTimings.IdleBreathingTranslateY <= 4, "Idle breathing vertical movement should remain subtle.");
+    Assert.True(PetAnimationTimings.IdleBreathingScaleDelta <= 0.02, "Idle breathing scale should remain subtle.");
+    Assert.Equal(0.96, PetAnimationTimings.ExpressionDimmedOpacity, "Expression transition should only slightly dim during swaps.");
+    Assert.Equal(0.92, PetAnimationTimings.WheelOpenStartScale, "Wheel should open from a small scale change.");
 }
 
 static void CharacterAssetsDecodeAtPetDisplayWidth()

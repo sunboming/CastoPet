@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using CastoPet.Core;
 using WpfControls = System.Windows.Controls;
 using WpfInput = System.Windows.Input;
+using WpfAnimation = System.Windows.Media.Animation;
 using WpfColor = System.Windows.Media.Color;
 using WpfPoint = System.Windows.Point;
 using WpfShapes = System.Windows.Shapes;
@@ -248,6 +249,7 @@ public partial class PetWindow : Window
         _dragRestoreTimer.Stop();
         StopIdleAnimation();
         StopBlinkAnimation();
+        ResetCharacterTransitionAnimations();
         CharacterImage.Source = _draggingCharacter;
     }
 
@@ -433,6 +435,24 @@ public partial class PetWindow : Window
         _expressionWheelOrigin = new WpfPoint(left + ExpressionWheelSurface.Width / 2, top + ExpressionWheelSurface.Height / 2);
     }
 
+    private void AnimateExpressionWheelOpen()
+    {
+        ExpressionWheelOverlay.Opacity = 0;
+        ExpressionWheelScaleTransform.ScaleX = PetAnimationTimings.WheelOpenStartScale;
+        ExpressionWheelScaleTransform.ScaleY = PetAnimationTimings.WheelOpenStartScale;
+
+        var duration = new Duration(PetAnimationTimings.WheelOpenDuration);
+        var easing = new WpfAnimation.BackEase
+        {
+            Amplitude = 0.2,
+            EasingMode = WpfAnimation.EasingMode.EaseOut,
+        };
+
+        ExpressionWheelOverlay.BeginAnimation(UIElement.OpacityProperty, new WpfAnimation.DoubleAnimation(1, duration));
+        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+    }
+
     private void OpenExpressionWheel()
     {
         _expressionWheelHoldTimer.Stop();
@@ -448,6 +468,7 @@ public partial class PetWindow : Window
         _selectedExpressionWheelIndex = null;
         PositionExpressionWheelOverlay(_expressionWheelOrigin);
         ExpressionWheelOverlay.Visibility = Visibility.Visible;
+        AnimateExpressionWheelOpen();
         CaptureMouse();
         UpdateExpressionWheelVisualSelection();
     }
@@ -457,6 +478,12 @@ public partial class PetWindow : Window
         _isExpressionWheelOpen = false;
         _selectedExpressionWheelIndex = null;
         ExpressionWheelOverlay.Visibility = Visibility.Collapsed;
+        ExpressionWheelOverlay.BeginAnimation(UIElement.OpacityProperty, null);
+        ExpressionWheelOverlay.Opacity = 1;
+        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        ExpressionWheelScaleTransform.ScaleX = 1;
+        ExpressionWheelScaleTransform.ScaleY = 1;
         UpdateExpressionWheelVisualSelection();
         StartIdleAnimation();
         ScheduleNextBlink();
@@ -504,8 +531,35 @@ public partial class PetWindow : Window
             _expressionWheelLabelVisuals[index].Opacity = isSelected ? 1 : 0.78;
             _expressionWheelLabelVisuals[index].FontWeight = isSelected ? FontWeights.Bold : FontWeights.SemiBold;
             _expressionWheelLabelVisuals[index].Foreground = new SolidColorBrush(isSelected ? WpfColor.FromArgb(255, 255, 255, 255) : WpfColor.FromArgb(224, 255, 255, 255));
-            _expressionWheelLabelVisuals[index].RenderTransform = new ScaleTransform(scale, scale);
+            if (_expressionWheelLabelVisuals[index].RenderTransform is not ScaleTransform labelScale)
+            {
+                labelScale = new ScaleTransform(1, 1);
+                _expressionWheelLabelVisuals[index].RenderTransform = labelScale;
+            }
+
+            var duration = new Duration(PetAnimationTimings.WheelSelectionDuration);
+            var easing = new WpfAnimation.QuadraticEase { EasingMode = WpfAnimation.EasingMode.EaseOut };
+            labelScale.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(scale, duration) { EasingFunction = easing });
+            labelScale.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(scale, duration) { EasingFunction = easing });
         }
+    }
+
+    private void AnimateCharacterImageSwap(ImageSource image)
+    {
+        StopIdleBreathing();
+        ResetCharacterTransitionAnimations();
+        CharacterImage.Opacity = PetAnimationTimings.ExpressionDimmedOpacity;
+        CharacterScaleTransform.ScaleX = PetAnimationTimings.ExpressionEnterStartScale;
+        CharacterScaleTransform.ScaleY = PetAnimationTimings.ExpressionEnterStartScale;
+        CharacterTranslateTransform.Y = 0;
+        CharacterImage.Source = image;
+
+        var duration = new Duration(PetAnimationTimings.ExpressionEnterDuration);
+        var easing = new WpfAnimation.QuadraticEase { EasingMode = WpfAnimation.EasingMode.EaseOut };
+
+        CharacterImage.BeginAnimation(UIElement.OpacityProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
     }
 
     private void ApplyTemporaryExpression(int index)
@@ -524,22 +578,113 @@ public partial class PetWindow : Window
         _temporaryExpressionTimer.Stop();
         StopIdleAnimation();
         StopBlinkAnimation();
-        CharacterImage.Source = image;
+        AnimateCharacterImageSwap(image);
         _temporaryExpressionTimer.Start();
     }
 
     private void CancelTemporaryExpression()
     {
         _temporaryExpressionTimer.Stop();
+        ResetCharacterTransitionAnimations();
+    }
+
+    private void ResetCharacterTransitionAnimations()
+    {
+        CharacterImage.BeginAnimation(UIElement.OpacityProperty, null);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        CharacterImage.Opacity = 1;
+        CharacterScaleTransform.ScaleX = 1;
+        CharacterScaleTransform.ScaleY = 1;
     }
 
     private void RestoreAfterTemporaryExpression()
     {
         _temporaryExpressionTimer.Stop();
         _idleFrameIndex = 0;
-        CharacterImage.Source = GetCurrentIdleFrame();
-        StartIdleAnimation();
-        ScheduleNextBlink();
+
+        var duration = new Duration(PetAnimationTimings.ExpressionExitDuration);
+        var easing = new WpfAnimation.QuadraticEase { EasingMode = WpfAnimation.EasingMode.EaseOut };
+        var fadeOut = new WpfAnimation.DoubleAnimation(PetAnimationTimings.ExpressionDimmedOpacity, duration)
+        {
+            EasingFunction = easing,
+        };
+        fadeOut.Completed += (_, _) =>
+        {
+            if (_isDragging || _isExpressionWheelOpen)
+            {
+                return;
+            }
+
+            CharacterImage.Source = GetCurrentIdleFrame();
+            CharacterScaleTransform.ScaleX = PetAnimationTimings.ExpressionEnterStartScale;
+            CharacterScaleTransform.ScaleY = PetAnimationTimings.ExpressionEnterStartScale;
+
+            var fadeIn = new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing };
+            fadeIn.Completed += (_, _) =>
+            {
+                if (_isDragging || _isExpressionWheelOpen)
+                {
+                    return;
+                }
+
+                StartIdleAnimation();
+                ScheduleNextBlink();
+            };
+
+            CharacterImage.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+            CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+        };
+
+        StopIdleAnimation();
+        StopBlinkAnimation();
+        CharacterImage.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+    }
+
+    private void StartIdleBreathing()
+    {
+        if (_isDragging || _isExpressionWheelOpen)
+        {
+            return;
+        }
+
+        var duration = new Duration(PetAnimationTimings.IdleBreathingCycleDuration);
+        var easing = new WpfAnimation.SineEase { EasingMode = WpfAnimation.EasingMode.EaseInOut };
+
+        var translate = new WpfAnimation.DoubleAnimation
+        {
+            From = 0,
+            To = PetAnimationTimings.IdleBreathingTranslateY,
+            Duration = duration,
+            AutoReverse = true,
+            RepeatBehavior = WpfAnimation.RepeatBehavior.Forever,
+            EasingFunction = easing,
+        };
+        CharacterTranslateTransform.BeginAnimation(TranslateTransform.YProperty, translate);
+
+        var scale = 1 + PetAnimationTimings.IdleBreathingScaleDelta;
+        var scaleX = new WpfAnimation.DoubleAnimation
+        {
+            From = 1,
+            To = scale,
+            Duration = duration,
+            AutoReverse = true,
+            RepeatBehavior = WpfAnimation.RepeatBehavior.Forever,
+            EasingFunction = easing,
+        };
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleX);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleX.Clone());
+    }
+
+    private void StopIdleBreathing()
+    {
+        CharacterTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        CharacterTranslateTransform.Y = 0;
+        CharacterScaleTransform.ScaleX = 1;
+        CharacterScaleTransform.ScaleY = 1;
     }
 
     private void StartIdleAnimation()
@@ -549,12 +694,14 @@ public partial class PetWindow : Window
             return;
         }
 
+        StartIdleBreathing();
         _idleFrameTimer.Start();
     }
 
     private void StopIdleAnimation()
     {
         _idleFrameTimer.Stop();
+        StopIdleBreathing();
     }
 
     private void AdvanceIdleFrame()
