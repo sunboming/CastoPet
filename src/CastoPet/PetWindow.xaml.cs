@@ -27,6 +27,9 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _dragRestoreTimer;
     private readonly DispatcherTimer _expressionWheelHoldTimer;
     private readonly DispatcherTimer _temporaryExpressionTimer;
+    private readonly DispatcherTimer _expressionTransitionFrameTimer;
+    private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
+    private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
     private readonly List<ExpressionWheelItem> _expressionWheelItems = new();
     private readonly List<FrameworkElement> _expressionWheelItemVisuals = new();
@@ -42,8 +45,18 @@ public partial class PetWindow : Window
     private bool _isBlinking;
     private bool _isExpressionWheelOpen;
     private int? _selectedExpressionWheelIndex;
+    private ImageSource? _pendingExpressionImage;
+    private ExpressionTransitionMode _expressionTransitionMode;
+    private int _expressionTransitionFrameIndex;
     private int _idleFrameIndex;
     private int _blinkFrameIndex;
+
+    private enum ExpressionTransitionMode
+    {
+        None,
+        In,
+        Out,
+    }
 
     public PetWindow(AssetService assets, LoggingService logger)
     {
@@ -61,6 +74,8 @@ public partial class PetWindow : Window
         _expressionWheelHoldTimer.Tick += (_, _) => OpenExpressionWheel();
         _temporaryExpressionTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.ExpressionDuration };
         _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
+        _expressionTransitionFrameTimer = new DispatcherTimer { Interval = ExpressionTransitionSequence.FrameInterval };
+        _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
 
         try
         {
@@ -68,6 +83,8 @@ public partial class PetWindow : Window
             _draggingCharacter = assets.LoadDraggingCharacter();
             _idleFrames = assets.LoadIdleFrames();
             _blinkFrames = assets.LoadBlinkFrames();
+            _expressionTransitionInFrames = assets.LoadExpressionTransitionInFrames();
+            _expressionTransitionOutFrames = assets.LoadExpressionTransitionOutFrames();
             _expressionImages = assets.LoadExpressionWheelImages();
             BuildExpressionWheel();
             CharacterImage.Source = GetCurrentIdleFrame();
@@ -78,6 +95,8 @@ public partial class PetWindow : Window
             _draggingCharacter = CharacterImage.Source;
             _idleFrames = Array.Empty<ImageSource>();
             _blinkFrames = Array.Empty<ImageSource>();
+            _expressionTransitionInFrames = Array.Empty<ImageSource>();
+            _expressionTransitionOutFrames = Array.Empty<ImageSource>();
             _expressionImages = new Dictionary<ExpressionWheelItem, ImageSource>();
             System.Windows.MessageBox.Show(
                 "CastoPet 无法加载内置角色图片 Castorice.png。",
@@ -576,15 +595,18 @@ public partial class PetWindow : Window
         }
 
         _temporaryExpressionTimer.Stop();
+        StopExpressionTransition();
         StopIdleAnimation();
         StopBlinkAnimation();
-        AnimateCharacterImageSwap(image);
-        _temporaryExpressionTimer.Start();
+        _pendingExpressionImage = image;
+        PlayExpressionTransitionIn();
     }
 
     private void CancelTemporaryExpression()
     {
         _temporaryExpressionTimer.Stop();
+        StopExpressionTransition();
+        _pendingExpressionImage = null;
         ResetCharacterTransitionAnimations();
     }
 
@@ -601,45 +623,107 @@ public partial class PetWindow : Window
     private void RestoreAfterTemporaryExpression()
     {
         _temporaryExpressionTimer.Stop();
-        _idleFrameIndex = 0;
-
-        var duration = new Duration(PetAnimationTimings.ExpressionExitDuration);
-        var easing = new WpfAnimation.QuadraticEase { EasingMode = WpfAnimation.EasingMode.EaseOut };
-        var fadeOut = new WpfAnimation.DoubleAnimation(PetAnimationTimings.ExpressionDimmedOpacity, duration)
-        {
-            EasingFunction = easing,
-        };
-        fadeOut.Completed += (_, _) =>
-        {
-            if (_isDragging || _isExpressionWheelOpen)
-            {
-                return;
-            }
-
-            CharacterImage.Source = GetCurrentIdleFrame();
-            CharacterScaleTransform.ScaleX = PetAnimationTimings.ExpressionEnterStartScale;
-            CharacterScaleTransform.ScaleY = PetAnimationTimings.ExpressionEnterStartScale;
-
-            var fadeIn = new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing };
-            fadeIn.Completed += (_, _) =>
-            {
-                if (_isDragging || _isExpressionWheelOpen)
-                {
-                    return;
-                }
-
-                StartIdleAnimation();
-                ScheduleNextBlink();
-            };
-
-            CharacterImage.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-            CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
-            CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
-        };
-
+        _pendingExpressionImage = null;
         StopIdleAnimation();
         StopBlinkAnimation();
-        CharacterImage.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+        PlayExpressionTransitionOut();
+    }
+
+    private void PlayExpressionTransitionIn()
+    {
+        if (_expressionTransitionInFrames.Count == 0)
+        {
+            ShowPendingExpression();
+            return;
+        }
+
+        ResetCharacterTransitionAnimations();
+        _expressionTransitionMode = ExpressionTransitionMode.In;
+        _expressionTransitionFrameIndex = 0;
+        CharacterImage.Source = _expressionTransitionInFrames[_expressionTransitionFrameIndex];
+        _expressionTransitionFrameTimer.Stop();
+        _expressionTransitionFrameTimer.Start();
+    }
+
+    private void PlayExpressionTransitionOut()
+    {
+        if (_expressionTransitionOutFrames.Count == 0)
+        {
+            CompleteExpressionRestore();
+            return;
+        }
+
+        ResetCharacterTransitionAnimations();
+        _expressionTransitionMode = ExpressionTransitionMode.Out;
+        _expressionTransitionFrameIndex = 0;
+        CharacterImage.Source = _expressionTransitionOutFrames[_expressionTransitionFrameIndex];
+        _expressionTransitionFrameTimer.Stop();
+        _expressionTransitionFrameTimer.Start();
+    }
+
+    private void AdvanceExpressionTransitionFrame()
+    {
+        var frames = _expressionTransitionMode == ExpressionTransitionMode.In
+            ? _expressionTransitionInFrames
+            : _expressionTransitionOutFrames;
+
+        if (_expressionTransitionMode == ExpressionTransitionMode.None || frames.Count == 0)
+        {
+            StopExpressionTransition();
+            return;
+        }
+
+        _expressionTransitionFrameIndex++;
+        if (_expressionTransitionFrameIndex < frames.Count)
+        {
+            CharacterImage.Source = frames[_expressionTransitionFrameIndex];
+            return;
+        }
+
+        var completedMode = _expressionTransitionMode;
+        StopExpressionTransition();
+
+        if (completedMode == ExpressionTransitionMode.In)
+        {
+            ShowPendingExpression();
+            return;
+        }
+
+        CompleteExpressionRestore();
+    }
+
+    private void ShowPendingExpression()
+    {
+        if (_pendingExpressionImage is null || _isDragging || _isExpressionWheelOpen)
+        {
+            return;
+        }
+
+        var image = _pendingExpressionImage;
+        _pendingExpressionImage = null;
+        AnimateCharacterImageSwap(image);
+        _temporaryExpressionTimer.Start();
+    }
+
+    private void CompleteExpressionRestore()
+    {
+        if (_isDragging || _isExpressionWheelOpen)
+        {
+            return;
+        }
+
+        _idleFrameIndex = 0;
+        ResetCharacterTransitionAnimations();
+        CharacterImage.Source = GetCurrentIdleFrame();
+        StartIdleAnimation();
+        ScheduleNextBlink();
+    }
+
+    private void StopExpressionTransition()
+    {
+        _expressionTransitionFrameTimer.Stop();
+        _expressionTransitionMode = ExpressionTransitionMode.None;
+        _expressionTransitionFrameIndex = 0;
     }
 
     private void StartIdleBreathing()
