@@ -48,6 +48,12 @@ public sealed class MenuCommandService
         ApplyAndSave("Mouse click-through setting changed.");
     }
 
+    public void ToggleActiveMovement()
+    {
+        Settings.ActiveMovement = !Settings.ActiveMovement;
+        ApplyAndSave("Active movement setting changed.");
+    }
+
     public void ToggleShowInTaskbar()
     {
         Settings.ShowInTaskbar = !Settings.ShowInTaskbar;

@@ -146,6 +146,7 @@ public partial class PetWindow : Window
         menu.Items.Add(new WpfControls.Separator());
         menu.Items.Add(CreateCheckedMenuItem(TrayService.AlwaysOnTopText, () => commands.Settings.Topmost, commands.ToggleTopmost));
         menu.Items.Add(CreateCheckedMenuItem(TrayService.MouseClickThroughText, () => commands.Settings.ClickThrough, commands.ToggleClickThrough));
+        menu.Items.Add(CreateCheckedMenuItem(TrayService.ActiveMovementText, () => commands.Settings.ActiveMovement, commands.ToggleActiveMovement));
         menu.Items.Add(CreateCheckedMenuItem(TrayService.ShowTaskbarIconText, () => commands.Settings.ShowInTaskbar, commands.ToggleShowInTaskbar));
         menu.Items.Add(CreateCheckedMenuItem(TrayService.StartWithWindowsText, () => commands.Settings.StartWithWindows, commands.ToggleStartWithWindows));
         menu.Items.Add(new WpfControls.Separator());
@@ -892,6 +893,7 @@ public partial class PetWindow : Window
             {
                 TrayService.AlwaysOnTopText => commands.Settings.Topmost,
                 TrayService.MouseClickThroughText => commands.Settings.ClickThrough,
+                TrayService.ActiveMovementText => commands.Settings.ActiveMovement,
                 TrayService.ShowTaskbarIconText => commands.Settings.ShowInTaskbar,
                 TrayService.StartWithWindowsText => commands.Settings.StartWithWindows,
                 _ => item.IsChecked,

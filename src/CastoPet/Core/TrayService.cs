@@ -8,6 +8,7 @@ public sealed class TrayService : IDisposable
     public const string ShowOrRestoreText = "显示/恢复";
     public const string AlwaysOnTopText = "始终置顶";
     public const string MouseClickThroughText = "鼠标穿透";
+    public const string ActiveMovementText = "主动移动";
     public const string ShowTaskbarIconText = "显示任务栏图标";
     public const string StartWithWindowsText = "开机自启动";
     public const string ExitText = "退出";
@@ -16,6 +17,7 @@ public sealed class TrayService : IDisposable
     private readonly Forms.NotifyIcon _notifyIcon;
     private readonly Forms.ToolStripMenuItem _topmostItem;
     private readonly Forms.ToolStripMenuItem _clickThroughItem;
+    private readonly Forms.ToolStripMenuItem _activeMovementItem;
     private readonly Forms.ToolStripMenuItem _taskbarItem;
     private readonly Forms.ToolStripMenuItem _startupItem;
 
@@ -24,6 +26,7 @@ public sealed class TrayService : IDisposable
         _commands = commands;
         _topmostItem = CreateCheckedItem(AlwaysOnTopText, _commands.ToggleTopmost);
         _clickThroughItem = CreateCheckedItem(MouseClickThroughText, _commands.ToggleClickThrough);
+        _activeMovementItem = CreateCheckedItem(ActiveMovementText, _commands.ToggleActiveMovement);
         _taskbarItem = CreateCheckedItem(ShowTaskbarIconText, _commands.ToggleShowInTaskbar);
         _startupItem = CreateCheckedItem(StartWithWindowsText, _commands.ToggleStartWithWindows);
 
@@ -32,6 +35,7 @@ public sealed class TrayService : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_topmostItem);
         menu.Items.Add(_clickThroughItem);
+        menu.Items.Add(_activeMovementItem);
         menu.Items.Add(_taskbarItem);
         menu.Items.Add(_startupItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -61,6 +65,7 @@ public sealed class TrayService : IDisposable
     {
         _topmostItem.Checked = _commands.Settings.Topmost;
         _clickThroughItem.Checked = _commands.Settings.ClickThrough;
+        _activeMovementItem.Checked = _commands.Settings.ActiveMovement;
         _taskbarItem.Checked = _commands.Settings.ShowInTaskbar;
         _startupItem.Checked = _commands.Settings.StartWithWindows;
     }

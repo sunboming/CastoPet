@@ -6,6 +6,7 @@ public sealed class AppSettings
     public bool ClickThrough { get; set; }
     public bool ShowInTaskbar { get; set; }
     public bool StartWithWindows { get; set; }
+    public bool ActiveMovement { get; set; }
 
     public static AppSettings Default => new();
 
@@ -17,6 +18,7 @@ public sealed class AppSettings
             ClickThrough = ClickThrough,
             ShowInTaskbar = ShowInTaskbar,
             StartWithWindows = StartWithWindows,
+            ActiveMovement = ActiveMovement,
         };
     }
 }

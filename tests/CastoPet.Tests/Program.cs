@@ -4,7 +4,9 @@ using CastoPet.Core;
 var tests = new (string Name, Action Test)[]
 {
     ("Default settings match MVP defaults", DefaultSettingsMatchMvpDefaults),
+    ("Default active movement is disabled", DefaultActiveMovementIsDisabled),
     ("Settings round trip as JSON", SettingsRoundTripAsJson),
+    ("Settings round trip includes active movement", SettingsRoundTripIncludesActiveMovement),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
     ("Logging writes a dated log file", LoggingWritesDatedLogFile),
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
@@ -22,6 +24,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition sequence defines shared frames", ExpressionTransitionSequenceDefinesSharedFrames),
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
+    ("Tray menu exposes active movement text", TrayMenuExposesActiveMovementText),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
@@ -52,6 +55,14 @@ static void DefaultSettingsMatchMvpDefaults()
     Assert.False(settings.ClickThrough, "ClickThrough should default to false.");
     Assert.False(settings.ShowInTaskbar, "ShowInTaskbar should default to false.");
     Assert.False(settings.StartWithWindows, "StartWithWindows should default to false.");
+    Assert.False(settings.ActiveMovement, "ActiveMovement should default to false.");
+}
+
+static void DefaultActiveMovementIsDisabled()
+{
+    var settings = AppSettings.Default;
+
+    Assert.False(settings.ActiveMovement, "Active movement should default to false.");
 }
 
 static void SettingsRoundTripAsJson()
@@ -67,6 +78,7 @@ static void SettingsRoundTripAsJson()
         ClickThrough = true,
         ShowInTaskbar = true,
         StartWithWindows = true,
+        ActiveMovement = true,
     };
 
     service.Save(settings);
@@ -76,6 +88,29 @@ static void SettingsRoundTripAsJson()
     Assert.True(loaded.ClickThrough, "ClickThrough should round trip.");
     Assert.True(loaded.ShowInTaskbar, "ShowInTaskbar should round trip.");
     Assert.True(loaded.StartWithWindows, "StartWithWindows should round trip.");
+    Assert.True(loaded.ActiveMovement, "ActiveMovement should round trip.");
+}
+
+static void SettingsRoundTripIncludesActiveMovement()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new SettingsService(paths, logger);
+
+    var settings = new AppSettings
+    {
+        Topmost = false,
+        ClickThrough = true,
+        ShowInTaskbar = true,
+        StartWithWindows = true,
+        ActiveMovement = true,
+    };
+
+    service.Save(settings);
+    var loaded = service.Load();
+
+    Assert.True(loaded.ActiveMovement, "ActiveMovement should round trip.");
 }
 
 static void InvalidSettingsFallsBackToDefaults()
@@ -91,6 +126,7 @@ static void InvalidSettingsFallsBackToDefaults()
 
     Assert.True(loaded.Topmost, "Invalid settings should return defaults.");
     Assert.False(loaded.ClickThrough, "Invalid settings should return defaults.");
+    Assert.False(loaded.ActiveMovement, "Invalid settings should return defaults.");
     Assert.True(File.Exists(paths.LogFile), "Invalid settings should be logged.");
 }
 
@@ -270,6 +306,11 @@ static void ExpressionWheelStyleIsTextOnlyWithDividers()
     Assert.Equal(256d, ExpressionWheelCatalog.WheelOuterDiameter, "Outer background should fit inside the wheel surface.");
     Assert.Equal(84d, ExpressionWheelCatalog.WheelInnerDiameter, "Inner no-selection zone should remain visible.");
     Assert.Equal(1.18d, ExpressionWheelCatalog.SelectedScale, "Selected wheel item should still scale up visibly.");
+}
+
+static void TrayMenuExposesActiveMovementText()
+{
+    Assert.Equal("主动移动", TrayService.ActiveMovementText, "Active movement menu text should be localized.");
 }
 
 static void PetAnimationTimingsAreResponsive()
