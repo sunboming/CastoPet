@@ -34,5 +34,9 @@
     <Resource Include="Assets\Expressions\Castorice.Expression.Confused.png" />
     <Resource Include="Assets\Expressions\Castorice.Expression.Proud.png" />
     <Resource Include="Assets\Expressions\Castorice.Expression.Crying.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.In.00.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.In.01.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.Out.00.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.Out.01.png" />
   </ItemGroup>
 </Project>
