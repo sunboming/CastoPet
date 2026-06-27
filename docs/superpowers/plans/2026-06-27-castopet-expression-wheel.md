@@ -728,3 +728,47 @@ git commit -m "fix: polish expression wheel behavior"
 ```
 
 Skip this step if there are no final fixes.
+
+## Task 7: Refine Wheel Visual Style
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-06-27-castopet-expression-wheel-design.md`
+- Modify: `docs/superpowers/plans/2026-06-27-castopet-expression-wheel.md`
+- Modify: `src/CastoPet/Core/ExpressionWheelCatalog.cs`
+- Modify: `src/CastoPet/PetWindow.xaml`
+- Modify: `src/CastoPet/PetWindow.xaml.cs`
+- Modify: `tests/CastoPet.Tests/Program.cs`
+
+- [x] **Step 1: Add a failing metadata test for text-only wheel style**
+
+Add a test that asserts the wheel uses text labels without in-wheel image previews and has one divider per item.
+
+- [x] **Step 2: Add wheel visual metadata**
+
+Add constants to `ExpressionWheelCatalog` for `UsesPreviewImages = false`, `DividerCount = ItemCount`, `WheelDiameter = 280`, `WheelOuterDiameter = 256`, `WheelInnerDiameter = 84`, and `SelectedScale = 1.18`.
+
+- [x] **Step 3: Replace item preview visuals with text-only sector visuals**
+
+Update `PetWindow.xaml.cs` so wheel items are sector paths plus text labels, not image preview buttons.
+
+- [x] **Step 4: Add visible separators and purple translucent styling**
+
+Generate eight radial divider lines and use a deeper purple translucent palette for the wheel background, sector fills, selected sector fill, and label states.
+
+- [x] **Step 5: Verify**
+
+Run:
+
+```powershell
+dotnet run --project tests\CastoPet.Tests\CastoPet.Tests.csproj
+dotnet build CastoPet.sln -c Release
+```
+
+Expected: all tests print `PASS`; release build reports `0 个警告`, `0 个错误`.
+
+- [x] **Step 6: Commit**
+
+```powershell
+git add docs/superpowers/specs/2026-06-27-castopet-expression-wheel-design.md docs/superpowers/plans/2026-06-27-castopet-expression-wheel.md src/CastoPet/Core/ExpressionWheelCatalog.cs src/CastoPet/PetWindow.xaml src/CastoPet/PetWindow.xaml.cs tests/CastoPet.Tests/Program.cs
+git commit -m "style: refine expression wheel visuals"
+```

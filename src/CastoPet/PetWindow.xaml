@@ -23,19 +23,19 @@
             <Canvas x:Name="ExpressionWheelSurface"
                     Width="280"
                     Height="280">
-                <Ellipse Width="248"
-                         Height="248"
-                         Canvas.Left="16"
-                         Canvas.Top="16"
-                         Fill="#66352A48"
-                         Stroke="#99D9C8FF"
+                <Ellipse Width="256"
+                         Height="256"
+                         Canvas.Left="12"
+                         Canvas.Top="12"
+                         Fill="#70322355"
+                         Stroke="#B8DDC8FF"
                          StrokeThickness="1.5" />
-                <Ellipse Width="72"
-                         Height="72"
-                         Canvas.Left="104"
-                         Canvas.Top="104"
-                         Fill="#55352A48"
-                         Stroke="#66FFFFFF"
+                <Ellipse Width="84"
+                         Height="84"
+                         Canvas.Left="98"
+                         Canvas.Top="98"
+                         Fill="#6630224D"
+                         Stroke="#80FFFFFF"
                          StrokeThickness="1" />
             </Canvas>
         </Canvas>

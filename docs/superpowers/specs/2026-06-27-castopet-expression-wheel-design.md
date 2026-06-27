@@ -44,11 +44,13 @@ If the user starts dragging or opens the wheel during an active temporary expres
 
 The wheel is an overlay inside `PetWindow`.
 
-- The wheel background is semi-transparent.
-- Each item sits on a semi-transparent circular or wedge-like hit target.
-- The selected item scales up, around 1.18x, and becomes more visually prominent.
-- Non-selected items stay slightly smaller and more transparent.
-- Labels can be short English emotion names for the first version.
+- The wheel background is semi-transparent with a refined purple tone.
+- Each item sits in a separated wedge-like hit target.
+- Wedges are divided by thin radial separators.
+- The first version does not show expression preview images inside the wheel.
+- Each item uses a short English emotion label.
+- The selected wedge becomes brighter, and its label scales up around 1.18x.
+- Non-selected labels stay slightly smaller and more transparent.
 - The overlay should feel light and not obscure the pet more than necessary.
 
 The first version does not need a separate transparent top-level window. Keeping the wheel inside the current pet window limits focus, click-through, topmost, and screen-boundary complexity.

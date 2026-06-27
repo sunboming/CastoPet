@@ -17,6 +17,7 @@ var tests = new (string Name, Action Test)[]
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
     ("Expression wheel defines eight items", ExpressionWheelDefinesEightItems),
     ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
+    ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
@@ -223,6 +224,16 @@ static void ExpressionWheelPathsUseAppResources()
         var expected = $"Assets/Expressions/Castorice.Expression.{item.Label}.png";
         Assert.Equal(expected, item.ResourcePath, $"{item.Label} should use the expression resource path convention.");
     }
+}
+
+static void ExpressionWheelStyleIsTextOnlyWithDividers()
+{
+    Assert.False(ExpressionWheelCatalog.UsesPreviewImages, "Wheel items should use text labels instead of in-wheel expression previews.");
+    Assert.Equal(ExpressionWheelCatalog.ItemCount, ExpressionWheelCatalog.DividerCount, "Wheel should draw one divider per item boundary.");
+    Assert.Equal(280d, ExpressionWheelCatalog.WheelDiameter, "Wheel surface should keep the first-version compact size.");
+    Assert.Equal(256d, ExpressionWheelCatalog.WheelOuterDiameter, "Outer background should fit inside the wheel surface.");
+    Assert.Equal(84d, ExpressionWheelCatalog.WheelInnerDiameter, "Inner no-selection zone should remain visible.");
+    Assert.Equal(1.18d, ExpressionWheelCatalog.SelectedScale, "Selected wheel item should still scale up visibly.");
 }
 
 static void CharacterAssetsDecodeAtPetDisplayWidth()

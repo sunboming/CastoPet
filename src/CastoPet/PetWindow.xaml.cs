@@ -5,7 +5,10 @@ using System.Windows.Threading;
 using CastoPet.Core;
 using WpfControls = System.Windows.Controls;
 using WpfInput = System.Windows.Input;
+using WpfColor = System.Windows.Media.Color;
 using WpfPoint = System.Windows.Point;
+using WpfShapes = System.Windows.Shapes;
+using WpfSize = System.Windows.Size;
 
 namespace CastoPet;
 
@@ -26,6 +29,9 @@ public partial class PetWindow : Window
     private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
     private readonly List<ExpressionWheelItem> _expressionWheelItems = new();
     private readonly List<FrameworkElement> _expressionWheelItemVisuals = new();
+    private readonly List<WpfShapes.Path> _expressionWheelSectorVisuals = new();
+    private readonly List<WpfControls.TextBlock> _expressionWheelLabelVisuals = new();
+    private readonly List<WpfShapes.Line> _expressionWheelDividerVisuals = new();
     private readonly Random _blinkRandom = new();
     private AppSettings? _pendingSettings;
     private WpfPoint _expressionWheelOrigin;
@@ -282,43 +288,53 @@ public partial class PetWindow : Window
         }
 
         PositionExpressionWheelItems();
+        BuildExpressionWheelDividers();
     }
 
     private FrameworkElement CreateExpressionWheelItemVisual(ExpressionWheelItem item)
     {
-        var panel = new WpfControls.StackPanel
+        var itemIndex = _expressionWheelItems.Count;
+        var itemCount = _expressionImages.Count;
+        var panel = new WpfControls.Canvas
         {
-            Width = 58,
-            Height = 68,
+            Width = ExpressionWheelSurface.Width,
+            Height = ExpressionWheelSurface.Height,
             RenderTransformOrigin = new WpfPoint(0.5, 0.5),
             RenderTransform = new ScaleTransform(1, 1),
-            Opacity = 0.78,
+            Opacity = 1,
         };
 
-        panel.Children.Add(new WpfControls.Border
+        var sector = new WpfShapes.Path
         {
-            Width = 46,
-            Height = 46,
-            CornerRadius = new CornerRadius(23),
-            Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(118, 53, 42, 72)),
-            BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(150, 217, 200, 255)),
-            BorderThickness = new Thickness(1),
-            Child = new WpfControls.Image
-            {
-                Source = _expressionImages[item],
-                Stretch = Stretch.Uniform,
-                Margin = new Thickness(3),
-            },
-        });
+            Data = CreateExpressionWheelSectorGeometry(itemIndex, itemCount),
+            Fill = new SolidColorBrush(WpfColor.FromArgb(78, 67, 43, 111)),
+            Stroke = new SolidColorBrush(WpfColor.FromArgb(72, 234, 224, 255)),
+            StrokeThickness = 0.75,
+        };
+        panel.Children.Add(sector);
+        _expressionWheelSectorVisuals.Add(sector);
 
-        panel.Children.Add(new WpfControls.TextBlock
+        var label = new WpfControls.TextBlock
         {
             Text = item.Label,
-            Foreground = System.Windows.Media.Brushes.White,
-            FontSize = 10,
+            Foreground = new SolidColorBrush(WpfColor.FromArgb(224, 255, 255, 255)),
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
             TextAlignment = TextAlignment.Center,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-        });
+            Width = 78,
+            Opacity = 0.78,
+            RenderTransformOrigin = new WpfPoint(0.5, 0.5),
+            RenderTransform = new ScaleTransform(1, 1),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = WpfColor.FromArgb(160, 45, 28, 72),
+                BlurRadius = 7,
+                ShadowDepth = 0,
+                Opacity = 0.75,
+            },
+        };
+        panel.Children.Add(label);
+        _expressionWheelLabelVisuals.Add(label);
 
         return panel;
     }
@@ -330,13 +346,80 @@ public partial class PetWindow : Window
 
         for (var index = 0; index < _expressionWheelItemVisuals.Count; index++)
         {
+            WpfControls.Canvas.SetLeft(_expressionWheelItemVisuals[index], 0);
+            WpfControls.Canvas.SetTop(_expressionWheelItemVisuals[index], 0);
+
             var angle = -Math.PI / 2 + index * 2 * Math.PI / _expressionWheelItemVisuals.Count;
-            var visual = _expressionWheelItemVisuals[index];
-            var x = center + Math.Cos(angle) * radius - visual.Width / 2;
-            var y = center + Math.Sin(angle) * radius - visual.Height / 2;
-            WpfControls.Canvas.SetLeft(visual, x);
-            WpfControls.Canvas.SetTop(visual, y);
+            var label = _expressionWheelLabelVisuals[index];
+            var x = center + Math.Cos(angle) * radius - label.Width / 2;
+            var y = center + Math.Sin(angle) * radius - 10;
+            WpfControls.Canvas.SetLeft(label, x);
+            WpfControls.Canvas.SetTop(label, y);
         }
+    }
+
+    private void BuildExpressionWheelDividers()
+    {
+        var count = _expressionWheelItems.Count;
+        if (count == 0)
+        {
+            return;
+        }
+
+        var center = ExpressionWheelSurface.Width / 2;
+        var innerRadius = ExpressionWheelCatalog.WheelInnerDiameter / 2;
+        var outerRadius = ExpressionWheelCatalog.WheelOuterDiameter / 2;
+        var halfStep = Math.PI / count;
+
+        for (var index = 0; index < count; index++)
+        {
+            var angle = -Math.PI / 2 - halfStep + index * 2 * Math.PI / count;
+            var inner = PointOnWheel(center, innerRadius, angle);
+            var outer = PointOnWheel(center, outerRadius, angle);
+            var divider = new WpfShapes.Line
+            {
+                X1 = inner.X,
+                Y1 = inner.Y,
+                X2 = outer.X,
+                Y2 = outer.Y,
+                Stroke = new SolidColorBrush(WpfColor.FromArgb(120, 233, 220, 255)),
+                StrokeThickness = 1,
+                SnapsToDevicePixels = true,
+            };
+            _expressionWheelDividerVisuals.Add(divider);
+            ExpressionWheelSurface.Children.Add(divider);
+        }
+    }
+
+    private Geometry CreateExpressionWheelSectorGeometry(int index, int count)
+    {
+        var center = ExpressionWheelSurface.Width / 2;
+        var outerRadius = ExpressionWheelCatalog.WheelOuterDiameter / 2;
+        var innerRadius = ExpressionWheelCatalog.WheelInnerDiameter / 2;
+        var step = 2 * Math.PI / count;
+        var gap = 0.012;
+        var startAngle = -Math.PI / 2 + index * step - step / 2 + gap;
+        var endAngle = -Math.PI / 2 + index * step + step / 2 - gap;
+        var outerStart = PointOnWheel(center, outerRadius, startAngle);
+        var outerEnd = PointOnWheel(center, outerRadius, endAngle);
+        var innerEnd = PointOnWheel(center, innerRadius, endAngle);
+        var innerStart = PointOnWheel(center, innerRadius, startAngle);
+
+        var figure = new PathFigure
+        {
+            StartPoint = outerStart,
+            IsClosed = true,
+        };
+        figure.Segments.Add(new ArcSegment(outerEnd, new WpfSize(outerRadius, outerRadius), 0, false, SweepDirection.Clockwise, true));
+        figure.Segments.Add(new LineSegment(innerEnd, true));
+        figure.Segments.Add(new ArcSegment(innerStart, new WpfSize(innerRadius, innerRadius), 0, false, SweepDirection.Counterclockwise, true));
+
+        return new PathGeometry(new[] { figure });
+    }
+
+    private static WpfPoint PointOnWheel(double center, double radius, double angle)
+    {
+        return new WpfPoint(center + Math.Cos(angle) * radius, center + Math.Sin(angle) * radius);
     }
 
     private void PositionExpressionWheelOverlay(WpfPoint origin)
@@ -414,9 +497,14 @@ public partial class PetWindow : Window
         for (var index = 0; index < _expressionWheelItemVisuals.Count; index++)
         {
             var isSelected = _selectedExpressionWheelIndex == index;
-            var scale = isSelected ? 1.18 : 1;
-            _expressionWheelItemVisuals[index].Opacity = isSelected ? 1 : 0.78;
-            _expressionWheelItemVisuals[index].RenderTransform = new ScaleTransform(scale, scale);
+            var scale = isSelected ? ExpressionWheelCatalog.SelectedScale : 1;
+            _expressionWheelSectorVisuals[index].Fill = new SolidColorBrush(isSelected ? WpfColor.FromArgb(138, 113, 78, 174) : WpfColor.FromArgb(78, 67, 43, 111));
+            _expressionWheelSectorVisuals[index].Stroke = new SolidColorBrush(isSelected ? WpfColor.FromArgb(200, 246, 235, 255) : WpfColor.FromArgb(72, 234, 224, 255));
+            _expressionWheelSectorVisuals[index].StrokeThickness = isSelected ? 1.25 : 0.75;
+            _expressionWheelLabelVisuals[index].Opacity = isSelected ? 1 : 0.78;
+            _expressionWheelLabelVisuals[index].FontWeight = isSelected ? FontWeights.Bold : FontWeights.SemiBold;
+            _expressionWheelLabelVisuals[index].Foreground = new SolidColorBrush(isSelected ? WpfColor.FromArgb(255, 255, 255, 255) : WpfColor.FromArgb(224, 255, 255, 255));
+            _expressionWheelLabelVisuals[index].RenderTransform = new ScaleTransform(scale, scale);
         }
     }
 
