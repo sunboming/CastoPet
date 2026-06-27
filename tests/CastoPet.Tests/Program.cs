@@ -396,8 +396,10 @@ static void IdleBreathingValuesAreNeutralDuringStabilization()
 static void CharacterFrameAnimationIsDisabledForMovementDiagnosis()
 {
     Assert.False(PetAnimationTimings.CharacterFrameAnimationEnabled, "Character frame animation should stay disabled while diagnosing movement hand feel.");
-    Assert.Equal(0d, PetAnimationTimings.ActiveMovementScaleDelta, "Active movement should not scale the character during movement diagnosis.");
-    Assert.Equal(0d, PetAnimationTimings.DragMovementScaleDelta, "Dragging should not scale the character during movement diagnosis.");
+    Assert.True(PetAnimationTimings.ActiveMovementScaleDelta > 0, "Active movement should use a subtle visual state after static movement validated window smoothness.");
+    Assert.True(PetAnimationTimings.ActiveMovementScaleDelta <= 0.006, "Active movement scale should stay subtle.");
+    Assert.True(PetAnimationTimings.DragMovementScaleDelta > PetAnimationTimings.ActiveMovementScaleDelta, "Dragging should use a slightly stronger visual state than automatic movement.");
+    Assert.True(PetAnimationTimings.DragMovementScaleDelta <= 0.012, "Dragging scale should stay subtle.");
 }
 
 static void CharacterAssetsDecodeAtPetDisplayWidth()

@@ -57,6 +57,8 @@ public partial class PetWindow : Window
     private int _expressionTransitionFrameIndex;
     private int _idleFrameIndex;
     private int _blinkFrameIndex;
+    private int _activeMovementVisualDirection;
+    private bool _dragMovementVisualApplied;
     private double _lastMovementDeltaX;
 
     private enum ExpressionTransitionMode
@@ -437,20 +439,31 @@ public partial class PetWindow : Window
 
     private void ApplyActiveMovementVisual()
     {
-        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        CharacterScaleTransform.ScaleX = _lastMovementDeltaX < 0
-            ? 1 - PetAnimationTimings.ActiveMovementScaleDelta
-            : 1 + PetAnimationTimings.ActiveMovementScaleDelta;
-        CharacterScaleTransform.ScaleY = 1 + PetAnimationTimings.ActiveMovementScaleDelta / 2;
+        var direction = _lastMovementDeltaX < 0 ? -1 : 1;
+        if (_activeMovementVisualDirection == direction)
+        {
+            return;
+        }
+
+        _activeMovementVisualDirection = direction;
+        AnimateCharacterScale(
+            direction < 0 ? 1 - PetAnimationTimings.ActiveMovementScaleDelta : 1 + PetAnimationTimings.ActiveMovementScaleDelta,
+            1 + PetAnimationTimings.ActiveMovementScaleDelta / 2,
+            PetAnimationTimings.MovementVisualDuration);
     }
 
     private void ApplyDragMovementVisual()
     {
-        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        CharacterScaleTransform.ScaleX = 1 + PetAnimationTimings.DragMovementScaleDelta;
-        CharacterScaleTransform.ScaleY = 1 - PetAnimationTimings.DragMovementScaleDelta;
+        if (_dragMovementVisualApplied)
+        {
+            return;
+        }
+
+        _dragMovementVisualApplied = true;
+        AnimateCharacterScale(
+            1 + PetAnimationTimings.DragMovementScaleDelta,
+            1 - PetAnimationTimings.DragMovementScaleDelta,
+            PetAnimationTimings.MovementVisualDuration);
     }
 
     private void ResetActiveMovementVisual()
@@ -460,10 +473,27 @@ public partial class PetWindow : Window
             return;
         }
 
-        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        CharacterScaleTransform.ScaleX = 1;
-        CharacterScaleTransform.ScaleY = 1;
+        if (_activeMovementVisualDirection == 0 && !_dragMovementVisualApplied)
+        {
+            return;
+        }
+
+        _activeMovementVisualDirection = 0;
+        _dragMovementVisualApplied = false;
+        AnimateCharacterScale(1, 1, PetAnimationTimings.MovementVisualRestoreDuration);
+    }
+
+    private void AnimateCharacterScale(double scaleX, double scaleY, TimeSpan duration)
+    {
+        var animationDuration = new Duration(duration);
+        var easing = new WpfAnimation.QuadraticEase { EasingMode = WpfAnimation.EasingMode.EaseOut };
+
+        CharacterScaleTransform.BeginAnimation(
+            ScaleTransform.ScaleXProperty,
+            new WpfAnimation.DoubleAnimation(scaleX, animationDuration) { EasingFunction = easing });
+        CharacterScaleTransform.BeginAnimation(
+            ScaleTransform.ScaleYProperty,
+            new WpfAnimation.DoubleAnimation(scaleY, animationDuration) { EasingFunction = easing });
     }
 
     private void BuildExpressionWheel()
