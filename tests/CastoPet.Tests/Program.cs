@@ -1,3 +1,4 @@
+using System.Drawing;
 using CastoPet.Core;
 
 var tests = new (string Name, Action Test)[]
@@ -14,6 +15,7 @@ var tests = new (string Name, Action Test)[]
     ("Runtime position tracks drag for current run only", RuntimePositionTracksDragForCurrentRunOnly),
     ("Show restore keeps hidden position but resets visible position", ShowRestoreKeepsHiddenPositionButResetsVisiblePosition),
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
+    ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
     ("Expression wheel defines eight items", ExpressionWheelDefinesEightItems),
     ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
@@ -194,6 +196,19 @@ static void IdleFrameSequenceDefinesEightSlowFramePaths()
     Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", IdleFrameSequence.FramePaths[^1], "Last idle frame path should be zero padded.");
 }
 
+static void IdleFrameDiagnosticsReadAllPackagedFrames()
+{
+    var diagnostics = ReadIdleFrameDiagnostics();
+
+    Assert.Equal(IdleFrameSequence.FrameCount, diagnostics.Count, "Diagnostics should include all idle frames.");
+    Assert.True(diagnostics.All(frame => frame.Width == AssetService.CharacterDecodePixelWidth), "Idle frames should keep the display width.");
+    Assert.True(diagnostics.All(frame => frame.Height == AssetService.CharacterDecodePixelWidth), "Idle frames should keep the display height.");
+    Assert.True(diagnostics.All(frame => frame.Bounds.Width > 0 && frame.Bounds.Height > 0), "Idle frames should have visible alpha bounds.");
+    Assert.True(diagnostics.Max(frame => frame.Bounds.Bottom) - diagnostics.Min(frame => frame.Bounds.Bottom) <= 1, "Idle frame bottom edges should stay anchored.");
+    Assert.True(diagnostics.Max(frame => frame.CenterX) - diagnostics.Min(frame => frame.CenterX) <= 1.0, "Idle frame centers should stay horizontally anchored.");
+    Assert.Equal("Castorice.Idle.07.png", diagnostics[^1].Name, "Diagnostics should preserve frame order.");
+}
+
 static void BlinkFrameSequenceDefinesRandomBlinkFrames()
 {
     Assert.Equal(3, BlinkFrameSequence.FrameCount, "Blink should use three frames.");
@@ -283,6 +298,101 @@ static void PackagedCharacterAssetsAreDisplaySized()
     }
 }
 
+static IReadOnlyList<IdleFrameDiagnostic> ReadIdleFrameDiagnostics()
+{
+    var workspace = FindWorkspaceRoot();
+    var idleRoot = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets", "States", "Idle");
+    var frames = Directory
+        .EnumerateFiles(idleRoot, "Castorice.Idle.*.png", SearchOption.TopDirectoryOnly)
+        .OrderBy(System.IO.Path.GetFileName, StringComparer.Ordinal)
+        .ToArray();
+
+    var diagnostics = new List<IdleFrameDiagnostic>();
+    for (var index = 0; index < frames.Length; index++)
+    {
+        using var bitmap = new Bitmap(frames[index]);
+        var bounds = FindVisibleBounds(bitmap);
+        diagnostics.Add(new IdleFrameDiagnostic(
+            Name: System.IO.Path.GetFileName(frames[index]),
+            Width: bitmap.Width,
+            Height: bitmap.Height,
+            Bounds: bounds,
+            CenterX: bounds.Left + bounds.Width / 2d,
+            AdjacentAverageDelta: 0));
+    }
+
+    for (var index = 0; index < diagnostics.Count; index++)
+    {
+        var current = frames[index];
+        var next = frames[(index + 1) % frames.Length];
+        using var currentBitmap = new Bitmap(current);
+        using var nextBitmap = new Bitmap(next);
+        diagnostics[index] = diagnostics[index] with
+        {
+            AdjacentAverageDelta = CalculateAverageRgbaDelta(currentBitmap, nextBitmap),
+        };
+    }
+
+    return diagnostics;
+}
+
+static Rectangle FindVisibleBounds(Bitmap bitmap)
+{
+    var minX = bitmap.Width;
+    var minY = bitmap.Height;
+    var maxX = -1;
+    var maxY = -1;
+
+    for (var y = 0; y < bitmap.Height; y++)
+    {
+        for (var x = 0; x < bitmap.Width; x++)
+        {
+            if (bitmap.GetPixel(x, y).A <= 8)
+            {
+                continue;
+            }
+
+            minX = Math.Min(minX, x);
+            minY = Math.Min(minY, y);
+            maxX = Math.Max(maxX, x);
+            maxY = Math.Max(maxY, y);
+        }
+    }
+
+    if (maxX < minX || maxY < minY)
+    {
+        return Rectangle.Empty;
+    }
+
+    return Rectangle.FromLTRB(minX, minY, maxX + 1, maxY + 1);
+}
+
+static double CalculateAverageRgbaDelta(Bitmap current, Bitmap next)
+{
+    if (current.Width != next.Width || current.Height != next.Height)
+    {
+        throw new InvalidOperationException("Idle frames must have matching dimensions.");
+    }
+
+    long total = 0;
+    long samples = 0;
+    for (var y = 0; y < current.Height; y += 2)
+    {
+        for (var x = 0; x < current.Width; x += 2)
+        {
+            var a = current.GetPixel(x, y);
+            var b = next.GetPixel(x, y);
+            total += Math.Abs(a.R - b.R);
+            total += Math.Abs(a.G - b.G);
+            total += Math.Abs(a.B - b.B);
+            total += Math.Abs(a.A - b.A);
+            samples++;
+        }
+    }
+
+    return total / (samples * 4d);
+}
+
 static string FindWorkspaceRoot()
 {
     var current = new DirectoryInfo(Environment.CurrentDirectory);
@@ -368,3 +478,11 @@ sealed class TempDirectory : IDisposable
         }
     }
 }
+
+readonly record struct IdleFrameDiagnostic(
+    string Name,
+    int Width,
+    int Height,
+    Rectangle Bounds,
+    double CenterX,
+    double AdjacentAverageDelta);
