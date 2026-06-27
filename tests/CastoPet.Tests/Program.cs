@@ -25,6 +25,10 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
     ("Tray menu exposes active movement text", TrayMenuExposesActiveMovementText),
+    ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
+    ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
+    ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
+    ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
@@ -311,6 +315,64 @@ static void ExpressionWheelStyleIsTextOnlyWithDividers()
 static void TrayMenuExposesActiveMovementText()
 {
     Assert.Equal("主动移动", TrayService.ActiveMovementText, "Active movement menu text should be localized.");
+}
+
+static void MovementPlannerClampsTargetsToWorkArea()
+{
+    var bounds = new PetMovementBounds(0, 0, 500, 400);
+
+    var target = PetMovementPlanner.ClampTarget(
+        left: 460,
+        top: 390,
+        windowWidth: 100,
+        windowHeight: 120,
+        bounds);
+
+    Assert.Equal(400d, target.Left, "Target left should keep the full pet inside the work area.");
+    Assert.Equal(280d, target.Top, "Target top should keep the full pet inside the work area.");
+}
+
+static void MovementPlannerApproachesMouseWithCursorOffset()
+{
+    var bounds = new PetMovementBounds(0, 0, 800, 600);
+
+    var target = PetMovementPlanner.CalculateMouseApproachTarget(
+        petLeft: 100,
+        petTop: 100,
+        petWidth: 100,
+        petHeight: 100,
+        mouseX: 300,
+        mouseY: 150,
+        bounds);
+
+    var targetCenterX = target.Left + 50;
+    var targetCenterY = target.Top + 50;
+    var distance = Math.Sqrt(Math.Pow(targetCenterX - 300, 2) + Math.Pow(targetCenterY - 150, 2));
+
+    Assert.True(distance >= PetMovementPlanner.MinMouseApproachOffset, "Target should not cover the cursor.");
+    Assert.True(distance <= PetMovementPlanner.MaxMouseApproachOffset, "Target should stop close to the cursor.");
+    Assert.True(target.Left > 100, "Target should move toward the mouse.");
+}
+
+static void MovementPlannerEasesTowardTarget()
+{
+    var next = PetMovementPlanner.StepToward(
+        currentLeft: 0,
+        currentTop: 0,
+        target: new PetMovementTarget(100, 50));
+
+    Assert.True(next.Left > 0, "Next left should move forward.");
+    Assert.True(next.Left < 100, "Next left should ease instead of jumping.");
+    Assert.True(next.Top > 0, "Next top should move forward.");
+    Assert.True(next.Top < 50, "Next top should ease instead of jumping.");
+}
+
+static void MovementPlannerDetectsCloseTargets()
+{
+    var target = new PetMovementTarget(12, 16);
+
+    Assert.True(PetMovementPlanner.IsClose(10, 14, target), "Nearby coordinates should be close.");
+    Assert.False(PetMovementPlanner.IsClose(0, 0, target), "Distant coordinates should not be close.");
 }
 
 static void PetAnimationTimingsAreResponsive()
