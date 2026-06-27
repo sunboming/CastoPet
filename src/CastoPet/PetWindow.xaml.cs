@@ -378,6 +378,14 @@ public partial class PetWindow : Window
             return;
         }
 
+        if (PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
+        {
+            _hasActiveMovementTarget = false;
+            _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+            ResetActiveMovementVisual();
+            return;
+        }
+
         var next = PetMovementPlanner.StepToward(Left, Top, _activeMovementTarget);
         _lastMovementDeltaX = next.Left - Left;
         Left = next.Left;
