@@ -439,16 +439,18 @@ public partial class PetWindow : Window
     {
         CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        CharacterScaleTransform.ScaleX = _lastMovementDeltaX < 0 ? 0.992 : 1.008;
-        CharacterScaleTransform.ScaleY = 1.004;
+        CharacterScaleTransform.ScaleX = _lastMovementDeltaX < 0
+            ? 1 - PetAnimationTimings.ActiveMovementScaleDelta
+            : 1 + PetAnimationTimings.ActiveMovementScaleDelta;
+        CharacterScaleTransform.ScaleY = 1 + PetAnimationTimings.ActiveMovementScaleDelta / 2;
     }
 
     private void ApplyDragMovementVisual()
     {
         CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        CharacterScaleTransform.ScaleX = 1.018;
-        CharacterScaleTransform.ScaleY = 0.986;
+        CharacterScaleTransform.ScaleX = 1 + PetAnimationTimings.DragMovementScaleDelta;
+        CharacterScaleTransform.ScaleY = 1 - PetAnimationTimings.DragMovementScaleDelta;
     }
 
     private void ResetActiveMovementVisual()
@@ -951,7 +953,7 @@ public partial class PetWindow : Window
 
     private void StartIdleAnimation()
     {
-        if (_isDragging || _idleFrames.Count == 0)
+        if (!PetAnimationTimings.CharacterFrameAnimationEnabled || _isDragging || _idleFrames.Count == 0)
         {
             return;
         }
@@ -988,7 +990,7 @@ public partial class PetWindow : Window
     private void ScheduleNextBlink()
     {
         _blinkScheduleTimer.Stop();
-        if (_isDragging || _isBlinking || _blinkFrames.Count == 0)
+        if (!PetAnimationTimings.CharacterFrameAnimationEnabled || _isDragging || _isBlinking || _blinkFrames.Count == 0)
         {
             return;
         }
@@ -1002,7 +1004,7 @@ public partial class PetWindow : Window
     private void BeginBlink()
     {
         _blinkScheduleTimer.Stop();
-        if (_isDragging || _isBlinking || _blinkFrames.Count == 0)
+        if (!PetAnimationTimings.CharacterFrameAnimationEnabled || _isDragging || _isBlinking || _blinkFrames.Count == 0)
         {
             return;
         }

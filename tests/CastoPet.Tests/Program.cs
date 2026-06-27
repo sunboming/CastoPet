@@ -31,6 +31,7 @@ var tests = new (string Name, Action Test)[]
     ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
+    ("Character frame animation is disabled for movement diagnosis", CharacterFrameAnimationIsDisabledForMovementDiagnosis),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
@@ -390,6 +391,13 @@ static void IdleBreathingValuesAreNeutralDuringStabilization()
     Assert.Equal(0d, PetAnimationTimings.IdleBreathingScaleDelta, "Idle breathing scale should be disabled while stabilizing frame anchors.");
     Assert.Equal(0.96, PetAnimationTimings.ExpressionDimmedOpacity, "Expression transition should only slightly dim during swaps.");
     Assert.Equal(0.92, PetAnimationTimings.WheelOpenStartScale, "Wheel should open from a small scale change.");
+}
+
+static void CharacterFrameAnimationIsDisabledForMovementDiagnosis()
+{
+    Assert.False(PetAnimationTimings.CharacterFrameAnimationEnabled, "Character frame animation should stay disabled while diagnosing movement hand feel.");
+    Assert.Equal(0d, PetAnimationTimings.ActiveMovementScaleDelta, "Active movement should not scale the character during movement diagnosis.");
+    Assert.Equal(0d, PetAnimationTimings.DragMovementScaleDelta, "Dragging should not scale the character during movement diagnosis.");
 }
 
 static void CharacterAssetsDecodeAtPetDisplayWidth()
