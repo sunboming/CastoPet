@@ -18,37 +18,37 @@ public sealed class AssetService
 
     public BitmapImage LoadDefaultCharacter()
     {
-        return LoadCharacter(DefaultCharacterPath);
+        return LoadCharacter(DefaultCharacterPath, "Default character");
     }
 
     public BitmapImage LoadDraggingCharacter()
     {
-        return LoadCharacter(DraggingCharacterPath);
+        return LoadCharacter(DraggingCharacterPath, "Dragging character");
     }
 
     public IReadOnlyList<ImageSource> LoadIdleFrames()
     {
-        return IdleFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
+        return IdleFrameSequence.FramePaths.Select(path => LoadCharacter(path, "Idle frames")).ToArray();
     }
 
     public IReadOnlyList<ImageSource> LoadBlinkFrames()
     {
-        return BlinkFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
+        return BlinkFrameSequence.FramePaths.Select(path => LoadCharacter(path, "Blink frames")).ToArray();
     }
 
     public IReadOnlyList<ImageSource> LoadMoveFrames()
     {
-        return MoveFrameSequence.FramePaths.Select(LoadCharacter).ToArray();
+        return MoveFrameSequence.FramePaths.Select(path => LoadCharacter(path, "Move frames")).ToArray();
     }
 
     public IReadOnlyList<ImageSource> LoadExpressionTransitionInFrames()
     {
-        return ExpressionTransitionSequence.InFramePaths.Select(LoadCharacter).ToArray();
+        return ExpressionTransitionSequence.InFramePaths.Select(path => LoadCharacter(path, "Expression transition in frames")).ToArray();
     }
 
     public IReadOnlyList<ImageSource> LoadExpressionTransitionOutFrames()
     {
-        return ExpressionTransitionSequence.OutFramePaths.Select(LoadCharacter).ToArray();
+        return ExpressionTransitionSequence.OutFramePaths.Select(path => LoadCharacter(path, "Expression transition out frames")).ToArray();
     }
 
     public IReadOnlyDictionary<ExpressionWheelItem, ImageSource> LoadExpressionWheelImages()
@@ -59,18 +59,22 @@ public sealed class AssetService
         {
             try
             {
-                images[item] = LoadCharacter(item.ResourcePath);
+                images[item] = LoadCharacter(item.ResourcePath, "Expression wheel images");
             }
-            catch (Exception ex)
+            catch
             {
-                _logger.Error($"Failed to load expression wheel image {item.ResourcePath}.", ex);
             }
         }
 
         return images;
     }
 
-    private BitmapImage LoadCharacter(string resourcePath)
+    public static string FormatLoadFailureMessage(string resourceGroup, string resourcePath)
+    {
+        return $"Failed to load {resourceGroup}: {resourcePath}.";
+    }
+
+    private BitmapImage LoadCharacter(string resourcePath, string resourceGroup)
     {
         try
         {
@@ -85,7 +89,7 @@ public sealed class AssetService
         }
         catch (Exception ex)
         {
-            _logger.Error($"Failed to load built-in character image {resourcePath}.", ex);
+            _logger.Error(FormatLoadFailureMessage(resourceGroup, resourcePath), ex);
             throw;
         }
     }

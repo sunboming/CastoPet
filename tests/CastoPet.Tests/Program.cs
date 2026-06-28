@@ -49,6 +49,7 @@ var tests = new (string Name, Action Test)[]
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
     ("Character stationary animations are enabled", CharacterStationaryAnimationsAreEnabled),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
+    ("Asset diagnostics include group and resource path", AssetDiagnosticsIncludeGroupAndResourcePath),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
 
@@ -702,6 +703,14 @@ static void CharacterStationaryAnimationsAreEnabled()
 static void CharacterAssetsDecodeAtPetDisplayWidth()
 {
     Assert.Equal(320, AssetService.CharacterDecodePixelWidth, "Character assets should decode near their display width to avoid full-size frame memory.");
+}
+
+static void AssetDiagnosticsIncludeGroupAndResourcePath()
+{
+    var message = AssetService.FormatLoadFailureMessage("Idle frames", "Assets/States/Idle/Castorice.Idle.03.png");
+
+    Assert.Contains(message, "Idle frames", "Asset diagnostics should include the resource group.");
+    Assert.Contains(message, "Assets/States/Idle/Castorice.Idle.03.png", "Asset diagnostics should include the resource path.");
 }
 
 static void PackagedCharacterAssetsAreDisplaySized()
