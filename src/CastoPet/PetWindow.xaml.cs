@@ -343,7 +343,16 @@ public partial class PetWindow : Window
             return;
         }
 
+        CharacterImage.Source = _inputReactiveBase;
         InputReactiveOverlay.Children.Clear();
+        foreach (var key in InputKeyboardLayout.KeyIds)
+        {
+            if (InputKeyboardLayout.TryGetKeyBounds(key, out var bounds))
+            {
+                AddInputReactiveKeyRectangle(bounds, isActive: false);
+            }
+        }
+
         foreach (var key in _inputReactiveState.GetActiveHighlights(GetInputReactiveTime()))
         {
             if (!InputKeyboardLayout.TryGetKeyBounds(key, out var bounds))
@@ -351,21 +360,30 @@ public partial class PetWindow : Window
                 continue;
             }
 
-            var rectangle = new WpfShapes.Rectangle
-            {
-                Width = bounds.Width,
-                Height = bounds.Height,
-                RadiusX = 5,
-                RadiusY = 5,
-                Fill = new SolidColorBrush(WpfColor.FromArgb(176, 247, 236, 255)),
-                Stroke = new SolidColorBrush(WpfColor.FromArgb(225, 119, 78, 190)),
-                StrokeThickness = 1.2,
-                IsHitTestVisible = false,
-            };
-            WpfControls.Canvas.SetLeft(rectangle, bounds.X);
-            WpfControls.Canvas.SetTop(rectangle, bounds.Y);
-            InputReactiveOverlay.Children.Add(rectangle);
+            AddInputReactiveKeyRectangle(bounds, isActive: true);
         }
+    }
+
+    private void AddInputReactiveKeyRectangle(System.Drawing.RectangleF bounds, bool isActive)
+    {
+        var rectangle = new WpfShapes.Rectangle
+        {
+            Width = bounds.Width,
+            Height = bounds.Height,
+            RadiusX = 5,
+            RadiusY = 5,
+            Fill = new SolidColorBrush(isActive
+                ? WpfColor.FromArgb(190, 248, 238, 255)
+                : WpfColor.FromArgb(92, 244, 236, 255)),
+            Stroke = new SolidColorBrush(isActive
+                ? WpfColor.FromArgb(230, 119, 78, 190)
+                : WpfColor.FromArgb(132, 119, 78, 190)),
+            StrokeThickness = isActive ? 1.4 : 0.8,
+            IsHitTestVisible = false,
+        };
+        WpfControls.Canvas.SetLeft(rectangle, bounds.X);
+        WpfControls.Canvas.SetTop(rectangle, bounds.Y);
+        InputReactiveOverlay.Children.Add(rectangle);
     }
 
     private static TimeSpan GetInputReactiveTime()

@@ -40,6 +40,7 @@ var tests = new (string Name, Action Test)[]
     ("Tray menu exposes push cursor text", TrayMenuExposesPushCursorText),
     ("Tray menu exposes input reactive mode text", TrayMenuExposesInputReactiveModeText),
     ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
+    ("Input keyboard layout exposes drawable keys", InputKeyboardLayoutExposesDrawableKeys),
     ("Input reactive state expires highlights", InputReactiveStateExpiresHighlights),
     ("Windows input hook normalizes common keys", WindowsInputHookNormalizesCommonKeys),
     ("Input reactive mode suppresses passive animation", InputReactiveModeSuppressesPassiveAnimation),
@@ -557,6 +558,13 @@ static void InputKeyboardLayoutMapsCommonKeys()
         "A should fit inside the visual bounds.");
     Assert.True(space.Width > a.Width, "Space should be wider than a letter key.");
     Assert.True(enter.Height >= a.Height, "Enter should be at least as tall as a letter key.");
+}
+
+static void InputKeyboardLayoutExposesDrawableKeys()
+{
+    Assert.True(InputKeyboardLayout.KeyIds.Contains("A"), "Drawable keys should include A.");
+    Assert.True(InputKeyboardLayout.KeyIds.Contains("Space"), "Drawable keys should include Space.");
+    Assert.True(InputKeyboardLayout.KeyIds.Contains("MouseLeft"), "Drawable keys should include mouse feedback zones.");
 }
 
 static void InputReactiveStateExpiresHighlights()

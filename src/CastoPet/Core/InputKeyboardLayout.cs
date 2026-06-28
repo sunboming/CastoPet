@@ -13,6 +13,11 @@ public static class InputKeyboardLayout
 
     private static readonly IReadOnlyDictionary<string, RectangleF> KeyBounds = BuildKeyBounds();
 
+    public static IReadOnlyList<string> KeyIds { get; } = KeyBounds.Keys
+        .OrderBy(key => KeyBounds[key].Y)
+        .ThenBy(key => KeyBounds[key].X)
+        .ToArray();
+
     public static bool TryGetKeyBounds(string key, out RectangleF bounds)
     {
         return KeyBounds.TryGetValue(key, out bounds);
