@@ -29,9 +29,9 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _expressionWheelHoldTimer;
     private readonly DispatcherTimer _temporaryExpressionTimer;
     private readonly DispatcherTimer _expressionTransitionFrameTimer;
-    private readonly DispatcherTimer _activeMovementTimer;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
+    private readonly IReadOnlyList<ImageSource> _moveFrames;
     private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
     private readonly List<ExpressionWheelItem> _expressionWheelItems = new();
     private readonly List<FrameworkElement> _expressionWheelItemVisuals = new();
@@ -53,6 +53,7 @@ public partial class PetWindow : Window
     private bool _hasActiveMovementTarget;
     private int? _selectedExpressionWheelIndex;
     private ImageSource? _pendingExpressionImage;
+    private TimeSpan? _lastActiveMovementRenderTime;
     private ExpressionTransitionMode _expressionTransitionMode;
     private int _expressionTransitionFrameIndex;
     private int _idleFrameIndex;
@@ -60,6 +61,11 @@ public partial class PetWindow : Window
     private int _activeMovementVisualDirection;
     private bool _dragMovementVisualApplied;
     private double _lastMovementDeltaX;
+    private double _logicalLeft;
+    private double _logicalTop;
+    private double _moveFrameDistanceAccumulator;
+    private int _moveFrameIndex;
+    private bool _activeMovementRenderingSubscribed;
 
     private enum ExpressionTransitionMode
     {
@@ -86,8 +92,6 @@ public partial class PetWindow : Window
         _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
         _expressionTransitionFrameTimer = new DispatcherTimer { Interval = ExpressionTransitionSequence.FrameInterval };
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
-        _activeMovementTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
-        _activeMovementTimer.Tick += (_, _) => AdvanceActiveMovement();
 
         try
         {
@@ -95,6 +99,7 @@ public partial class PetWindow : Window
             _draggingCharacter = assets.LoadDraggingCharacter();
             _idleFrames = assets.LoadIdleFrames();
             _blinkFrames = assets.LoadBlinkFrames();
+            _moveFrames = assets.LoadMoveFrames();
             _expressionTransitionInFrames = assets.LoadExpressionTransitionInFrames();
             _expressionTransitionOutFrames = assets.LoadExpressionTransitionOutFrames();
             _expressionImages = assets.LoadExpressionWheelImages();
@@ -107,6 +112,7 @@ public partial class PetWindow : Window
             _draggingCharacter = CharacterImage.Source;
             _idleFrames = Array.Empty<ImageSource>();
             _blinkFrames = Array.Empty<ImageSource>();
+            _moveFrames = Array.Empty<ImageSource>();
             _expressionTransitionInFrames = Array.Empty<ImageSource>();
             _expressionTransitionOutFrames = Array.Empty<ImageSource>();
             _expressionImages = new Dictionary<ExpressionWheelItem, ImageSource>();
@@ -281,7 +287,7 @@ public partial class PetWindow : Window
     private void BeginDrag()
     {
         CancelTemporaryExpression();
-        _activeMovementTimer.Stop();
+        StopActiveMovementRendering();
         _hasActiveMovementTarget = false;
         _isDragging = true;
         _dragRestoreTimer.Stop();
@@ -332,20 +338,72 @@ public partial class PetWindow : Window
     {
         if (CanRunActiveMovement())
         {
-            _activeMovementTimer.Start();
+            StartActiveMovementRendering();
             return;
         }
 
-        _activeMovementTimer.Stop();
+        StopActiveMovementRendering();
         _hasActiveMovementTarget = false;
+        ResetMoveFrameState();
         ResetActiveMovementVisual();
     }
 
-    private void AdvanceActiveMovement()
+    private void StartActiveMovementRendering()
+    {
+        if (_activeMovementRenderingSubscribed)
+        {
+            return;
+        }
+
+        _logicalLeft = Left;
+        _logicalTop = Top;
+        _lastActiveMovementRenderTime = null;
+        CompositionTarget.Rendering += OnActiveMovementRendering;
+        _activeMovementRenderingSubscribed = true;
+    }
+
+    private void StopActiveMovementRendering()
+    {
+        if (!_activeMovementRenderingSubscribed)
+        {
+            return;
+        }
+
+        CompositionTarget.Rendering -= OnActiveMovementRendering;
+        _activeMovementRenderingSubscribed = false;
+        _lastActiveMovementRenderTime = null;
+    }
+
+    private void OnActiveMovementRendering(object? sender, EventArgs e)
+    {
+        if (e is not RenderingEventArgs renderingArgs)
+        {
+            return;
+        }
+
+        AdvanceActiveMovement(renderingArgs.RenderingTime);
+    }
+
+    private void AdvanceActiveMovement(TimeSpan renderingTime)
     {
         if (!CanRunActiveMovement())
         {
             UpdateActiveMovementTimer();
+            return;
+        }
+
+        if (_lastActiveMovementRenderTime is null)
+        {
+            _lastActiveMovementRenderTime = renderingTime;
+            _logicalLeft = Left;
+            _logicalTop = Top;
+            return;
+        }
+
+        var elapsed = renderingTime - _lastActiveMovementRenderTime.Value;
+        _lastActiveMovementRenderTime = renderingTime;
+        if (elapsed <= TimeSpan.Zero)
+        {
             return;
         }
 
@@ -384,21 +442,38 @@ public partial class PetWindow : Window
         {
             _hasActiveMovementTarget = false;
             _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+            ResetMoveFrameState();
             ResetActiveMovementVisual();
             return;
         }
 
-        var next = PetMovementPlanner.StepToward(Left, Top, _activeMovementTarget);
-        _lastMovementDeltaX = next.Left - Left;
-        Left = next.Left;
-        Top = next.Top;
+        var dx = _activeMovementTarget.Left - _logicalLeft;
+        var dy = _activeMovementTarget.Top - _logicalTop;
+        var distance = Math.Sqrt(dx * dx + dy * dy);
+        var step = MoveFrameSequence.StepDistance(elapsed, distance);
+        if (step <= 0 || distance <= 0.001)
+        {
+            return;
+        }
+
+        var ratio = step / distance;
+        var nextLeft = _logicalLeft + dx * ratio;
+        var nextTop = _logicalTop + dy * ratio;
+
+        _lastMovementDeltaX = nextLeft - _logicalLeft;
+        _logicalLeft = nextLeft;
+        _logicalTop = nextTop;
+        Left = Math.Round(_logicalLeft);
+        Top = Math.Round(_logicalTop);
         _runtimeState.SetRuntimePosition(Left, Top);
+        AdvanceMoveFrame(step);
         ApplyActiveMovementVisual();
 
         if (PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
         {
             _hasActiveMovementTarget = false;
             _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+            ResetMoveFrameState();
         }
     }
 
@@ -435,6 +510,33 @@ public partial class PetWindow : Window
 
         _activeMovementTarget = PetMovementPlanner.ClampTarget(targetLeft, targetTop, width, height, bounds);
         _hasActiveMovementTarget = true;
+    }
+
+    private void AdvanceMoveFrame(double distance)
+    {
+        if (_moveFrames.Count == 0 || distance <= 0)
+        {
+            return;
+        }
+
+        _moveFrameDistanceAccumulator += distance;
+        while (_moveFrameDistanceAccumulator >= MoveFrameSequence.DistancePerFrame)
+        {
+            _moveFrameDistanceAccumulator -= MoveFrameSequence.DistancePerFrame;
+            _moveFrameIndex = (_moveFrameIndex + 1) % _moveFrames.Count;
+            CharacterImage.Source = _moveFrames[_moveFrameIndex];
+        }
+    }
+
+    private void ResetMoveFrameState()
+    {
+        _moveFrameDistanceAccumulator = 0;
+        _moveFrameIndex = 0;
+
+        if (!_isDragging && !_temporaryExpressionTimer.IsEnabled && _expressionTransitionMode == ExpressionTransitionMode.None)
+        {
+            CharacterImage.Source = GetCurrentIdleFrame();
+        }
     }
 
     private void ApplyActiveMovementVisual()
