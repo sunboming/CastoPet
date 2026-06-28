@@ -50,6 +50,7 @@ public partial class PetWindow : Window
     private bool _isBlinking;
     private bool _isExpressionWheelOpen;
     private bool _activeMovementEnabled;
+    private bool _pushCursorEnabled;
     private bool _hasActiveMovementTarget;
     private int? _selectedExpressionWheelIndex;
     private ImageSource? _pendingExpressionImage;
@@ -143,6 +144,7 @@ public partial class PetWindow : Window
         ShowInTaskbar = settings.ShowInTaskbar;
         _isClickThrough = settings.ClickThrough;
         _activeMovementEnabled = settings.ActiveMovement;
+        _pushCursorEnabled = settings.PushCursor;
         UpdateActiveMovementTimer();
 
         if (new WindowInteropHelper(this).Handle == IntPtr.Zero)
@@ -169,6 +171,7 @@ public partial class PetWindow : Window
         menu.Items.Add(CreateCheckedMenuItem(TrayService.AlwaysOnTopText, () => commands.Settings.Topmost, commands.ToggleTopmost));
         menu.Items.Add(CreateCheckedMenuItem(TrayService.MouseClickThroughText, () => commands.Settings.ClickThrough, commands.ToggleClickThrough));
         menu.Items.Add(CreateCheckedMenuItem(TrayService.ActiveMovementText, () => commands.Settings.ActiveMovement, commands.ToggleActiveMovement));
+        menu.Items.Add(CreateCheckedMenuItem(TrayService.PushCursorText, () => commands.Settings.PushCursor, commands.TogglePushCursor));
         menu.Items.Add(CreateCheckedMenuItem(TrayService.ShowTaskbarIconText, () => commands.Settings.ShowInTaskbar, commands.ToggleShowInTaskbar));
         menu.Items.Add(CreateCheckedMenuItem(TrayService.StartWithWindowsText, () => commands.Settings.StartWithWindows, commands.ToggleStartWithWindows));
         menu.Items.Add(new WpfControls.Separator());
@@ -1205,6 +1208,7 @@ public partial class PetWindow : Window
                 TrayService.AlwaysOnTopText => commands.Settings.Topmost,
                 TrayService.MouseClickThroughText => commands.Settings.ClickThrough,
                 TrayService.ActiveMovementText => commands.Settings.ActiveMovement,
+                TrayService.PushCursorText => commands.Settings.PushCursor,
                 TrayService.ShowTaskbarIconText => commands.Settings.ShowInTaskbar,
                 TrayService.StartWithWindowsText => commands.Settings.StartWithWindows,
                 _ => item.IsChecked,

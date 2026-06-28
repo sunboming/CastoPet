@@ -54,6 +54,12 @@ public sealed class MenuCommandService
         ApplyAndSave("Active movement setting changed.");
     }
 
+    public void TogglePushCursor()
+    {
+        Settings.PushCursor = !Settings.PushCursor;
+        ApplyAndSave("Push cursor setting changed.");
+    }
+
     public void ToggleShowInTaskbar()
     {
         Settings.ShowInTaskbar = !Settings.ShowInTaskbar;

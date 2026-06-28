@@ -7,6 +7,7 @@ public sealed class AppSettings
     public bool ShowInTaskbar { get; set; }
     public bool StartWithWindows { get; set; }
     public bool ActiveMovement { get; set; }
+    public bool PushCursor { get; set; }
 
     public static AppSettings Default => new();
 
@@ -19,6 +20,7 @@ public sealed class AppSettings
             ShowInTaskbar = ShowInTaskbar,
             StartWithWindows = StartWithWindows,
             ActiveMovement = ActiveMovement,
+            PushCursor = PushCursor,
         };
     }
 }

@@ -5,8 +5,10 @@ var tests = new (string Name, Action Test)[]
 {
     ("Default settings match MVP defaults", DefaultSettingsMatchMvpDefaults),
     ("Default active movement is disabled", DefaultActiveMovementIsDisabled),
+    ("Default push cursor is disabled", DefaultPushCursorIsDisabled),
     ("Settings round trip as JSON", SettingsRoundTripAsJson),
     ("Settings round trip includes active movement", SettingsRoundTripIncludesActiveMovement),
+    ("Settings round trip includes push cursor", SettingsRoundTripIncludesPushCursor),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
     ("Logging writes a dated log file", LoggingWritesDatedLogFile),
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
@@ -28,6 +30,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
     ("Tray menu exposes active movement text", TrayMenuExposesActiveMovementText),
+    ("Tray menu exposes push cursor text", TrayMenuExposesPushCursorText),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
@@ -64,6 +67,7 @@ static void DefaultSettingsMatchMvpDefaults()
     Assert.False(settings.ShowInTaskbar, "ShowInTaskbar should default to false.");
     Assert.False(settings.StartWithWindows, "StartWithWindows should default to false.");
     Assert.False(settings.ActiveMovement, "ActiveMovement should default to false.");
+    Assert.False(settings.PushCursor, "PushCursor should default to false.");
 }
 
 static void DefaultActiveMovementIsDisabled()
@@ -71,6 +75,13 @@ static void DefaultActiveMovementIsDisabled()
     var settings = AppSettings.Default;
 
     Assert.False(settings.ActiveMovement, "Active movement should default to false.");
+}
+
+static void DefaultPushCursorIsDisabled()
+{
+    var settings = AppSettings.Default;
+
+    Assert.False(settings.PushCursor, "Push cursor should default to false.");
 }
 
 static void SettingsRoundTripAsJson()
@@ -87,6 +98,7 @@ static void SettingsRoundTripAsJson()
         ShowInTaskbar = true,
         StartWithWindows = true,
         ActiveMovement = true,
+        PushCursor = true,
     };
 
     service.Save(settings);
@@ -97,6 +109,7 @@ static void SettingsRoundTripAsJson()
     Assert.True(loaded.ShowInTaskbar, "ShowInTaskbar should round trip.");
     Assert.True(loaded.StartWithWindows, "StartWithWindows should round trip.");
     Assert.True(loaded.ActiveMovement, "ActiveMovement should round trip.");
+    Assert.True(loaded.PushCursor, "PushCursor should round trip.");
 }
 
 static void SettingsRoundTripIncludesActiveMovement()
@@ -121,6 +134,24 @@ static void SettingsRoundTripIncludesActiveMovement()
     Assert.True(loaded.ActiveMovement, "ActiveMovement should round trip.");
 }
 
+static void SettingsRoundTripIncludesPushCursor()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new SettingsService(paths, logger);
+
+    var settings = new AppSettings
+    {
+        PushCursor = true,
+    };
+
+    service.Save(settings);
+    var loaded = service.Load();
+
+    Assert.True(loaded.PushCursor, "PushCursor should round trip.");
+}
+
 static void InvalidSettingsFallsBackToDefaults()
 {
     using var temp = TempDirectory.Create();
@@ -135,6 +166,7 @@ static void InvalidSettingsFallsBackToDefaults()
     Assert.True(loaded.Topmost, "Invalid settings should return defaults.");
     Assert.False(loaded.ClickThrough, "Invalid settings should return defaults.");
     Assert.False(loaded.ActiveMovement, "Invalid settings should return defaults.");
+    Assert.False(loaded.PushCursor, "Invalid settings should return defaults.");
     Assert.True(File.Exists(paths.LogFile), "Invalid settings should be logged.");
 }
 
@@ -343,6 +375,11 @@ static void ExpressionWheelStyleIsTextOnlyWithDividers()
 static void TrayMenuExposesActiveMovementText()
 {
     Assert.Equal("主动移动", TrayService.ActiveMovementText, "Active movement menu text should be localized.");
+}
+
+static void TrayMenuExposesPushCursorText()
+{
+    Assert.Equal("推动鼠标", TrayService.PushCursorText, "Push cursor menu text should be localized.");
 }
 
 static void MovementPlannerClampsTargetsToWorkArea()
