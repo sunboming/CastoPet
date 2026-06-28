@@ -425,13 +425,7 @@ public partial class PetWindow : Window
 
         if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
         {
-            if (!_hasActiveMovementTarget)
-            {
-                StopIdleAnimation();
-                StopBlinkAnimation();
-            }
-
-            _activeMovementTarget = PetMovementPlanner.CalculateMouseApproachTarget(
+            var mouseApproachTarget = PetMovementPlanner.CalculateMouseApproachTarget(
                 Left,
                 Top,
                 width,
@@ -439,6 +433,27 @@ public partial class PetWindow : Window
                 cursor.X,
                 cursor.Y,
                 bounds);
+            if (PetMovementPlanner.IsClose(Left, Top, mouseApproachTarget))
+            {
+                if (_hasActiveMovementTarget)
+                {
+                    _hasActiveMovementTarget = false;
+                    _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+                    ResetMoveFrameState();
+                    ResetActiveMovementVisual();
+                    ScheduleNextBlink();
+                }
+
+                return;
+            }
+
+            if (!_hasActiveMovementTarget)
+            {
+                StopIdleAnimation();
+                StopBlinkAnimation();
+            }
+
+            _activeMovementTarget = mouseApproachTarget;
             _hasActiveMovementTarget = true;
         }
         else if (!_hasActiveMovementTarget || PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))

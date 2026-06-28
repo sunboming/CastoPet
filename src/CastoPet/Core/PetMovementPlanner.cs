@@ -81,4 +81,18 @@ public static class PetMovementPlanner
 
         return Math.Sqrt(dx * dx + dy * dy) <= StopDistance;
     }
+
+    public static bool IsAtMouseApproachTarget(
+        double petLeft,
+        double petTop,
+        double petWidth,
+        double petHeight,
+        double mouseX,
+        double mouseY,
+        PetMovementBounds bounds)
+    {
+        var target = CalculateMouseApproachTarget(petLeft, petTop, petWidth, petHeight, mouseX, mouseY, bounds);
+
+        return IsClose(petLeft, petTop, target);
+    }
 }

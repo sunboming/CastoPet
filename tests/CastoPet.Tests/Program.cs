@@ -35,6 +35,7 @@ var tests = new (string Name, Action Test)[]
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
     ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
+    ("Movement planner detects mouse approach rest position", MovementPlannerDetectsMouseApproachRestPosition),
     ("Cursor nudge planner nudges nearby cursor", CursorNudgePlannerNudgesNearbyCursor),
     ("Cursor nudge planner ignores distant cursor", CursorNudgePlannerIgnoresDistantCursor),
     ("Cursor nudge planner clamps to work area", CursorNudgePlannerClampsToWorkArea),
@@ -442,6 +443,40 @@ static void MovementPlannerDetectsCloseTargets()
 
     Assert.True(PetMovementPlanner.IsClose(10, 14, target), "Nearby coordinates should be close.");
     Assert.False(PetMovementPlanner.IsClose(0, 0, target), "Distant coordinates should not be close.");
+}
+
+static void MovementPlannerDetectsMouseApproachRestPosition()
+{
+    var bounds = new PetMovementBounds(0, 0, 800, 600);
+    var target = PetMovementPlanner.CalculateMouseApproachTarget(
+        petLeft: 100,
+        petTop: 100,
+        petWidth: 100,
+        petHeight: 100,
+        mouseX: 300,
+        mouseY: 150,
+        bounds);
+
+    Assert.True(
+        PetMovementPlanner.IsAtMouseApproachTarget(
+            target.Left + 1,
+            target.Top + 1,
+            petWidth: 100,
+            petHeight: 100,
+            mouseX: 300,
+            mouseY: 150,
+            bounds),
+        "Pet should be treated as stationary when already near the mouse approach target.");
+    Assert.False(
+        PetMovementPlanner.IsAtMouseApproachTarget(
+            petLeft: 100,
+            petTop: 100,
+            petWidth: 100,
+            petHeight: 100,
+            mouseX: 300,
+            mouseY: 150,
+            bounds),
+        "Pet should still move when away from the mouse approach target.");
 }
 
 static void CursorNudgePlannerNudgesNearbyCursor()
