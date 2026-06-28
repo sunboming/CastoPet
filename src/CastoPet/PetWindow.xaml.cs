@@ -984,31 +984,12 @@ public partial class PetWindow : Window
 
     private void UpdateExpressionWheelSelection(WpfPoint position)
     {
-        var vector = position - _expressionWheelOrigin;
-        var distance = vector.Length;
-
-        if (distance < ExpressionWheelCatalog.InnerRadius || distance > ExpressionWheelCatalog.OuterRadius)
-        {
-            _selectedExpressionWheelIndex = null;
-            UpdateExpressionWheelVisualSelection();
-            return;
-        }
-
-        var count = _expressionWheelItems.Count;
-        if (count == 0)
-        {
-            _selectedExpressionWheelIndex = null;
-            UpdateExpressionWheelVisualSelection();
-            return;
-        }
-
-        var angle = Math.Atan2(vector.Y, vector.X) + Math.PI / 2;
-        if (angle < 0)
-        {
-            angle += 2 * Math.PI;
-        }
-
-        _selectedExpressionWheelIndex = (int)Math.Round(angle / (2 * Math.PI / count)) % count;
+        _selectedExpressionWheelIndex = ExpressionWheelSelector.GetSelectedIndex(
+            position.X,
+            position.Y,
+            _expressionWheelOrigin.X,
+            _expressionWheelOrigin.Y,
+            _expressionWheelItems.Count);
         UpdateExpressionWheelVisualSelection();
     }
 

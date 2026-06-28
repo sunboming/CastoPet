@@ -30,6 +30,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition sequence defines shared frames", ExpressionTransitionSequenceDefinesSharedFrames),
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
+    ("Expression wheel selector maps pointer positions", ExpressionWheelSelectorMapsPointerPositions),
     ("Tray menu exposes active movement text", TrayMenuExposesActiveMovementText),
     ("Tray menu exposes push cursor text", TrayMenuExposesPushCursorText),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
@@ -397,6 +398,55 @@ static void ExpressionWheelStyleIsTextOnlyWithDividers()
     Assert.Equal(256d, ExpressionWheelCatalog.WheelOuterDiameter, "Outer background should fit inside the wheel surface.");
     Assert.Equal(84d, ExpressionWheelCatalog.WheelInnerDiameter, "Inner no-selection zone should remain visible.");
     Assert.Equal(1.18d, ExpressionWheelCatalog.SelectedScale, "Selected wheel item should still scale up visibly.");
+}
+
+static void ExpressionWheelSelectorMapsPointerPositions()
+{
+    Assert.Equal(
+        null,
+        ExpressionWheelSelector.GetSelectedIndex(
+            pointerX: 0,
+            pointerY: 0,
+            originX: 0,
+            originY: 0,
+            itemCount: 8),
+        "Pointer inside the inner radius should not select an item.");
+    Assert.Equal(
+        null,
+        ExpressionWheelSelector.GetSelectedIndex(
+            pointerX: ExpressionWheelCatalog.OuterRadius + 20,
+            pointerY: 0,
+            originX: 0,
+            originY: 0,
+            itemCount: 8),
+        "Pointer outside the outer radius should not select an item.");
+    Assert.Equal(
+        0,
+        ExpressionWheelSelector.GetSelectedIndex(
+            pointerX: 0,
+            pointerY: -ExpressionWheelCatalog.InnerRadius - 10,
+            originX: 0,
+            originY: 0,
+            itemCount: 8),
+        "Pointer above the origin should select the top item.");
+    Assert.Equal(
+        2,
+        ExpressionWheelSelector.GetSelectedIndex(
+            pointerX: ExpressionWheelCatalog.InnerRadius + 10,
+            pointerY: 0,
+            originX: 0,
+            originY: 0,
+            itemCount: 8),
+        "Pointer right of the origin should select the right item.");
+    Assert.Equal(
+        4,
+        ExpressionWheelSelector.GetSelectedIndex(
+            pointerX: 0,
+            pointerY: ExpressionWheelCatalog.InnerRadius + 10,
+            originX: 0,
+            originY: 0,
+            itemCount: 8),
+        "Pointer below the origin should select the bottom item.");
 }
 
 static void TrayMenuExposesActiveMovementText()
