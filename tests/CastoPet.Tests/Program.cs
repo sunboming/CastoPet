@@ -41,7 +41,7 @@ var tests = new (string Name, Action Test)[]
     ("Cursor nudge planner detects manual movement cooldown", CursorNudgePlannerDetectsManualMovementCooldown),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
-    ("Character frame animation is disabled for movement diagnosis", CharacterFrameAnimationIsDisabledForMovementDiagnosis),
+    ("Character stationary animations are enabled", CharacterStationaryAnimationsAreEnabled),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
@@ -531,10 +531,10 @@ static void IdleBreathingValuesAreNeutralDuringStabilization()
     Assert.Equal(0.92, PetAnimationTimings.WheelOpenStartScale, "Wheel should open from a small scale change.");
 }
 
-static void CharacterFrameAnimationIsDisabledForMovementDiagnosis()
+static void CharacterStationaryAnimationsAreEnabled()
 {
-    Assert.False(PetAnimationTimings.CharacterFrameAnimationEnabled, "Character frame animation should stay disabled while diagnosing movement hand feel.");
-    Assert.True(PetAnimationTimings.BlinkFrameAnimationEnabled, "Blink should be restored while idle frame animation remains disabled.");
+    Assert.True(PetAnimationTimings.CharacterFrameAnimationEnabled, "Idle frame animation should be restored only while stationary.");
+    Assert.True(PetAnimationTimings.BlinkFrameAnimationEnabled, "Blink should be restored while stationary.");
     Assert.True(PetAnimationTimings.ActiveMovementScaleDelta > 0, "Active movement should use a subtle visual state after static movement validated window smoothness.");
     Assert.True(PetAnimationTimings.ActiveMovementScaleDelta <= 0.006, "Active movement scale should stay subtle.");
     Assert.True(PetAnimationTimings.DragMovementScaleDelta > PetAnimationTimings.ActiveMovementScaleDelta, "Dragging should use a slightly stronger visual state than automatic movement.");

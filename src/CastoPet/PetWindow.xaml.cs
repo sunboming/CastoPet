@@ -425,6 +425,12 @@ public partial class PetWindow : Window
 
         if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
         {
+            if (!_hasActiveMovementTarget)
+            {
+                StopIdleAnimation();
+                StopBlinkAnimation();
+            }
+
             _activeMovementTarget = PetMovementPlanner.CalculateMouseApproachTarget(
                 Left,
                 Top,
@@ -575,6 +581,9 @@ public partial class PetWindow : Window
             return;
         }
 
+        StopIdleAnimation();
+        StopBlinkAnimation();
+
         const double range = 160;
         var targetLeft = Left + _movementRandom.NextDouble() * range * 2 - range;
         var targetTop = Top + _movementRandom.NextDouble() * range * 2 - range;
@@ -607,6 +616,7 @@ public partial class PetWindow : Window
         if (!_isDragging && !_temporaryExpressionTimer.IsEnabled && _expressionTransitionMode == ExpressionTransitionMode.None)
         {
             CharacterImage.Source = GetCurrentIdleFrame();
+            StartIdleAnimation();
         }
     }
 
@@ -1156,7 +1166,7 @@ public partial class PetWindow : Window
 
     private void StartIdleAnimation()
     {
-        if (!PetAnimationTimings.CharacterFrameAnimationEnabled || _isDragging || _idleFrames.Count == 0)
+        if (!CanIdleAnimate())
         {
             return;
         }
@@ -1173,8 +1183,9 @@ public partial class PetWindow : Window
 
     private void AdvanceIdleFrame()
     {
-        if (_isDragging || _idleFrames.Count == 0)
+        if (!CanIdleAnimate())
         {
+            StopIdleAnimation();
             return;
         }
 
@@ -1188,6 +1199,17 @@ public partial class PetWindow : Window
     private ImageSource GetCurrentIdleFrame()
     {
         return _idleFrames.Count == 0 ? _defaultCharacter : _idleFrames[_idleFrameIndex];
+    }
+
+    private bool CanIdleAnimate()
+    {
+        return PetAnimationTimings.CharacterFrameAnimationEnabled
+            && !_isDragging
+            && !_hasActiveMovementTarget
+            && !_isExpressionWheelOpen
+            && !_temporaryExpressionTimer.IsEnabled
+            && _expressionTransitionMode == ExpressionTransitionMode.None
+            && _idleFrames.Count > 0;
     }
 
     private void ScheduleNextBlink()
