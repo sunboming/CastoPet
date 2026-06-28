@@ -41,7 +41,7 @@ public partial class PetWindow : Window
     private readonly List<WpfShapes.Line> _expressionWheelDividerVisuals = new();
     private readonly Random _blinkRandom = new();
     private readonly Random _movementRandom = new();
-    private AppSettings? _pendingSettings;
+    private PetWindowSettingsSnapshot? _pendingSettings;
     private PetMovementTarget _activeMovementTarget;
     private DateTime _nextWanderDecisionUtc = DateTime.MinValue;
     private WpfPoint _expressionWheelOrigin;
@@ -147,16 +147,17 @@ public partial class PetWindow : Window
 
     public void ApplySettings(AppSettings settings)
     {
-        Topmost = settings.Topmost;
-        ShowInTaskbar = settings.ShowInTaskbar;
-        _isClickThrough = settings.ClickThrough;
-        _activeMovementEnabled = settings.ActiveMovement;
-        _pushCursorEnabled = settings.PushCursor;
+        var snapshot = PetWindowSettingsSnapshot.FromSettings(settings);
+        Topmost = snapshot.Topmost;
+        ShowInTaskbar = snapshot.ShowInTaskbar;
+        _isClickThrough = snapshot.ClickThrough;
+        _activeMovementEnabled = snapshot.ActiveMovement;
+        _pushCursorEnabled = snapshot.PushCursor;
         UpdateActiveMovementTimer();
 
         if (new WindowInteropHelper(this).Handle == IntPtr.Zero)
         {
-            _pendingSettings = settings;
+            _pendingSettings = snapshot;
             if (!_applySettingsOnSourceInitialized)
             {
                 _applySettingsOnSourceInitialized = true;
@@ -166,7 +167,7 @@ public partial class PetWindow : Window
             return;
         }
 
-        ClickThroughService.Apply(this, settings.ClickThrough, settings.ShowInTaskbar);
+        ClickThroughService.Apply(this, snapshot.ClickThrough, snapshot.ShowInTaskbar);
     }
 
     public void AttachContextMenu(MenuCommandService commands)

@@ -9,6 +9,7 @@ var tests = new (string Name, Action Test)[]
     ("Settings round trip as JSON", SettingsRoundTripAsJson),
     ("Settings round trip includes active movement", SettingsRoundTripIncludesActiveMovement),
     ("Settings round trip includes push cursor", SettingsRoundTripIncludesPushCursor),
+    ("Pet window settings snapshot copies runtime flags", PetWindowSettingsSnapshotCopiesRuntimeFlags),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
     ("Logging writes a dated log file", LoggingWritesDatedLogFile),
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
@@ -159,6 +160,26 @@ static void SettingsRoundTripIncludesPushCursor()
     var loaded = service.Load();
 
     Assert.True(loaded.PushCursor, "PushCursor should round trip.");
+}
+
+static void PetWindowSettingsSnapshotCopiesRuntimeFlags()
+{
+    var settings = new AppSettings
+    {
+        Topmost = false,
+        ClickThrough = true,
+        ShowInTaskbar = true,
+        ActiveMovement = true,
+        PushCursor = true,
+    };
+
+    var snapshot = PetWindowSettingsSnapshot.FromSettings(settings);
+
+    Assert.False(snapshot.Topmost, "Topmost should be copied for immediate window application.");
+    Assert.True(snapshot.ClickThrough, "Click-through should be copied for Win32 window style application.");
+    Assert.True(snapshot.ShowInTaskbar, "Taskbar visibility should be copied for window application.");
+    Assert.True(snapshot.ActiveMovement, "Active movement should be copied for movement runtime state.");
+    Assert.True(snapshot.PushCursor, "Push cursor should be copied for movement runtime state.");
 }
 
 static void InvalidSettingsFallsBackToDefaults()
