@@ -42,6 +42,7 @@ var tests = new (string Name, Action Test)[]
     ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
     ("Input reactive state expires highlights", InputReactiveStateExpiresHighlights),
     ("Windows input hook normalizes common keys", WindowsInputHookNormalizesCommonKeys),
+    ("Input reactive mode suppresses passive animation", InputReactiveModeSuppressesPassiveAnimation),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
@@ -574,6 +575,16 @@ static void WindowsInputHookNormalizesCommonKeys()
     Assert.Equal("Space", WindowsInputHookService.NormalizeVirtualKey(0x20), "VK_SPACE should normalize to Space.");
     Assert.Equal("Enter", WindowsInputHookService.NormalizeVirtualKey(0x0D), "VK_RETURN should normalize to Enter.");
     Assert.Equal("Left", WindowsInputHookService.NormalizeVirtualKey(0x25), "VK_LEFT should normalize to Left.");
+}
+
+static void InputReactiveModeSuppressesPassiveAnimation()
+{
+    Assert.False(
+        InputReactiveModePolicy.AllowsPassiveAnimation(inputReactiveModeActive: true),
+        "Input reactive mode should pause idle, blink, and active movement visuals.");
+    Assert.True(
+        InputReactiveModePolicy.AllowsPassiveAnimation(inputReactiveModeActive: false),
+        "Normal passive animation should remain available outside input reactive mode.");
 }
 
 static void MovementPlannerClampsTargetsToWorkArea()

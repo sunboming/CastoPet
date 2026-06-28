@@ -25,6 +25,12 @@
             </Image.RenderTransform>
         </Image>
 
+        <Canvas x:Name="InputReactiveOverlay"
+                Width="320"
+                Height="420"
+                Visibility="Collapsed"
+                IsHitTestVisible="False" />
+
         <Canvas x:Name="ExpressionWheelOverlay"
                 Visibility="Collapsed"
                 IsHitTestVisible="False">
