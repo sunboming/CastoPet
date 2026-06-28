@@ -7,6 +7,7 @@ public sealed class AssetService
 {
     public const string DefaultCharacterPath = "Assets/Castorice.png";
     public const string DraggingCharacterPath = "Assets/States/Castorice.Dragging.png";
+    public const string InputReactiveBasePath = "Assets/States/InputReactive/Castorice.InputReactive.Base.png";
     public const int CharacterDecodePixelWidth = 320;
 
     private readonly LoggingService _logger;
@@ -24,6 +25,18 @@ public sealed class AssetService
     public BitmapImage LoadDraggingCharacter()
     {
         return LoadCharacter(DraggingCharacterPath, "Dragging character");
+    }
+
+    public ImageSource? TryLoadInputReactiveBase()
+    {
+        try
+        {
+            return LoadCharacter(InputReactiveBasePath, "Input reactive base");
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public IReadOnlyList<ImageSource> LoadIdleFrames()

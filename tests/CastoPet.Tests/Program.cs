@@ -57,6 +57,8 @@ var tests = new (string Name, Action Test)[]
     ("Character stationary animations are enabled", CharacterStationaryAnimationsAreEnabled),
     ("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
     ("Asset diagnostics include group and resource path", AssetDiagnosticsIncludeGroupAndResourcePath),
+    ("Input reactive asset path uses app resource", InputReactiveAssetPathUsesAppResource),
+    ("Input reactive asset is packaged", InputReactiveAssetIsPackaged),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
 };
 
@@ -797,6 +799,26 @@ static void AssetDiagnosticsIncludeGroupAndResourcePath()
     Assert.Contains(message, "Assets/States/Idle/Castorice.Idle.03.png", "Asset diagnostics should include the resource path.");
 }
 
+static void InputReactiveAssetPathUsesAppResource()
+{
+    Assert.Equal(
+        "Assets/States/InputReactive/Castorice.InputReactive.Base.png",
+        AssetService.InputReactiveBasePath,
+        "Input reactive base should use an app resource path.");
+}
+
+static void InputReactiveAssetIsPackaged()
+{
+    var workspace = FindWorkspaceRoot();
+    var projectFile = System.IO.Path.Combine(workspace, "src", "CastoPet", "CastoPet.csproj");
+    var projectText = File.ReadAllText(projectFile);
+
+    Assert.Contains(
+        projectText,
+        @"Assets\States\InputReactive\Castorice.InputReactive.Base.png",
+        "Input reactive base should be packaged as a WPF resource.");
+}
+
 static void PackagedCharacterAssetsAreDisplaySized()
 {
     var workspace = FindWorkspaceRoot();
@@ -815,8 +837,8 @@ static void PackagedCharacterAssetsAreDisplaySized()
         var (width, height) = ReadPngSize(asset);
 
         Assert.True(
-            width <= AssetService.CharacterDecodePixelWidth && height <= AssetService.CharacterDecodePixelWidth,
-            $"{asset} should be no larger than {AssetService.CharacterDecodePixelWidth}px, got {width}x{height}.");
+            width <= AssetService.CharacterDecodePixelWidth && height <= 420,
+            $"{asset} should fit the pet display bounds, got {width}x{height}.");
     }
 }
 

@@ -34,6 +34,7 @@
     <Resource Include="Assets\States\Blink\Castorice.Blink.00.png" />
     <Resource Include="Assets\States\Blink\Castorice.Blink.01.png" />
     <Resource Include="Assets\States\Blink\Castorice.Blink.02.png" />
+    <Resource Include="Assets\States\InputReactive\Castorice.InputReactive.Base.png" />
     <Resource Include="Assets\Expressions\Castorice.Expression.Happy.png" />
     <Resource Include="Assets\Expressions\Castorice.Expression.Shy.png" />
     <Resource Include="Assets\Expressions\Castorice.Expression.Sleepy.png" />
