@@ -35,6 +35,10 @@ var tests = new (string Name, Action Test)[]
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
     ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
+    ("Cursor nudge planner nudges nearby cursor", CursorNudgePlannerNudgesNearbyCursor),
+    ("Cursor nudge planner ignores distant cursor", CursorNudgePlannerIgnoresDistantCursor),
+    ("Cursor nudge planner clamps to work area", CursorNudgePlannerClampsToWorkArea),
+    ("Cursor nudge planner detects manual movement cooldown", CursorNudgePlannerDetectsManualMovementCooldown),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
     ("Character frame animation is disabled for movement diagnosis", CharacterFrameAnimationIsDisabledForMovementDiagnosis),
@@ -438,6 +442,76 @@ static void MovementPlannerDetectsCloseTargets()
 
     Assert.True(PetMovementPlanner.IsClose(10, 14, target), "Nearby coordinates should be close.");
     Assert.False(PetMovementPlanner.IsClose(0, 0, target), "Distant coordinates should not be close.");
+}
+
+static void CursorNudgePlannerNudgesNearbyCursor()
+{
+    var bounds = new PetMovementBounds(0, 0, 500, 400);
+    var result = CursorNudgePlanner.CalculateNudge(
+        cursorX: 120,
+        cursorY: 120,
+        petCenterX: 130,
+        petCenterY: 120,
+        movementDeltaX: 10,
+        movementDeltaY: 0,
+        bounds);
+
+    Assert.True(result.ShouldMove, "Nearby cursor should be nudged.");
+    Assert.Equal(123d, result.X, "Nudge should clamp to the per-frame maximum.");
+    Assert.Equal(120d, result.Y, "Horizontal movement should not change Y.");
+}
+
+static void CursorNudgePlannerIgnoresDistantCursor()
+{
+    var bounds = new PetMovementBounds(0, 0, 500, 400);
+    var result = CursorNudgePlanner.CalculateNudge(
+        cursorX: 20,
+        cursorY: 20,
+        petCenterX: 200,
+        petCenterY: 200,
+        movementDeltaX: 10,
+        movementDeltaY: 0,
+        bounds);
+
+    Assert.False(result.ShouldMove, "Distant cursor should not be nudged.");
+}
+
+static void CursorNudgePlannerClampsToWorkArea()
+{
+    var bounds = new PetMovementBounds(0, 0, 100, 100);
+    var result = CursorNudgePlanner.CalculateNudge(
+        cursorX: 99,
+        cursorY: 99,
+        petCenterX: 98,
+        petCenterY: 98,
+        movementDeltaX: 10,
+        movementDeltaY: 10,
+        bounds);
+
+    Assert.True(result.ShouldMove, "Nearby cursor should still be nudged at the edge.");
+    Assert.Equal(99d, result.X, "Cursor should stay inside the work area.");
+    Assert.Equal(99d, result.Y, "Cursor should stay inside the work area.");
+}
+
+static void CursorNudgePlannerDetectsManualMovementCooldown()
+{
+    Assert.True(
+        CursorNudgePlanner.IsManualMovement(
+            currentX: 140,
+            currentY: 100,
+            expectedX: 100,
+            expectedY: 100),
+        "Large unexpected cursor movement should count as manual input.");
+    Assert.False(
+        CursorNudgePlanner.CanNudgeAfterManualMovement(
+            now: TimeSpan.FromMilliseconds(500),
+            lastManualMovement: TimeSpan.Zero),
+        "Push should pause during the manual movement cooldown.");
+    Assert.True(
+        CursorNudgePlanner.CanNudgeAfterManualMovement(
+            now: TimeSpan.FromMilliseconds(1200),
+            lastManualMovement: TimeSpan.Zero),
+        "Push should resume after the manual movement cooldown.");
 }
 
 static void PetAnimationTimingsAreResponsive()
