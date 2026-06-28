@@ -349,7 +349,7 @@ public partial class PetWindow : Window
         {
             if (InputKeyboardLayout.TryGetKeyBounds(key, out var bounds))
             {
-                AddInputReactiveKeyRectangle(bounds, isActive: false);
+                AddInputReactiveKeyVisual(key, bounds, isActive: false);
             }
         }
 
@@ -360,11 +360,11 @@ public partial class PetWindow : Window
                 continue;
             }
 
-            AddInputReactiveKeyRectangle(bounds, isActive: true);
+            AddInputReactiveKeyVisual(key, bounds, isActive: true);
         }
     }
 
-    private void AddInputReactiveKeyRectangle(System.Drawing.RectangleF bounds, bool isActive)
+    private void AddInputReactiveKeyVisual(string key, System.Drawing.RectangleF bounds, bool isActive)
     {
         var rectangle = new WpfShapes.Rectangle
         {
@@ -384,6 +384,23 @@ public partial class PetWindow : Window
         WpfControls.Canvas.SetLeft(rectangle, bounds.X);
         WpfControls.Canvas.SetTop(rectangle, bounds.Y);
         InputReactiveOverlay.Children.Add(rectangle);
+
+        var label = new WpfControls.TextBlock
+        {
+            Text = InputKeyboardLayout.GetDisplayLabel(key),
+            Width = bounds.Width,
+            Height = bounds.Height,
+            FontSize = bounds.Width > 34 ? 8 : 9,
+            FontWeight = isActive ? FontWeights.Bold : FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(isActive
+                ? WpfColor.FromArgb(255, 70, 38, 114)
+                : WpfColor.FromArgb(210, 80, 48, 128)),
+            TextAlignment = TextAlignment.Center,
+            IsHitTestVisible = false,
+        };
+        WpfControls.Canvas.SetLeft(label, bounds.X);
+        WpfControls.Canvas.SetTop(label, bounds.Y + 1);
+        InputReactiveOverlay.Children.Add(label);
     }
 
     private static TimeSpan GetInputReactiveTime()

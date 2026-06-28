@@ -41,6 +41,7 @@ var tests = new (string Name, Action Test)[]
     ("Tray menu exposes input reactive mode text", TrayMenuExposesInputReactiveModeText),
     ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
     ("Input keyboard layout exposes drawable keys", InputKeyboardLayoutExposesDrawableKeys),
+    ("Input keyboard layout exposes key labels", InputKeyboardLayoutExposesKeyLabels),
     ("Input reactive state expires highlights", InputReactiveStateExpiresHighlights),
     ("Windows input hook normalizes common keys", WindowsInputHookNormalizesCommonKeys),
     ("Input reactive mode suppresses passive animation", InputReactiveModeSuppressesPassiveAnimation),
@@ -565,6 +566,14 @@ static void InputKeyboardLayoutExposesDrawableKeys()
     Assert.True(InputKeyboardLayout.KeyIds.Contains("A"), "Drawable keys should include A.");
     Assert.True(InputKeyboardLayout.KeyIds.Contains("Space"), "Drawable keys should include Space.");
     Assert.True(InputKeyboardLayout.KeyIds.Contains("MouseLeft"), "Drawable keys should include mouse feedback zones.");
+}
+
+static void InputKeyboardLayoutExposesKeyLabels()
+{
+    Assert.Equal("A", InputKeyboardLayout.GetDisplayLabel("A"), "Letter keys should display themselves.");
+    Assert.Equal("Space", InputKeyboardLayout.GetDisplayLabel("Space"), "Space should display a readable label.");
+    Assert.Equal("←", InputKeyboardLayout.GetDisplayLabel("Left"), "Arrow keys should display arrow glyphs.");
+    Assert.Equal("L", InputKeyboardLayout.GetDisplayLabel("MouseLeft"), "Mouse left feedback should display a compact label.");
 }
 
 static void InputReactiveStateExpiresHighlights()

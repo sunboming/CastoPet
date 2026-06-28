@@ -23,6 +23,26 @@ public static class InputKeyboardLayout
         return KeyBounds.TryGetValue(key, out bounds);
     }
 
+    public static string GetDisplayLabel(string key)
+    {
+        return key switch
+        {
+            "Backspace" => "⌫",
+            "Enter" => "↵",
+            "Shift" => "⇧",
+            "Ctrl" => "C",
+            "Alt" => "A",
+            "Left" => "←",
+            "Up" => "↑",
+            "Right" => "→",
+            "Down" => "↓",
+            "MouseLeft" => "L",
+            "MouseRight" => "R",
+            "MouseMiddle" => "M",
+            _ => key,
+        };
+    }
+
     private static IReadOnlyDictionary<string, RectangleF> BuildKeyBounds()
     {
         var keys = new Dictionary<string, RectangleF>(StringComparer.OrdinalIgnoreCase);
