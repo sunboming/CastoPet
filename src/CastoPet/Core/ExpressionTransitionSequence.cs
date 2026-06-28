@@ -2,9 +2,9 @@ namespace CastoPet.Core;
 
 public static class ExpressionTransitionSequence
 {
-    public const int InFrameCount = 2;
-    public const int OutFrameCount = 2;
-    public static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(80);
+    public const int InFrameCount = 4;
+    public const int OutFrameCount = 4;
+    public static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(55);
 
     public static readonly IReadOnlyList<string> InFramePaths = Enumerable
         .Range(0, InFrameCount)

@@ -410,9 +410,9 @@ static void ExpressionWheelPathsUseAppResources()
 
 static void ExpressionTransitionSequenceDefinesSharedFrames()
 {
-    Assert.Equal(2, ExpressionTransitionSequence.InFrameCount, "Transition-in should use two shared frames.");
-    Assert.Equal(2, ExpressionTransitionSequence.OutFrameCount, "Transition-out should use two shared frames.");
-    Assert.Equal(TimeSpan.FromMilliseconds(80), ExpressionTransitionSequence.FrameInterval, "Expression transition frames should be brief.");
+    Assert.Equal(4, ExpressionTransitionSequence.InFrameCount, "Transition-in should use four shared frames for smoother expression changes.");
+    Assert.Equal(4, ExpressionTransitionSequence.OutFrameCount, "Transition-out should use four shared frames for smoother expression changes.");
+    Assert.Equal(TimeSpan.FromMilliseconds(55), ExpressionTransitionSequence.FrameInterval, "More transition frames should stay brief overall.");
     Assert.Equal(ExpressionTransitionSequence.InFrameCount, ExpressionTransitionSequence.InFramePaths.Count, "Transition-in paths should match frame count.");
     Assert.Equal(ExpressionTransitionSequence.OutFrameCount, ExpressionTransitionSequence.OutFramePaths.Count, "Transition-out paths should match frame count.");
 }
@@ -420,9 +420,9 @@ static void ExpressionTransitionSequenceDefinesSharedFrames()
 static void ExpressionTransitionPathsUseAppResources()
 {
     Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.00.png", ExpressionTransitionSequence.InFramePaths[0], "First transition-in path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.01.png", ExpressionTransitionSequence.InFramePaths[^1], "Last transition-in path should use the transition resource convention.");
+    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.03.png", ExpressionTransitionSequence.InFramePaths[^1], "Last transition-in path should use the transition resource convention.");
     Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.00.png", ExpressionTransitionSequence.OutFramePaths[0], "First transition-out path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.01.png", ExpressionTransitionSequence.OutFramePaths[^1], "Last transition-out path should use the transition resource convention.");
+    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.03.png", ExpressionTransitionSequence.OutFramePaths[^1], "Last transition-out path should use the transition resource convention.");
 }
 
 static void ExpressionWheelStyleIsTextOnlyWithDividers()

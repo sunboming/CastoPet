@@ -44,7 +44,11 @@
     <Resource Include="Assets\Expressions\Castorice.Expression.Crying.png" />
     <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.In.00.png" />
     <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.In.01.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.In.02.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.In.03.png" />
     <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.Out.00.png" />
     <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.Out.01.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.Out.02.png" />
+    <Resource Include="Assets\Expressions\Transition\Castorice.ExpressionTransition.Out.03.png" />
   </ItemGroup>
 </Project>
