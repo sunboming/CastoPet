@@ -39,6 +39,8 @@ var tests = new (string Name, Action Test)[]
     ("Tray menu exposes active movement text", TrayMenuExposesActiveMovementText),
     ("Tray menu exposes push cursor text", TrayMenuExposesPushCursorText),
     ("Tray menu exposes input reactive mode text", TrayMenuExposesInputReactiveModeText),
+    ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
+    ("Input reactive state expires highlights", InputReactiveStateExpiresHighlights),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
@@ -538,6 +540,29 @@ static void TrayMenuExposesPushCursorText()
 static void TrayMenuExposesInputReactiveModeText()
 {
     Assert.Equal("输入响应模式", TrayService.InputReactiveModeText, "Input reactive menu text should be localized.");
+}
+
+static void InputKeyboardLayoutMapsCommonKeys()
+{
+    Assert.True(InputKeyboardLayout.TryGetKeyBounds("A", out var a), "A should have a key rectangle.");
+    Assert.True(InputKeyboardLayout.TryGetKeyBounds("Space", out var space), "Space should have a key rectangle.");
+    Assert.True(InputKeyboardLayout.TryGetKeyBounds("Enter", out var enter), "Enter should have a key rectangle.");
+    Assert.False(InputKeyboardLayout.TryGetKeyBounds("Unknown", out _), "Unknown keys should not map to a rectangle.");
+    Assert.True(
+        a.X >= 0 && a.Y >= 0 && a.Right <= InputKeyboardLayout.VisualWidth && a.Bottom <= InputKeyboardLayout.VisualHeight,
+        "A should fit inside the visual bounds.");
+    Assert.True(space.Width > a.Width, "Space should be wider than a letter key.");
+    Assert.True(enter.Height >= a.Height, "Enter should be at least as tall as a letter key.");
+}
+
+static void InputReactiveStateExpiresHighlights()
+{
+    var state = new InputReactiveState();
+
+    state.AddKey("A", TimeSpan.Zero);
+
+    Assert.True(state.GetActiveHighlights(TimeSpan.FromMilliseconds(100)).Contains("A"), "A should remain active before expiration.");
+    Assert.False(state.GetActiveHighlights(TimeSpan.FromMilliseconds(300)).Contains("A"), "A should expire after the highlight duration.");
 }
 
 static void MovementPlannerClampsTargetsToWorkArea()
