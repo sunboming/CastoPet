@@ -9,6 +9,7 @@ public static class PetAnimationTimings
     public static readonly TimeSpan WheelSelectionDuration = TimeSpan.FromMilliseconds(90);
     public static readonly TimeSpan MovementVisualDuration = TimeSpan.FromMilliseconds(110);
     public static readonly TimeSpan MovementVisualRestoreDuration = TimeSpan.FromMilliseconds(150);
+    public static readonly TimeSpan ActiveMovementProbeInterval = TimeSpan.FromMilliseconds(250);
 
     public const bool CharacterFrameAnimationEnabled = true;
     public const bool BlinkFrameAnimationEnabled = true;

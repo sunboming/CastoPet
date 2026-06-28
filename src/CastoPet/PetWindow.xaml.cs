@@ -28,6 +28,7 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _expressionWheelHoldTimer;
     private readonly DispatcherTimer _temporaryExpressionTimer;
     private readonly DispatcherTimer _expressionTransitionFrameTimer;
+    private readonly DispatcherTimer _activeMovementProbeTimer;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyList<ImageSource> _moveFrames;
@@ -97,6 +98,8 @@ public partial class PetWindow : Window
         _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
         _expressionTransitionFrameTimer = new DispatcherTimer { Interval = ExpressionTransitionSequence.FrameInterval };
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
+        _activeMovementProbeTimer = new DispatcherTimer { Interval = PetAnimationTimings.ActiveMovementProbeInterval };
+        _activeMovementProbeTimer.Tick += (_, _) => ProbeActiveMovement();
 
         try
         {
@@ -345,14 +348,67 @@ public partial class PetWindow : Window
     {
         if (CanRunActiveMovement())
         {
-            StartActiveMovementRendering();
+            StartActiveMovementProbe();
             return;
         }
 
+        StopActiveMovementProbe();
         StopActiveMovementRendering();
         _hasActiveMovementTarget = false;
         ResetMoveFrameState();
         ResetActiveMovementVisual();
+    }
+
+    private void StartActiveMovementProbe()
+    {
+        if (!_activeMovementProbeTimer.IsEnabled)
+        {
+            _activeMovementProbeTimer.Start();
+        }
+
+        ProbeActiveMovement();
+    }
+
+    private void StopActiveMovementProbe()
+    {
+        _activeMovementProbeTimer.Stop();
+    }
+
+    private void ProbeActiveMovement()
+    {
+        if (!CanRunActiveMovement())
+        {
+            UpdateActiveMovementTimer();
+            return;
+        }
+
+        if (_activeMovementRenderingSubscribed)
+        {
+            return;
+        }
+
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var bounds = GetCurrentMovementBounds();
+        var cursor = GetCursorScreenPosition();
+        var petCenterX = Left + width / 2;
+        var petCenterY = Top + height / 2;
+        var cursorDistance = Math.Sqrt(Math.Pow(cursor.X - petCenterX, 2) + Math.Pow(cursor.Y - petCenterY, 2));
+
+        if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
+        {
+            if (!PetMovementPlanner.IsAtMouseApproachTarget(Left, Top, width, height, cursor.X, cursor.Y, bounds))
+            {
+                StartActiveMovementRendering();
+            }
+
+            return;
+        }
+
+        if (DateTime.UtcNow >= _nextWanderDecisionUtc)
+        {
+            StartActiveMovementRendering();
+        }
     }
 
     private void StartActiveMovementRendering()
@@ -446,6 +502,7 @@ public partial class PetWindow : Window
                     ScheduleNextBlink();
                 }
 
+                StopActiveMovementRendering();
                 return;
             }
 
@@ -466,6 +523,7 @@ public partial class PetWindow : Window
         if (!_hasActiveMovementTarget)
         {
             ResetActiveMovementVisual();
+            StopActiveMovementRendering();
             return;
         }
 
@@ -476,6 +534,7 @@ public partial class PetWindow : Window
             ResetMoveFrameState();
             ResetActiveMovementVisual();
             ScheduleNextBlink();
+            StopActiveMovementRendering();
             return;
         }
 
@@ -510,6 +569,7 @@ public partial class PetWindow : Window
             _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
             ResetMoveFrameState();
             ScheduleNextBlink();
+            StopActiveMovementRendering();
         }
     }
 
