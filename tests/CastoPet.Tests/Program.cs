@@ -534,6 +534,7 @@ static void IdleBreathingValuesAreNeutralDuringStabilization()
 static void CharacterFrameAnimationIsDisabledForMovementDiagnosis()
 {
     Assert.False(PetAnimationTimings.CharacterFrameAnimationEnabled, "Character frame animation should stay disabled while diagnosing movement hand feel.");
+    Assert.True(PetAnimationTimings.BlinkFrameAnimationEnabled, "Blink should be restored while idle frame animation remains disabled.");
     Assert.True(PetAnimationTimings.ActiveMovementScaleDelta > 0, "Active movement should use a subtle visual state after static movement validated window smoothness.");
     Assert.True(PetAnimationTimings.ActiveMovementScaleDelta <= 0.006, "Active movement scale should stay subtle.");
     Assert.True(PetAnimationTimings.DragMovementScaleDelta > PetAnimationTimings.ActiveMovementScaleDelta, "Dragging should use a slightly stronger visual state than automatic movement.");

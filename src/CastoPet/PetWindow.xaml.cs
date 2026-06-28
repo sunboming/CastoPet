@@ -452,6 +452,7 @@ public partial class PetWindow : Window
             _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
             ResetMoveFrameState();
             ResetActiveMovementVisual();
+            ScheduleNextBlink();
             return;
         }
 
@@ -485,6 +486,7 @@ public partial class PetWindow : Window
             _hasActiveMovementTarget = false;
             _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
             ResetMoveFrameState();
+            ScheduleNextBlink();
         }
     }
 
@@ -1191,7 +1193,7 @@ public partial class PetWindow : Window
     private void ScheduleNextBlink()
     {
         _blinkScheduleTimer.Stop();
-        if (!PetAnimationTimings.CharacterFrameAnimationEnabled || _isDragging || _isBlinking || _blinkFrames.Count == 0)
+        if (!CanBlink())
         {
             return;
         }
@@ -1205,7 +1207,7 @@ public partial class PetWindow : Window
     private void BeginBlink()
     {
         _blinkScheduleTimer.Stop();
-        if (!PetAnimationTimings.CharacterFrameAnimationEnabled || _isDragging || _isBlinking || _blinkFrames.Count == 0)
+        if (!CanBlink())
         {
             return;
         }
@@ -1214,6 +1216,18 @@ public partial class PetWindow : Window
         _blinkFrameIndex = 0;
         CharacterImage.Source = _blinkFrames[_blinkFrameIndex];
         _blinkFrameTimer.Start();
+    }
+
+    private bool CanBlink()
+    {
+        return PetAnimationTimings.BlinkFrameAnimationEnabled
+            && !_isDragging
+            && !_isBlinking
+            && !_hasActiveMovementTarget
+            && !_isExpressionWheelOpen
+            && !_temporaryExpressionTimer.IsEnabled
+            && _expressionTransitionMode == ExpressionTransitionMode.None
+            && _blinkFrames.Count > 0;
     }
 
     private void AdvanceBlinkFrame()

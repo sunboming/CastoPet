@@ -11,6 +11,7 @@ public static class PetAnimationTimings
     public static readonly TimeSpan MovementVisualRestoreDuration = TimeSpan.FromMilliseconds(150);
 
     public const bool CharacterFrameAnimationEnabled = false;
+    public const bool BlinkFrameAnimationEnabled = true;
     public const double IdleBreathingTranslateY = 0;
     public const double IdleBreathingScaleDelta = 0;
     public const double ActiveMovementScaleDelta = 0.004;
