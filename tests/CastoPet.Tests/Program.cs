@@ -15,6 +15,7 @@ var tests = new (string Name, Action Test)[]
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
     ("Startup value name is CastoPet", StartupValueNameIsCastoPet),
     ("Startup registration matches current executable path", StartupRegistrationMatchesCurrentExecutablePath),
+    ("Project does not keep template MainWindow", ProjectDoesNotKeepTemplateMainWindow),
     ("Single instance rejects a second owner", SingleInstanceRejectsSecondOwner),
     ("Single instance restore signal reaches primary", SingleInstanceRestoreSignalReachesPrimary),
     ("Runtime position starts at default", RuntimePositionStartsAtDefault),
@@ -251,6 +252,18 @@ static void StartupRegistrationMatchesCurrentExecutablePath()
             "\"C:\\Old\\CastoPet.exe\"",
             "C:\\Apps\\CastoPet\\CastoPet.exe"),
         "Different registry path should not count as enabled for this executable.");
+}
+
+static void ProjectDoesNotKeepTemplateMainWindow()
+{
+    var workspace = FindWorkspaceRoot();
+
+    Assert.False(
+        File.Exists(System.IO.Path.Combine(workspace, "src", "CastoPet", "MainWindow.xaml")),
+        "Template MainWindow.xaml should not be kept in the tray-only pet app.");
+    Assert.False(
+        File.Exists(System.IO.Path.Combine(workspace, "src", "CastoPet", "MainWindow.xaml.cs")),
+        "Template MainWindow.xaml.cs should not be kept in the tray-only pet app.");
 }
 
 static void SingleInstanceRejectsSecondOwner()
