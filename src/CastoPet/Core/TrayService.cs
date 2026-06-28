@@ -10,6 +10,7 @@ public sealed class TrayService : IDisposable
     public const string MouseClickThroughText = "鼠标穿透";
     public const string ActiveMovementText = "主动移动";
     public const string PushCursorText = "推动鼠标";
+    public const string InputReactiveModeText = "输入响应模式";
     public const string ShowTaskbarIconText = "显示任务栏图标";
     public const string StartWithWindowsText = "开机自启动";
     public const string ExitText = "退出";
@@ -20,6 +21,7 @@ public sealed class TrayService : IDisposable
     private readonly Forms.ToolStripMenuItem _clickThroughItem;
     private readonly Forms.ToolStripMenuItem _activeMovementItem;
     private readonly Forms.ToolStripMenuItem _pushCursorItem;
+    private readonly Forms.ToolStripMenuItem _inputReactiveModeItem;
     private readonly Forms.ToolStripMenuItem _taskbarItem;
     private readonly Forms.ToolStripMenuItem _startupItem;
 
@@ -30,6 +32,7 @@ public sealed class TrayService : IDisposable
         _clickThroughItem = CreateCheckedItem(MouseClickThroughText, _commands.ToggleClickThrough);
         _activeMovementItem = CreateCheckedItem(ActiveMovementText, _commands.ToggleActiveMovement);
         _pushCursorItem = CreateCheckedItem(PushCursorText, _commands.TogglePushCursor);
+        _inputReactiveModeItem = CreateCheckedItem(InputReactiveModeText, _commands.ToggleInputReactiveMode);
         _taskbarItem = CreateCheckedItem(ShowTaskbarIconText, _commands.ToggleShowInTaskbar);
         _startupItem = CreateCheckedItem(StartWithWindowsText, _commands.ToggleStartWithWindows);
 
@@ -40,6 +43,7 @@ public sealed class TrayService : IDisposable
         menu.Items.Add(_clickThroughItem);
         menu.Items.Add(_activeMovementItem);
         menu.Items.Add(_pushCursorItem);
+        menu.Items.Add(_inputReactiveModeItem);
         menu.Items.Add(_taskbarItem);
         menu.Items.Add(_startupItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -71,6 +75,7 @@ public sealed class TrayService : IDisposable
         _clickThroughItem.Checked = _commands.Settings.ClickThrough;
         _activeMovementItem.Checked = _commands.Settings.ActiveMovement;
         _pushCursorItem.Checked = _commands.Settings.PushCursor;
+        _inputReactiveModeItem.Checked = _commands.Settings.InputReactiveMode;
         _taskbarItem.Checked = _commands.Settings.ShowInTaskbar;
         _startupItem.Checked = _commands.Settings.StartWithWindows;
     }

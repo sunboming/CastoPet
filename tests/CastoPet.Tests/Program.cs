@@ -6,10 +6,13 @@ var tests = new (string Name, Action Test)[]
     ("Default settings match MVP defaults", DefaultSettingsMatchMvpDefaults),
     ("Default active movement is disabled", DefaultActiveMovementIsDisabled),
     ("Default push cursor is disabled", DefaultPushCursorIsDisabled),
+    ("Default input reactive mode is disabled", DefaultInputReactiveModeIsDisabled),
     ("Settings round trip as JSON", SettingsRoundTripAsJson),
     ("Settings round trip includes active movement", SettingsRoundTripIncludesActiveMovement),
     ("Settings round trip includes push cursor", SettingsRoundTripIncludesPushCursor),
+    ("Settings round trip includes input reactive mode", SettingsRoundTripIncludesInputReactiveMode),
     ("Pet window settings snapshot copies runtime flags", PetWindowSettingsSnapshotCopiesRuntimeFlags),
+    ("Pet window settings snapshot copies input reactive mode", PetWindowSettingsSnapshotCopiesInputReactiveMode),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
     ("Logging writes a dated log file", LoggingWritesDatedLogFile),
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
@@ -35,6 +38,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression wheel selector maps pointer positions", ExpressionWheelSelectorMapsPointerPositions),
     ("Tray menu exposes active movement text", TrayMenuExposesActiveMovementText),
     ("Tray menu exposes push cursor text", TrayMenuExposesPushCursorText),
+    ("Tray menu exposes input reactive mode text", TrayMenuExposesInputReactiveModeText),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
@@ -94,6 +98,13 @@ static void DefaultPushCursorIsDisabled()
     var settings = AppSettings.Default;
 
     Assert.False(settings.PushCursor, "Push cursor should default to false.");
+}
+
+static void DefaultInputReactiveModeIsDisabled()
+{
+    var settings = AppSettings.Default;
+
+    Assert.False(settings.InputReactiveMode, "Input reactive mode should default to false.");
 }
 
 static void SettingsRoundTripAsJson()
@@ -164,6 +175,24 @@ static void SettingsRoundTripIncludesPushCursor()
     Assert.True(loaded.PushCursor, "PushCursor should round trip.");
 }
 
+static void SettingsRoundTripIncludesInputReactiveMode()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new SettingsService(paths, logger);
+
+    var settings = new AppSettings
+    {
+        InputReactiveMode = true,
+    };
+
+    service.Save(settings);
+    var loaded = service.Load();
+
+    Assert.True(loaded.InputReactiveMode, "InputReactiveMode should round trip.");
+}
+
 static void PetWindowSettingsSnapshotCopiesRuntimeFlags()
 {
     var settings = new AppSettings
@@ -182,6 +211,18 @@ static void PetWindowSettingsSnapshotCopiesRuntimeFlags()
     Assert.True(snapshot.ShowInTaskbar, "Taskbar visibility should be copied for window application.");
     Assert.True(snapshot.ActiveMovement, "Active movement should be copied for movement runtime state.");
     Assert.True(snapshot.PushCursor, "Push cursor should be copied for movement runtime state.");
+}
+
+static void PetWindowSettingsSnapshotCopiesInputReactiveMode()
+{
+    var settings = new AppSettings
+    {
+        InputReactiveMode = true,
+    };
+
+    var snapshot = PetWindowSettingsSnapshot.FromSettings(settings);
+
+    Assert.True(snapshot.InputReactiveMode, "Input reactive mode should be copied for window runtime state.");
 }
 
 static void InvalidSettingsFallsBackToDefaults()
@@ -492,6 +533,11 @@ static void TrayMenuExposesActiveMovementText()
 static void TrayMenuExposesPushCursorText()
 {
     Assert.Equal("推动鼠标", TrayService.PushCursorText, "Push cursor menu text should be localized.");
+}
+
+static void TrayMenuExposesInputReactiveModeText()
+{
+    Assert.Equal("输入响应模式", TrayService.InputReactiveModeText, "Input reactive menu text should be localized.");
 }
 
 static void MovementPlannerClampsTargetsToWorkArea()

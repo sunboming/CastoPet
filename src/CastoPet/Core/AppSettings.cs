@@ -8,6 +8,7 @@ public sealed class AppSettings
     public bool StartWithWindows { get; set; }
     public bool ActiveMovement { get; set; }
     public bool PushCursor { get; set; }
+    public bool InputReactiveMode { get; set; }
 
     public static AppSettings Default => new();
 
@@ -21,6 +22,7 @@ public sealed class AppSettings
             StartWithWindows = StartWithWindows,
             ActiveMovement = ActiveMovement,
             PushCursor = PushCursor,
+            InputReactiveMode = InputReactiveMode,
         };
     }
 }

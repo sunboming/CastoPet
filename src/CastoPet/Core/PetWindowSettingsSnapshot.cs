@@ -5,7 +5,8 @@ public sealed record PetWindowSettingsSnapshot(
     bool ClickThrough,
     bool ShowInTaskbar,
     bool ActiveMovement,
-    bool PushCursor)
+    bool PushCursor,
+    bool InputReactiveMode)
 {
     public static PetWindowSettingsSnapshot FromSettings(AppSettings settings)
     {
@@ -14,6 +15,7 @@ public sealed record PetWindowSettingsSnapshot(
             settings.ClickThrough,
             settings.ShowInTaskbar,
             settings.ActiveMovement,
-            settings.PushCursor);
+            settings.PushCursor,
+            settings.InputReactiveMode);
     }
 }

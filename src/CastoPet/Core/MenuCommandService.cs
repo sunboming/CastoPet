@@ -60,6 +60,12 @@ public sealed class MenuCommandService
         ApplyAndSave("Push cursor setting changed.");
     }
 
+    public void ToggleInputReactiveMode()
+    {
+        Settings.InputReactiveMode = !Settings.InputReactiveMode;
+        ApplyAndSave("Input reactive mode setting changed.");
+    }
+
     public void ToggleShowInTaskbar()
     {
         Settings.ShowInTaskbar = !Settings.ShowInTaskbar;
