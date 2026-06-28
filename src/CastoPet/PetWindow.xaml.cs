@@ -3,7 +3,6 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using CastoPet.Core;
-using Forms = System.Windows.Forms;
 using WpfControls = System.Windows.Controls;
 using WpfInput = System.Windows.Input;
 using WpfAnimation = System.Windows.Media.Animation;
@@ -33,6 +32,7 @@ public partial class PetWindow : Window
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyList<ImageSource> _moveFrames;
     private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
+    private readonly WindowsCursorService _cursorService = new();
     private readonly List<ExpressionWheelItem> _expressionWheelItems = new();
     private readonly List<FrameworkElement> _expressionWheelItemVisuals = new();
     private readonly List<WpfShapes.Path> _expressionWheelSectorVisuals = new();
@@ -55,6 +55,7 @@ public partial class PetWindow : Window
     private int? _selectedExpressionWheelIndex;
     private ImageSource? _pendingExpressionImage;
     private TimeSpan? _lastActiveMovementRenderTime;
+    private TimeSpan? _lastManualCursorMovementTime;
     private ExpressionTransitionMode _expressionTransitionMode;
     private int _expressionTransitionFrameIndex;
     private int _idleFrameIndex;
@@ -65,6 +66,8 @@ public partial class PetWindow : Window
     private double _logicalLeft;
     private double _logicalTop;
     private double _moveFrameDistanceAccumulator;
+    private double? _expectedCursorX;
+    private double? _expectedCursorY;
     private int _moveFrameIndex;
     private bool _activeMovementRenderingSubscribed;
 
@@ -375,6 +378,8 @@ public partial class PetWindow : Window
         CompositionTarget.Rendering -= OnActiveMovementRendering;
         _activeMovementRenderingSubscribed = false;
         _lastActiveMovementRenderTime = null;
+        _expectedCursorX = null;
+        _expectedCursorY = null;
     }
 
     private void OnActiveMovementRendering(object? sender, EventArgs e)
@@ -462,8 +467,10 @@ public partial class PetWindow : Window
         var ratio = step / distance;
         var nextLeft = _logicalLeft + dx * ratio;
         var nextTop = _logicalTop + dy * ratio;
+        var movementDeltaX = nextLeft - _logicalLeft;
+        var movementDeltaY = nextTop - _logicalTop;
 
-        _lastMovementDeltaX = nextLeft - _logicalLeft;
+        _lastMovementDeltaX = movementDeltaX;
         _logicalLeft = nextLeft;
         _logicalTop = nextTop;
         Left = Math.Round(_logicalLeft);
@@ -471,6 +478,7 @@ public partial class PetWindow : Window
         _runtimeState.SetRuntimePosition(Left, Top);
         AdvanceMoveFrame(step);
         ApplyActiveMovementVisual();
+        TryPushCursor(renderingTime, movementDeltaX, movementDeltaY);
 
         if (PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
         {
@@ -491,13 +499,71 @@ public partial class PetWindow : Window
 
     private WpfPoint GetCursorScreenPosition()
     {
-        var cursor = Forms.Cursor.Position;
+        var cursor = _cursorService.GetPosition();
         var point = new WpfPoint(cursor.X, cursor.Y);
         var source = PresentationSource.FromVisual(this);
 
         return source?.CompositionTarget is null
             ? point
             : source.CompositionTarget.TransformFromDevice.Transform(point);
+    }
+
+    private void TryPushCursor(TimeSpan renderingTime, double movementDeltaX, double movementDeltaY)
+    {
+        if (!_pushCursorEnabled || !_activeMovementEnabled)
+        {
+            _expectedCursorX = null;
+            _expectedCursorY = null;
+            return;
+        }
+
+        var cursor = GetCursorScreenPosition();
+        if (_expectedCursorX is double expectedX
+            && _expectedCursorY is double expectedY
+            && CursorNudgePlanner.IsManualMovement(cursor.X, cursor.Y, expectedX, expectedY))
+        {
+            _lastManualCursorMovementTime = renderingTime;
+            _expectedCursorX = cursor.X;
+            _expectedCursorY = cursor.Y;
+            return;
+        }
+
+        if (!CursorNudgePlanner.CanNudgeAfterManualMovement(renderingTime, _lastManualCursorMovementTime))
+        {
+            return;
+        }
+
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+        var result = CursorNudgePlanner.CalculateNudge(
+            cursor.X,
+            cursor.Y,
+            Left + width / 2,
+            Top + height / 2,
+            movementDeltaX,
+            movementDeltaY,
+            GetCurrentMovementBounds());
+
+        if (!result.ShouldMove)
+        {
+            _expectedCursorX = cursor.X;
+            _expectedCursorY = cursor.Y;
+            return;
+        }
+
+        var devicePoint = ToDevicePoint(new WpfPoint(result.X, result.Y));
+        _cursorService.SetPosition(devicePoint.X, devicePoint.Y);
+        _expectedCursorX = result.X;
+        _expectedCursorY = result.Y;
+    }
+
+    private WpfPoint ToDevicePoint(WpfPoint point)
+    {
+        var source = PresentationSource.FromVisual(this);
+
+        return source?.CompositionTarget is null
+            ? point
+            : source.CompositionTarget.TransformToDevice.Transform(point);
     }
 
     private void ChooseWanderTarget(double width, double height, PetMovementBounds bounds)
