@@ -56,6 +56,7 @@ public partial class PetWindow : Window
     private ImageSource? _pendingExpressionImage;
     private TimeSpan? _lastActiveMovementRenderTime;
     private TimeSpan? _lastManualCursorMovementTime;
+    private TimeSpan? _cursorPushStartedAt;
     private ExpressionTransitionMode _expressionTransitionMode;
     private int _expressionTransitionFrameIndex;
     private int _idleFrameIndex;
@@ -380,6 +381,7 @@ public partial class PetWindow : Window
         _lastActiveMovementRenderTime = null;
         _expectedCursorX = null;
         _expectedCursorY = null;
+        _cursorPushStartedAt = null;
     }
 
     private void OnActiveMovementRendering(object? sender, EventArgs e)
@@ -537,6 +539,7 @@ public partial class PetWindow : Window
         {
             _expectedCursorX = null;
             _expectedCursorY = null;
+            _cursorPushStartedAt = null;
             return;
         }
 
@@ -548,11 +551,17 @@ public partial class PetWindow : Window
             _lastManualCursorMovementTime = renderingTime;
             _expectedCursorX = cursor.X;
             _expectedCursorY = cursor.Y;
+            _cursorPushStartedAt = null;
             return;
         }
 
-        if (!CursorNudgePlanner.CanNudgeAfterManualMovement(renderingTime, _lastManualCursorMovementTime))
+        if (!CursorNudgePlanner.CanNudge(
+            _cursorService.IsAnyMouseButtonPressed(),
+            renderingTime,
+            _lastManualCursorMovementTime,
+            _cursorPushStartedAt))
         {
+            _cursorPushStartedAt = null;
             return;
         }
 
@@ -571,9 +580,11 @@ public partial class PetWindow : Window
         {
             _expectedCursorX = cursor.X;
             _expectedCursorY = cursor.Y;
+            _cursorPushStartedAt = null;
             return;
         }
 
+        _cursorPushStartedAt ??= renderingTime;
         var devicePoint = ToDevicePoint(new WpfPoint(result.X, result.Y));
         _cursorService.SetPosition(devicePoint.X, devicePoint.Y);
         _expectedCursorX = result.X;

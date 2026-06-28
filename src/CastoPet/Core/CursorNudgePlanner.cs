@@ -8,6 +8,7 @@ public static class CursorNudgePlanner
     public const double MaxPixelsPerFrame = 3;
     public const double ManualMovementThreshold = 8;
     public static readonly TimeSpan ManualMovementCooldown = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan MaxContinuousPushDuration = TimeSpan.FromSeconds(2);
 
     public static CursorNudgeResult CalculateNudge(
         double cursorX,
@@ -54,6 +55,20 @@ public static class CursorNudgePlanner
     public static bool CanNudgeAfterManualMovement(TimeSpan now, TimeSpan? lastManualMovement)
     {
         return lastManualMovement is null || now - lastManualMovement.Value >= ManualMovementCooldown;
+    }
+
+    public static bool CanNudge(
+        bool isMouseButtonPressed,
+        TimeSpan now,
+        TimeSpan? lastManualMovement,
+        TimeSpan? pushStartedAt)
+    {
+        if (isMouseButtonPressed || !CanNudgeAfterManualMovement(now, lastManualMovement))
+        {
+            return false;
+        }
+
+        return pushStartedAt is null || now - pushStartedAt.Value <= MaxContinuousPushDuration;
     }
 
     private static double Distance(double ax, double ay, double bx, double by)

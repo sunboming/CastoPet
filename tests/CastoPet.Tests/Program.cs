@@ -40,6 +40,8 @@ var tests = new (string Name, Action Test)[]
     ("Cursor nudge planner ignores distant cursor", CursorNudgePlannerIgnoresDistantCursor),
     ("Cursor nudge planner clamps to work area", CursorNudgePlannerClampsToWorkArea),
     ("Cursor nudge planner detects manual movement cooldown", CursorNudgePlannerDetectsManualMovementCooldown),
+    ("Cursor nudge planner blocks while mouse button is pressed", CursorNudgePlannerBlocksWhileMouseButtonIsPressed),
+    ("Cursor nudge planner limits continuous push duration", CursorNudgePlannerLimitsContinuousPushDuration),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
     ("Character stationary animations are enabled", CharacterStationaryAnimationsAreEnabled),
@@ -547,6 +549,35 @@ static void CursorNudgePlannerDetectsManualMovementCooldown()
             now: TimeSpan.FromMilliseconds(1200),
             lastManualMovement: TimeSpan.Zero),
         "Push should resume after the manual movement cooldown.");
+}
+
+static void CursorNudgePlannerBlocksWhileMouseButtonIsPressed()
+{
+    Assert.False(
+        CursorNudgePlanner.CanNudge(
+            isMouseButtonPressed: true,
+            now: TimeSpan.FromSeconds(2),
+            lastManualMovement: null,
+            pushStartedAt: TimeSpan.FromSeconds(1)),
+        "Cursor push should stop while any mouse button is pressed.");
+}
+
+static void CursorNudgePlannerLimitsContinuousPushDuration()
+{
+    Assert.True(
+        CursorNudgePlanner.CanNudge(
+            isMouseButtonPressed: false,
+            now: TimeSpan.FromMilliseconds(500),
+            lastManualMovement: null,
+            pushStartedAt: TimeSpan.Zero),
+        "Cursor push should be allowed before the continuous duration cap.");
+    Assert.False(
+        CursorNudgePlanner.CanNudge(
+            isMouseButtonPressed: false,
+            now: TimeSpan.FromMilliseconds(2500),
+            lastManualMovement: null,
+            pushStartedAt: TimeSpan.Zero),
+        "Cursor push should stop after the continuous duration cap.");
 }
 
 static void PetAnimationTimingsAreResponsive()
