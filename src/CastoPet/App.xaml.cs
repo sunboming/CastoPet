@@ -29,14 +29,13 @@ public partial class App : System.Windows.Application
 
         var settingsService = new SettingsService(paths, _logger);
         var settings = settingsService.Load();
+        var executablePath = Environment.ProcessPath
+            ?? Assembly.GetExecutingAssembly().Location;
         var startupService = new StartupService(_logger);
-        settings.StartWithWindows = startupService.IsEnabled();
+        settings.StartWithWindows = startupService.IsEnabled(executablePath);
 
         var assets = new AssetService(_logger);
         _window = new PetWindow(assets, _logger);
-
-        var executablePath = Environment.ProcessPath
-            ?? Assembly.GetExecutingAssembly().Location;
         var commands = new MenuCommandService(
             _window,
             settings,

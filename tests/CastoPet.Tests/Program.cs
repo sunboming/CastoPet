@@ -13,6 +13,7 @@ var tests = new (string Name, Action Test)[]
     ("Logging writes a dated log file", LoggingWritesDatedLogFile),
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
     ("Startup value name is CastoPet", StartupValueNameIsCastoPet),
+    ("Startup registration matches current executable path", StartupRegistrationMatchesCurrentExecutablePath),
     ("Single instance rejects a second owner", SingleInstanceRejectsSecondOwner),
     ("Single instance restore signal reaches primary", SingleInstanceRestoreSignalReachesPrimary),
     ("Runtime position starts at default", RuntimePositionStartsAtDefault),
@@ -208,6 +209,25 @@ static void BottomRightPlacementUsesWorkAreaMargin()
 static void StartupValueNameIsCastoPet()
 {
     Assert.Equal("CastoPet", StartupService.ValueName, "Startup registry value should use app name.");
+}
+
+static void StartupRegistrationMatchesCurrentExecutablePath()
+{
+    Assert.True(
+        StartupService.MatchesExecutablePath(
+            "\"C:\\Apps\\CastoPet\\CastoPet.exe\"",
+            "C:\\Apps\\CastoPet\\CastoPet.exe"),
+        "Quoted registry path should match the executable path.");
+    Assert.True(
+        StartupService.MatchesExecutablePath(
+            "C:\\Apps\\CastoPet\\CastoPet.exe",
+            "C:\\Apps\\CastoPet\\CastoPet.exe"),
+        "Unquoted registry path should match the executable path.");
+    Assert.False(
+        StartupService.MatchesExecutablePath(
+            "\"C:\\Old\\CastoPet.exe\"",
+            "C:\\Apps\\CastoPet\\CastoPet.exe"),
+        "Different registry path should not count as enabled for this executable.");
 }
 
 static void SingleInstanceRejectsSecondOwner()
