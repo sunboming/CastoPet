@@ -41,6 +41,7 @@ var tests = new (string Name, Action Test)[]
     ("Tray menu exposes input reactive mode text", TrayMenuExposesInputReactiveModeText),
     ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
     ("Input reactive state expires highlights", InputReactiveStateExpiresHighlights),
+    ("Windows input hook normalizes common keys", WindowsInputHookNormalizesCommonKeys),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
@@ -565,6 +566,14 @@ static void InputReactiveStateExpiresHighlights()
 
     Assert.True(state.GetActiveHighlights(TimeSpan.FromMilliseconds(100)).Contains("A"), "A should remain active before expiration.");
     Assert.False(state.GetActiveHighlights(TimeSpan.FromMilliseconds(300)).Contains("A"), "A should expire after the highlight duration.");
+}
+
+static void WindowsInputHookNormalizesCommonKeys()
+{
+    Assert.Equal("A", WindowsInputHookService.NormalizeVirtualKey(0x41), "VK_A should normalize to A.");
+    Assert.Equal("Space", WindowsInputHookService.NormalizeVirtualKey(0x20), "VK_SPACE should normalize to Space.");
+    Assert.Equal("Enter", WindowsInputHookService.NormalizeVirtualKey(0x0D), "VK_RETURN should normalize to Enter.");
+    Assert.Equal("Left", WindowsInputHookService.NormalizeVirtualKey(0x25), "VK_LEFT should normalize to Left.");
 }
 
 static void MovementPlannerClampsTargetsToWorkArea()
