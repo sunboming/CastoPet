@@ -34,7 +34,9 @@ public partial class App : System.Windows.Application
         var startupService = new StartupService(_logger);
         settings.StartWithWindows = startupService.IsEnabled(executablePath);
 
-        var assets = new AssetService(_logger);
+        var skinSelectionService = new PetSkinSelectionService(_logger);
+        var skin = skinSelectionService.LoadCurrentSkin(settings);
+        var assets = new AssetService(_logger, skin);
         _window = new PetWindow(assets, _logger);
         var commands = new MenuCommandService(
             _window,

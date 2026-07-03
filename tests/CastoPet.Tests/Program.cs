@@ -11,6 +11,7 @@ var tests = new (string Name, Action Test)[]
     ("Settings round trip includes active movement", SettingsRoundTripIncludesActiveMovement),
     ("Settings round trip includes push cursor", SettingsRoundTripIncludesPushCursor),
     ("Settings round trip includes input reactive mode", SettingsRoundTripIncludesInputReactiveMode),
+    ("Settings round trip includes skin manifest path", SettingsRoundTripIncludesSkinManifestPath),
     ("Pet window settings snapshot copies runtime flags", PetWindowSettingsSnapshotCopiesRuntimeFlags),
     ("Pet window settings snapshot copies input reactive mode", PetWindowSettingsSnapshotCopiesInputReactiveMode),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
@@ -31,8 +32,14 @@ var tests = new (string Name, Action Test)[]
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
     ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
+    ("Pet skin manifest writer emits loadable JSON", PetSkinManifestWriterEmitsLoadableJson),
+    ("Pet skin manifest writer stores paths relative to resource root", PetSkinManifestWriterStoresPathsRelativeToResourceRoot),
+    ("Pet skin selection defaults to built-in skin", PetSkinSelectionDefaultsToBuiltInSkin),
+    ("Pet skin selection loads configured manifest", PetSkinSelectionLoadsConfiguredManifest),
+    ("Pet skin selection falls back when manifest fails", PetSkinSelectionFallsBackWhenManifestFails),
     ("Asset service defaults to built-in skin", AssetServiceDefaultsToBuiltInSkin),
     ("Asset service uses configured skin paths", AssetServiceUsesConfiguredSkinPaths),
+    ("Asset service loads file system skin image paths", AssetServiceLoadsFileSystemSkinImagePaths),
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
@@ -208,6 +215,24 @@ static void SettingsRoundTripIncludesInputReactiveMode()
     var loaded = service.Load();
 
     Assert.True(loaded.InputReactiveMode, "InputReactiveMode should round trip.");
+}
+
+static void SettingsRoundTripIncludesSkinManifestPath()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new SettingsService(paths, logger);
+
+    var settings = new AppSettings
+    {
+        SkinManifestPath = @"D:\Skins\Custom\skin.json",
+    };
+
+    service.Save(settings);
+    var loaded = service.Load();
+
+    Assert.Equal(@"D:\Skins\Custom\skin.json", loaded.SkinManifestPath, "Skin manifest path should round trip.");
 }
 
 static void PetWindowSettingsSnapshotCopiesRuntimeFlags()
@@ -534,6 +559,90 @@ static void PetSkinManifestRequiresCoreActions()
     Assert.Contains(ex.Message, "Move", "Manifest validation should identify missing move action.");
 }
 
+static void PetSkinManifestWriterEmitsLoadableJson()
+{
+    using var temp = TempDirectory.Create();
+    var manifestPath = System.IO.Path.Combine(temp.Path, "skin.json");
+
+    PetSkinManifestWriter.WriteToFile(manifestPath, BuiltInPetSkins.Castorice);
+    var skin = PetSkinManifestLoader.LoadFromJson(File.ReadAllText(manifestPath));
+
+    Assert.Equal(BuiltInPetSkins.Castorice.Id, skin.Id, "Written manifest should preserve skin id.");
+    Assert.Equal(BuiltInPetSkins.Castorice.DisplayName, skin.DisplayName, "Written manifest should preserve display name.");
+    Assert.Equal(BuiltInPetSkins.Castorice.DefaultCharacterPath, skin.DefaultCharacterPath, "Written manifest should reload default character path.");
+    Assert.Equal(BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle).FramePaths[0], skin.GetRequiredAction(PetActionKind.Idle).FramePaths[0], "Written manifest should reload action frames.");
+}
+
+static void PetSkinManifestWriterStoresPathsRelativeToResourceRoot()
+{
+    using var temp = TempDirectory.Create();
+    var manifestPath = System.IO.Path.Combine(temp.Path, "skin.json");
+
+    PetSkinManifestWriter.WriteToFile(manifestPath, BuiltInPetSkins.Castorice);
+    var json = File.ReadAllText(manifestPath);
+
+    Assert.Contains(json, @"""resourceRoot"": ""Assets""", "Written manifest should keep the resource root.");
+    Assert.Contains(json, @"""defaultCharacter"": ""Castorice.png""", "Default character should be stored relative to resource root.");
+    Assert.Contains(json, @"""States/Idle/Castorice.Idle.00.png""", "Action frame paths should be stored relative to resource root.");
+}
+
+static void PetSkinSelectionDefaultsToBuiltInSkin()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new PetSkinSelectionService(logger);
+
+    var skin = service.LoadCurrentSkin(AppSettings.Default);
+
+    Assert.Equal(BuiltInPetSkins.Castorice, skin, "No configured manifest should use the built-in skin.");
+}
+
+static void PetSkinSelectionLoadsConfiguredManifest()
+{
+    using var temp = TempDirectory.Create();
+    var manifestDirectory = System.IO.Path.Combine(temp.Path, "CustomSkin");
+    Directory.CreateDirectory(manifestDirectory);
+    var manifestPath = System.IO.Path.Combine(manifestDirectory, "skin.json");
+    File.WriteAllText(manifestPath, """
+        {
+          "schemaVersion": 1,
+          "id": "configured",
+          "displayName": "Configured Skin",
+          "resourceRoot": "Resources",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": ["Idle/00.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move/00.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink/00.png"] }
+          ]
+        }
+        """);
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new PetSkinSelectionService(logger);
+
+    var skin = service.LoadCurrentSkin(new AppSettings { SkinManifestPath = manifestPath });
+
+    Assert.Equal("configured", skin.Id, "Configured manifest should load as the active skin.");
+    Assert.Equal(System.IO.Path.Combine(manifestDirectory, "Resources", "Default.png"), skin.DefaultCharacterPath, "Configured manifest paths should resolve from the manifest.");
+}
+
+static void PetSkinSelectionFallsBackWhenManifestFails()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new PetSkinSelectionService(logger);
+    var missingManifest = System.IO.Path.Combine(temp.Path, "Missing", "skin.json");
+
+    var skin = service.LoadCurrentSkin(new AppSettings { SkinManifestPath = missingManifest });
+
+    Assert.Equal(BuiltInPetSkins.Castorice, skin, "Failed external manifest load should fall back to the built-in skin.");
+    var logText = File.ReadAllText(paths.LogFile);
+    Assert.Contains(logText, "Failed to load configured skin manifest", "Fallback should log the manifest load failure.");
+}
+
 static void AssetServiceDefaultsToBuiltInSkin()
 {
     using var temp = TempDirectory.Create();
@@ -560,6 +669,27 @@ static void AssetServiceUsesConfiguredSkinPaths()
 
     var logText = File.ReadAllText(Directory.EnumerateFiles(paths.LogsDirectory, "*.log").Single());
     Assert.Contains(logText, "Skins/Custom/Missing.png", "Asset service should load the configured skin path.");
+}
+
+static void AssetServiceLoadsFileSystemSkinImagePaths()
+{
+    using var temp = TempDirectory.Create();
+    var sourcePath = System.IO.Path.Combine(FindWorkspaceRoot(), "src", "CastoPet", "Assets", "Castorice.png");
+    var skinImagePath = System.IO.Path.Combine(temp.Path, "Skin", "Default.png");
+    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(skinImagePath)!);
+    File.Copy(sourcePath, skinImagePath);
+    var paths = new AppPaths(System.IO.Path.Combine(temp.Path, "Data"));
+    var logger = new LoggingService(paths);
+    var skin = BuiltInPetSkins.Castorice with
+    {
+        Id = "file-skin",
+        DefaultCharacterPath = skinImagePath,
+    };
+    var service = new AssetService(logger, skin);
+
+    var image = service.LoadDefaultCharacter();
+
+    Assert.True(image.PixelWidth > 0, "File-system skin images should load through AssetService.");
 }
 
 static void IdleFrameSequenceDefinesEightSlowFramePaths()

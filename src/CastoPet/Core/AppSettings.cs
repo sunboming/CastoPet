@@ -9,6 +9,7 @@ public sealed class AppSettings
     public bool ActiveMovement { get; set; }
     public bool PushCursor { get; set; }
     public bool InputReactiveMode { get; set; }
+    public string? SkinManifestPath { get; set; }
 
     public static AppSettings Default => new();
 
@@ -23,6 +24,7 @@ public sealed class AppSettings
             ActiveMovement = ActiveMovement,
             PushCursor = PushCursor,
             InputReactiveMode = InputReactiveMode,
+            SkinManifestPath = SkinManifestPath,
         };
     }
 }

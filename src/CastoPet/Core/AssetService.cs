@@ -1,5 +1,6 @@
 using System.Windows.Media.Imaging;
 using System.Windows.Media;
+using System.IO;
 
 namespace CastoPet.Core;
 
@@ -117,7 +118,7 @@ public sealed class AssetService
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.DecodePixelWidth = CharacterDecodePixelWidth;
-            image.UriSource = new Uri($"pack://application:,,,/{resourcePath}", UriKind.Absolute);
+            image.UriSource = CreateImageUri(resourcePath);
             image.EndInit();
             image.Freeze();
             return image;
@@ -127,5 +128,12 @@ public sealed class AssetService
             _logger.Error(FormatLoadFailureMessage(resourceGroup, resourcePath), ex);
             throw;
         }
+    }
+
+    private static Uri CreateImageUri(string resourcePath)
+    {
+        return Path.IsPathFullyQualified(resourcePath)
+            ? new Uri(resourcePath, UriKind.Absolute)
+            : new Uri($"pack://application:,,,/{resourcePath}", UriKind.Absolute);
     }
 }
