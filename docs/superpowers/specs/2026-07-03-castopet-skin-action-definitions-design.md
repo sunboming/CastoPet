@@ -27,6 +27,15 @@ First migration phase excludes:
 - Removing every old `*FrameSequence` class in one pass.
 - Validating image dimensions inside the manifest loader.
 
+Current implementation status:
+
+- Runtime skin selection is implemented through `AppSettings.SkinManifestPath` and `PetSkinSelectionService`.
+- The UI menu for choosing or switching skins is intentionally deferred.
+- `AssetService` supports built-in WPF resource paths and file-system image paths from external manifests.
+- `PetSkinManifestWriter` can write a loadable v1 `skin.json` for future editor/export workflows.
+- `PetSkinDefinition.Expressions` is an ordered list of `PetExpressionDefinition`, so expression wheel contents can vary by skin.
+- The old frame sequence classes have been removed; built-in Castorice action data now lives in `BuiltInPetSkins.Castorice`.
+
 ## Migration Strategy
 
 Use a compatibility-layer migration.
@@ -163,6 +172,29 @@ Rules:
 - default character
 - dragging character
 - input reactive base
+
+The current runtime now loads the active skin during startup:
+
+1. `SettingsService` loads `AppSettings`.
+2. `PetSkinSelectionService` checks `SkinManifestPath`.
+3. Empty `SkinManifestPath` selects `BuiltInPetSkins.Castorice`.
+4. A configured manifest path is loaded through `PetSkinManifestLoader.LoadFromFile`.
+5. Manifest load failure is logged, then the app falls back to `BuiltInPetSkins.Castorice`.
+6. `AssetService` receives the selected `PetSkinDefinition`.
+7. `PetWindow` loads actions and expressions from that selected skin.
+
+## Future Skin UI Entry
+
+The skin selection UI is deferred until a later extension phase. The intended UI entry should be a small settings/menu surface that updates `AppSettings.SkinManifestPath` rather than introducing a second selection mechanism.
+
+Expected future behavior:
+
+- Choose external `skin.json`.
+- Clear selection to return to built-in Castorice.
+- Show the currently active skin display name.
+- Reload or restart the pet after selection changes.
+- Reuse `PetSkinSelectionService` for validation and fallback.
+- Keep failure behavior consistent: log the error, keep or return to Castorice, and avoid crashing the pet.
 
 ## Test Strategy
 
