@@ -13,25 +13,33 @@ public sealed class AssetService
     private readonly LoggingService _logger;
 
     public AssetService(LoggingService logger)
+        : this(logger, BuiltInPetSkins.Castorice)
+    {
+    }
+
+    public AssetService(LoggingService logger, PetSkinDefinition skin)
     {
         _logger = logger;
+        Skin = skin;
     }
+
+    public PetSkinDefinition Skin { get; }
 
     public BitmapImage LoadDefaultCharacter()
     {
-        return LoadCharacter(DefaultCharacterPath, "Default character");
+        return LoadCharacter(Skin.DefaultCharacterPath, "Default character");
     }
 
     public BitmapImage LoadDraggingCharacter()
     {
-        return LoadCharacter(DraggingCharacterPath, "Dragging character");
+        return LoadCharacter(Skin.DraggingCharacterPath, "Dragging character");
     }
 
     public ImageSource? TryLoadInputReactiveBase()
     {
         try
         {
-            return LoadCharacter(InputReactiveBasePath, "Input reactive base");
+            return LoadCharacter(Skin.InputReactiveBasePath, "Input reactive base");
         }
         catch
         {
@@ -41,27 +49,27 @@ public sealed class AssetService
 
     public IReadOnlyList<ImageSource> LoadIdleFrames()
     {
-        return IdleFrameSequence.FramePaths.Select(path => LoadCharacter(path, "Idle frames")).ToArray();
+        return LoadActionFrames(PetActionKind.Idle, "Idle frames");
     }
 
     public IReadOnlyList<ImageSource> LoadBlinkFrames()
     {
-        return BlinkFrameSequence.FramePaths.Select(path => LoadCharacter(path, "Blink frames")).ToArray();
+        return LoadActionFrames(PetActionKind.Blink, "Blink frames");
     }
 
     public IReadOnlyList<ImageSource> LoadMoveFrames()
     {
-        return MoveFrameSequence.FramePaths.Select(path => LoadCharacter(path, "Move frames")).ToArray();
+        return LoadActionFrames(PetActionKind.Move, "Move frames");
     }
 
     public IReadOnlyList<ImageSource> LoadExpressionTransitionInFrames()
     {
-        return ExpressionTransitionSequence.InFramePaths.Select(path => LoadCharacter(path, "Expression transition in frames")).ToArray();
+        return LoadActionFrames(PetActionKind.ExpressionTransitionIn, "Expression transition in frames");
     }
 
     public IReadOnlyList<ImageSource> LoadExpressionTransitionOutFrames()
     {
-        return ExpressionTransitionSequence.OutFramePaths.Select(path => LoadCharacter(path, "Expression transition out frames")).ToArray();
+        return LoadActionFrames(PetActionKind.ExpressionTransitionOut, "Expression transition out frames");
     }
 
     public IReadOnlyDictionary<ExpressionWheelItem, ImageSource> LoadExpressionWheelImages()
@@ -70,9 +78,14 @@ public sealed class AssetService
 
         foreach (var item in ExpressionWheelCatalog.Items)
         {
+            if (!Skin.Expressions.TryGetValue(item.Label, out var resourcePath))
+            {
+                continue;
+            }
+
             try
             {
-                images[item] = LoadCharacter(item.ResourcePath, "Expression wheel images");
+                images[item] = LoadCharacter(resourcePath, "Expression wheel images");
             }
             catch
             {
@@ -85,6 +98,15 @@ public sealed class AssetService
     public static string FormatLoadFailureMessage(string resourceGroup, string resourcePath)
     {
         return $"Failed to load {resourceGroup}: {resourcePath}.";
+    }
+
+    private IReadOnlyList<ImageSource> LoadActionFrames(PetActionKind kind, string resourceGroup)
+    {
+        return Skin
+            .GetRequiredAction(kind)
+            .FramePaths
+            .Select(path => LoadCharacter(path, resourceGroup))
+            .ToArray();
     }
 
     private BitmapImage LoadCharacter(string resourcePath, string resourceGroup)

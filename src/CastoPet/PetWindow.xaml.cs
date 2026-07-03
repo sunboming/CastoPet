@@ -34,6 +34,11 @@ public partial class PetWindow : Window
     private readonly IReadOnlyList<ImageSource> _moveFrames;
     private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
     private readonly ImageSource? _inputReactiveBase;
+    private readonly PetActionDefinition _idleAction;
+    private readonly PetActionDefinition _moveAction;
+    private readonly PetActionDefinition _blinkAction;
+    private readonly PetActionDefinition _expressionTransitionInAction;
+    private readonly PetActionDefinition _expressionTransitionOutAction;
     private readonly InputReactiveState _inputReactiveState = new();
     private readonly WindowsInputHookService _inputHookService = new();
     private readonly DispatcherTimer _inputReactiveRenderTimer;
@@ -89,11 +94,16 @@ public partial class PetWindow : Window
     {
         InitializeComponent();
         _logger = logger;
-        _idleFrameTimer = new DispatcherTimer { Interval = IdleFrameSequence.FrameInterval };
+        _idleAction = assets.Skin.GetRequiredAction(PetActionKind.Idle);
+        _moveAction = assets.Skin.GetRequiredAction(PetActionKind.Move);
+        _blinkAction = assets.Skin.GetRequiredAction(PetActionKind.Blink);
+        _expressionTransitionInAction = assets.Skin.GetRequiredAction(PetActionKind.ExpressionTransitionIn);
+        _expressionTransitionOutAction = assets.Skin.GetRequiredAction(PetActionKind.ExpressionTransitionOut);
+        _idleFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_idleAction, IdleFrameSequence.FrameInterval) };
         _idleFrameTimer.Tick += (_, _) => AdvanceIdleFrame();
         _blinkScheduleTimer = new DispatcherTimer();
         _blinkScheduleTimer.Tick += (_, _) => BeginBlink();
-        _blinkFrameTimer = new DispatcherTimer { Interval = BlinkFrameSequence.FrameInterval };
+        _blinkFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_blinkAction, BlinkFrameSequence.FrameInterval) };
         _blinkFrameTimer.Tick += (_, _) => AdvanceBlinkFrame();
         _dragRestoreTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _dragRestoreTimer.Tick += (_, _) => RestoreAfterDrag();
@@ -101,7 +111,7 @@ public partial class PetWindow : Window
         _expressionWheelHoldTimer.Tick += (_, _) => OpenExpressionWheel();
         _temporaryExpressionTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.ExpressionDuration };
         _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
-        _expressionTransitionFrameTimer = new DispatcherTimer { Interval = ExpressionTransitionSequence.FrameInterval };
+        _expressionTransitionFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_expressionTransitionInAction, ExpressionTransitionSequence.FrameInterval) };
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
         _activeMovementProbeTimer = new DispatcherTimer { Interval = PetAnimationTimings.ActiveMovementProbeInterval };
         _activeMovementProbeTimer.Tick += (_, _) => ProbeActiveMovement();
@@ -726,7 +736,7 @@ public partial class PetWindow : Window
         var dx = _activeMovementTarget.Left - _logicalLeft;
         var dy = _activeMovementTarget.Top - _logicalTop;
         var distance = Math.Sqrt(dx * dx + dy * dy);
-        var step = MoveFrameSequence.StepDistance(elapsed, distance);
+        var step = CalculateMoveStep(_moveAction, elapsed, distance);
         if (step <= 0 || distance <= 0.001)
         {
             return;
@@ -871,9 +881,10 @@ public partial class PetWindow : Window
         }
 
         _moveFrameDistanceAccumulator += distance;
-        while (_moveFrameDistanceAccumulator >= MoveFrameSequence.DistancePerFrame)
+        var distancePerFrame = _moveAction.DistancePerFrame ?? MoveFrameSequence.DistancePerFrame;
+        while (_moveFrameDistanceAccumulator >= distancePerFrame)
         {
-            _moveFrameDistanceAccumulator -= MoveFrameSequence.DistancePerFrame;
+            _moveFrameDistanceAccumulator -= distancePerFrame;
             _moveFrameIndex = (_moveFrameIndex + 1) % _moveFrames.Count;
             CharacterImage.Source = _moveFrames[_moveFrameIndex];
         }
@@ -1287,6 +1298,7 @@ public partial class PetWindow : Window
         ResetCharacterTransitionAnimations();
         _expressionTransitionMode = ExpressionTransitionMode.In;
         _expressionTransitionFrameIndex = 0;
+        _expressionTransitionFrameTimer.Interval = GetActionFrameInterval(_expressionTransitionInAction, ExpressionTransitionSequence.FrameInterval);
         CharacterImage.Source = _expressionTransitionInFrames[_expressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
@@ -1303,6 +1315,7 @@ public partial class PetWindow : Window
         ResetCharacterTransitionAnimations();
         _expressionTransitionMode = ExpressionTransitionMode.Out;
         _expressionTransitionFrameIndex = 0;
+        _expressionTransitionFrameTimer.Interval = GetActionFrameInterval(_expressionTransitionOutAction, ExpressionTransitionSequence.FrameInterval);
         CharacterImage.Source = _expressionTransitionOutFrames[_expressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
@@ -1478,10 +1491,34 @@ public partial class PetWindow : Window
             return;
         }
 
-        var minMs = (int)BlinkFrameSequence.MinScheduleDelay.TotalMilliseconds;
-        var maxMs = (int)BlinkFrameSequence.MaxScheduleDelay.TotalMilliseconds;
+        var minDelay = _blinkAction.MinScheduleDelay ?? BlinkFrameSequence.MinScheduleDelay;
+        var maxDelay = _blinkAction.MaxScheduleDelay ?? BlinkFrameSequence.MaxScheduleDelay;
+        var minMs = (int)minDelay.TotalMilliseconds;
+        var maxMs = (int)maxDelay.TotalMilliseconds;
         _blinkScheduleTimer.Interval = TimeSpan.FromMilliseconds(_blinkRandom.Next(minMs, maxMs + 1));
         _blinkScheduleTimer.Start();
+    }
+
+    private static TimeSpan GetActionFrameInterval(PetActionDefinition action, TimeSpan fallback)
+    {
+        return action.FrameInterval ?? fallback;
+    }
+
+    private static double CalculateMoveStep(PetActionDefinition action, TimeSpan elapsed, double distanceToTarget)
+    {
+        if (elapsed <= TimeSpan.Zero || distanceToTarget <= 0)
+        {
+            return 0;
+        }
+
+        var baseSpeed = action.BaseSpeedPixelsPerSecond ?? MoveFrameSequence.BaseSpeedPixelsPerSecond;
+        var minSpeed = action.MinSpeedPixelsPerSecond ?? MoveFrameSequence.MinSpeedPixelsPerSecond;
+        var maxSpeed = action.MaxSpeedPixelsPerSecond ?? MoveFrameSequence.MaxSpeedPixelsPerSecond;
+        var speed = distanceToTarget > 240 ? maxSpeed
+            : distanceToTarget < 80 ? minSpeed
+            : baseSpeed;
+
+        return Math.Min(distanceToTarget, speed * elapsed.TotalSeconds);
     }
 
     private void BeginBlink()

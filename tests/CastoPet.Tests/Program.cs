@@ -31,6 +31,8 @@ var tests = new (string Name, Action Test)[]
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
     ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
+    ("Asset service defaults to built-in skin", AssetServiceDefaultsToBuiltInSkin),
+    ("Asset service uses configured skin paths", AssetServiceUsesConfiguredSkinPaths),
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
@@ -530,6 +532,34 @@ static void PetSkinManifestRequiresCoreActions()
         """));
 
     Assert.Contains(ex.Message, "Move", "Manifest validation should identify missing move action.");
+}
+
+static void AssetServiceDefaultsToBuiltInSkin()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new AssetService(logger);
+
+    Assert.Equal(BuiltInPetSkins.Castorice, service.Skin, "Asset service should default to the built-in Castorice skin.");
+}
+
+static void AssetServiceUsesConfiguredSkinPaths()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var skin = BuiltInPetSkins.Castorice with
+    {
+        Id = "custom",
+        DefaultCharacterPath = "Skins/Custom/Missing.png",
+    };
+    var service = new AssetService(logger, skin);
+
+    _ = Assert.Throws<Exception>(() => service.LoadDefaultCharacter());
+
+    var logText = File.ReadAllText(Directory.EnumerateFiles(paths.LogsDirectory, "*.log").Single());
+    Assert.Contains(logText, "Skins/Custom/Missing.png", "Asset service should load the configured skin path.");
 }
 
 static void IdleFrameSequenceDefinesEightSlowFramePaths()
