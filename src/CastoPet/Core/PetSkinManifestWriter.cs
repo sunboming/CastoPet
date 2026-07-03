@@ -46,8 +46,8 @@ public static class PetSkinManifestWriter
                 MinSpeedPixelsPerSecond: action.MinSpeedPixelsPerSecond,
                 MaxSpeedPixelsPerSecond: action.MaxSpeedPixelsPerSecond)).ToArray(),
             Expressions: skin.Expressions.ToDictionary(
-                item => item.Key,
-                item => ToManifestPath(item.Value, skin.ResourceRoot),
+                item => item.Label,
+                item => ToManifestPath(item.ResourcePath, skin.ResourceRoot),
                 StringComparer.OrdinalIgnoreCase));
 
         return JsonSerializer.Serialize(manifest, JsonOptions);

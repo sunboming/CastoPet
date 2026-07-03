@@ -77,16 +77,12 @@ public sealed class AssetService
     {
         var images = new Dictionary<ExpressionWheelItem, ImageSource>();
 
-        foreach (var item in ExpressionWheelCatalog.Items)
+        foreach (var expression in Skin.Expressions)
         {
-            if (!Skin.Expressions.TryGetValue(item.Label, out var resourcePath))
-            {
-                continue;
-            }
-
             try
             {
-                images[item] = LoadCharacter(resourcePath, "Expression wheel images");
+                var item = new ExpressionWheelItem(expression.Label, expression.ResourcePath);
+                images[item] = LoadCharacter(expression.ResourcePath, "Expression wheel images");
             }
             catch
             {

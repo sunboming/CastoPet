@@ -38,12 +38,15 @@ public static class PetSkinManifestLoader
         RequireAction(actions, PetActionKind.Move);
         RequireAction(actions, PetActionKind.Blink);
 
-        var expressions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var expressions = new List<PetExpressionDefinition>();
         if (manifest.Expressions is not null)
         {
             foreach (var item in manifest.Expressions)
             {
-                expressions[item.Key] = resolver.Resolve(item.Value);
+                expressions.Add(new PetExpressionDefinition(
+                    Id: ToExpressionId(item.Key),
+                    Label: item.Key,
+                    ResourcePath: resolver.Resolve(item.Value)));
             }
         }
 
@@ -144,6 +147,11 @@ public static class PetSkinManifestLoader
     private static TimeSpan? MillisecondsToTimeSpan(double? milliseconds)
     {
         return milliseconds is null ? null : TimeSpan.FromMilliseconds(milliseconds.Value);
+    }
+
+    private static string ToExpressionId(string label)
+    {
+        return label.Trim().Replace(' ', '-').ToLowerInvariant();
     }
 
     private sealed class PathResolver

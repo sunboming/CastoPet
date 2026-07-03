@@ -29,6 +29,7 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice idle action preserves current frames", BuiltInCastoriceIdleActionPreservesCurrentFrames),
     ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
     ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
+    ("Built-in Castorice expressions are ordered skin definitions", BuiltInCastoriceExpressionsAreOrderedSkinDefinitions),
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
     ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
@@ -40,15 +41,15 @@ var tests = new (string Name, Action Test)[]
     ("Asset service defaults to built-in skin", AssetServiceDefaultsToBuiltInSkin),
     ("Asset service uses configured skin paths", AssetServiceUsesConfiguredSkinPaths),
     ("Asset service loads file system skin image paths", AssetServiceLoadsFileSystemSkinImagePaths),
-    ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
+    ("Built-in idle action defines eight slow frame paths", BuiltInIdleActionDefinesEightSlowFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
-    ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
-    ("Move frame sequence defines eight distance-driven paths", MoveFrameSequenceDefinesEightDistanceDrivenPaths),
+    ("Built-in blink action defines random blink frames", BuiltInBlinkActionDefinesRandomBlinkFrames),
+    ("Built-in move action defines eight distance-driven paths", BuiltInMoveActionDefinesEightDistanceDrivenPaths),
     ("Move frame paths use app resources", MoveFramePathsUseAppResources),
     ("Move speed constants stay in smooth range", MoveSpeedConstantsStayInSmoothRange),
     ("Expression wheel defines eight items", ExpressionWheelDefinesEightItems),
     ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
-    ("Expression transition sequence defines shared frames", ExpressionTransitionSequenceDefinesSharedFrames),
+    ("Built-in expression transition actions define shared frames", BuiltInExpressionTransitionActionsDefineSharedFrames),
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
     ("Expression wheel selector maps pointer positions", ExpressionWheelSelectorMapsPointerPositions),
@@ -459,6 +460,18 @@ static void BuiltInCastoriceBlinkActionPreservesSchedule()
     Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink max schedule should stay compatible.");
 }
 
+static void BuiltInCastoriceExpressionsAreOrderedSkinDefinitions()
+{
+    var expressions = BuiltInPetSkins.Castorice.Expressions;
+
+    Assert.Equal(8, expressions.Count, "Castorice should keep eight expression wheel items.");
+    Assert.Equal("happy", expressions[0].Id, "First expression id should be stable.");
+    Assert.Equal("Happy", expressions[0].Label, "First expression label should be stable.");
+    Assert.Equal("Assets/Expressions/Castorice.Expression.Happy.png", expressions[0].ResourcePath, "First expression path should stay compatible.");
+    Assert.Equal("crying", expressions[^1].Id, "Last expression id should be stable.");
+    Assert.Equal("Crying", expressions[^1].Label, "Last expression label should be stable.");
+}
+
 static void PetSkinManifestLoadsJsonResourcePaths()
 {
     var skin = PetSkinManifestLoader.LoadFromJson("""
@@ -511,7 +524,8 @@ static void PetSkinManifestLoadsJsonResourcePaths()
     Assert.Equal(TimeSpan.FromMilliseconds(200), skin.GetRequiredAction(PetActionKind.Idle).FrameInterval, "Action frame interval should load.");
     Assert.Equal(10d, skin.GetRequiredAction(PetActionKind.Move).DistancePerFrame, "Move distance should load.");
     Assert.Equal(TimeSpan.FromMilliseconds(3000), skin.GetRequiredAction(PetActionKind.Blink).MinScheduleDelay, "Blink min schedule should load.");
-    Assert.Equal("Skins/Custom/Expressions/Happy.png", skin.Expressions["Happy"], "Expression paths should resolve under resource root.");
+    Assert.Equal("Happy", skin.Expressions[0].Label, "Expression labels should load.");
+    Assert.Equal("Skins/Custom/Expressions/Happy.png", skin.Expressions[0].ResourcePath, "Expression paths should resolve under resource root.");
 }
 
 static void PetSkinManifestLoadsFilePathsRelativeToManifest()
@@ -692,19 +706,21 @@ static void AssetServiceLoadsFileSystemSkinImagePaths()
     Assert.True(image.PixelWidth > 0, "File-system skin images should load through AssetService.");
 }
 
-static void IdleFrameSequenceDefinesEightSlowFramePaths()
+static void BuiltInIdleActionDefinesEightSlowFramePaths()
 {
-    Assert.Equal(8, IdleFrameSequence.FrameCount, "Idle should use eight frames.");
-    Assert.Equal(TimeSpan.FromMilliseconds(200), IdleFrameSequence.FrameInterval, "Idle frames should advance slowly.");
-    Assert.Equal("Assets/States/Idle/Castorice.Idle.00.png", IdleFrameSequence.FramePaths[0], "First idle frame path should be zero padded.");
-    Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", IdleFrameSequence.FramePaths[^1], "Last idle frame path should be zero padded.");
+    var idle = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle);
+
+    Assert.Equal(8, idle.FramePaths.Count, "Idle should use eight frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(200), idle.FrameInterval, "Idle frames should advance slowly.");
+    Assert.Equal("Assets/States/Idle/Castorice.Idle.00.png", idle.FramePaths[0], "First idle frame path should be zero padded.");
+    Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", idle.FramePaths[^1], "Last idle frame path should be zero padded.");
 }
 
 static void IdleFrameDiagnosticsReadAllPackagedFrames()
 {
     var diagnostics = ReadIdleFrameDiagnostics();
 
-    Assert.Equal(IdleFrameSequence.FrameCount, diagnostics.Count, "Diagnostics should include all idle frames.");
+    Assert.Equal(BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle).FramePaths.Count, diagnostics.Count, "Diagnostics should include all idle frames.");
     Assert.True(diagnostics.All(frame => frame.Width == AssetService.CharacterDecodePixelWidth), "Idle frames should keep the display width.");
     Assert.True(diagnostics.All(frame => frame.Height == AssetService.CharacterDecodePixelWidth), "Idle frames should keep the display height.");
     Assert.True(diagnostics.All(frame => frame.Bounds.Width > 0 && frame.Bounds.Height > 0), "Idle frames should have visible alpha bounds.");
@@ -713,79 +729,93 @@ static void IdleFrameDiagnosticsReadAllPackagedFrames()
     Assert.Equal("Castorice.Idle.07.png", diagnostics[^1].Name, "Diagnostics should preserve frame order.");
 }
 
-static void BlinkFrameSequenceDefinesRandomBlinkFrames()
+static void BuiltInBlinkActionDefinesRandomBlinkFrames()
 {
-    Assert.Equal(3, BlinkFrameSequence.FrameCount, "Blink should use three frames.");
-    Assert.Equal(TimeSpan.FromMilliseconds(90), BlinkFrameSequence.FrameInterval, "Blink frames should advance quickly.");
-    Assert.Equal(TimeSpan.FromSeconds(3), BlinkFrameSequence.MinScheduleDelay, "Blink should not repeat too frequently.");
-    Assert.Equal(TimeSpan.FromSeconds(7), BlinkFrameSequence.MaxScheduleDelay, "Blink should remain occasional.");
-    Assert.Equal("Assets/States/Blink/Castorice.Blink.00.png", BlinkFrameSequence.FramePaths[0], "First blink frame path should be zero padded.");
-    Assert.Equal("Assets/States/Blink/Castorice.Blink.02.png", BlinkFrameSequence.FramePaths[^1], "Last blink frame path should be zero padded.");
+    var blink = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Blink);
+
+    Assert.Equal(3, blink.FramePaths.Count, "Blink should use three frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(90), blink.FrameInterval, "Blink frames should advance quickly.");
+    Assert.Equal(TimeSpan.FromSeconds(3), blink.MinScheduleDelay, "Blink should not repeat too frequently.");
+    Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink should remain occasional.");
+    Assert.Equal("Assets/States/Blink/Castorice.Blink.00.png", blink.FramePaths[0], "First blink frame path should be zero padded.");
+    Assert.Equal("Assets/States/Blink/Castorice.Blink.02.png", blink.FramePaths[^1], "Last blink frame path should be zero padded.");
 }
 
-static void MoveFrameSequenceDefinesEightDistanceDrivenPaths()
+static void BuiltInMoveActionDefinesEightDistanceDrivenPaths()
 {
-    Assert.Equal(8, MoveFrameSequence.FrameCount, "Move should use eight frames.");
-    Assert.Equal(10d, MoveFrameSequence.DistancePerFrame, "Move frames should advance by travel distance.");
-    Assert.Equal("Assets/States/Move/Castorice.Move.00.png", MoveFrameSequence.FramePaths[0], "First move frame path should be zero padded.");
-    Assert.Equal("Assets/States/Move/Castorice.Move.07.png", MoveFrameSequence.FramePaths[^1], "Last move frame path should be zero padded.");
+    var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
+
+    Assert.Equal(8, move.FramePaths.Count, "Move should use eight frames.");
+    Assert.Equal(10d, move.DistancePerFrame, "Move frames should advance by travel distance.");
+    Assert.Equal("Assets/States/Move/Castorice.Move.00.png", move.FramePaths[0], "First move frame path should be zero padded.");
+    Assert.Equal("Assets/States/Move/Castorice.Move.07.png", move.FramePaths[^1], "Last move frame path should be zero padded.");
 }
 
 static void MoveFramePathsUseAppResources()
 {
-    for (var index = 0; index < MoveFrameSequence.FrameCount; index++)
+    var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
+
+    for (var index = 0; index < move.FramePaths.Count; index++)
     {
-        Assert.Equal($"Assets/States/Move/Castorice.Move.{index:00}.png", MoveFrameSequence.FramePaths[index], "Move frame should use the resource path convention.");
+        Assert.Equal($"Assets/States/Move/Castorice.Move.{index:00}.png", move.FramePaths[index], "Move frame should use the resource path convention.");
     }
 }
 
 static void MoveSpeedConstantsStayInSmoothRange()
 {
-    Assert.Equal(90d, MoveFrameSequence.BaseSpeedPixelsPerSecond, "Move speed should have a stable base.");
-    Assert.Equal(80d, MoveFrameSequence.MinSpeedPixelsPerSecond, "Move speed lower bound should stay near the base.");
-    Assert.Equal(105d, MoveFrameSequence.MaxSpeedPixelsPerSecond, "Move speed upper bound should stay near the base.");
-    Assert.Equal(9d, MoveFrameSequence.StepDistance(TimeSpan.FromMilliseconds(100), distanceToTarget: 200), "100ms at base speed should move 9px.");
+    var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
+
+    Assert.Equal(90d, move.BaseSpeedPixelsPerSecond, "Move speed should have a stable base.");
+    Assert.Equal(80d, move.MinSpeedPixelsPerSecond, "Move speed lower bound should stay near the base.");
+    Assert.Equal(105d, move.MaxSpeedPixelsPerSecond, "Move speed upper bound should stay near the base.");
 }
 
 static void ExpressionWheelDefinesEightItems()
 {
-    Assert.Equal(8, ExpressionWheelCatalog.Items.Count, "Expression wheel should use eight first-version items.");
-    Assert.Equal("Happy", ExpressionWheelCatalog.Items[0].Label, "First expression should be Happy.");
-    Assert.Equal("Shy", ExpressionWheelCatalog.Items[1].Label, "Second expression should be Shy.");
-    Assert.Equal("Sleepy", ExpressionWheelCatalog.Items[2].Label, "Third expression should be Sleepy.");
-    Assert.Equal("Surprised", ExpressionWheelCatalog.Items[3].Label, "Fourth expression should be Surprised.");
-    Assert.Equal("Pouting", ExpressionWheelCatalog.Items[4].Label, "Fifth expression should be Pouting.");
-    Assert.Equal("Confused", ExpressionWheelCatalog.Items[5].Label, "Sixth expression should be Confused.");
-    Assert.Equal("Proud", ExpressionWheelCatalog.Items[6].Label, "Seventh expression should be Proud.");
-    Assert.Equal("Crying", ExpressionWheelCatalog.Items[7].Label, "Eighth expression should be Crying.");
+    var expressions = BuiltInPetSkins.Castorice.Expressions;
+
+    Assert.Equal(8, expressions.Count, "Built-in skin should use eight first-version expression wheel items.");
+    Assert.Equal("Happy", expressions[0].Label, "First expression should be Happy.");
+    Assert.Equal("Shy", expressions[1].Label, "Second expression should be Shy.");
+    Assert.Equal("Sleepy", expressions[2].Label, "Third expression should be Sleepy.");
+    Assert.Equal("Surprised", expressions[3].Label, "Fourth expression should be Surprised.");
+    Assert.Equal("Pouting", expressions[4].Label, "Fifth expression should be Pouting.");
+    Assert.Equal("Confused", expressions[5].Label, "Sixth expression should be Confused.");
+    Assert.Equal("Proud", expressions[6].Label, "Seventh expression should be Proud.");
+    Assert.Equal("Crying", expressions[7].Label, "Eighth expression should be Crying.");
     Assert.Equal(TimeSpan.FromMilliseconds(250), ExpressionWheelCatalog.HoldDelay, "Wheel hold delay should be short but deliberate.");
     Assert.Equal(TimeSpan.FromSeconds(2), ExpressionWheelCatalog.ExpressionDuration, "Selected expression should be temporary.");
 }
 
 static void ExpressionWheelPathsUseAppResources()
 {
-    foreach (var item in ExpressionWheelCatalog.Items)
+    foreach (var item in BuiltInPetSkins.Castorice.Expressions)
     {
         var expected = $"Assets/Expressions/Castorice.Expression.{item.Label}.png";
         Assert.Equal(expected, item.ResourcePath, $"{item.Label} should use the expression resource path convention.");
     }
 }
 
-static void ExpressionTransitionSequenceDefinesSharedFrames()
+static void BuiltInExpressionTransitionActionsDefineSharedFrames()
 {
-    Assert.Equal(4, ExpressionTransitionSequence.InFrameCount, "Transition-in should use four shared frames for smoother expression changes.");
-    Assert.Equal(4, ExpressionTransitionSequence.OutFrameCount, "Transition-out should use four shared frames for smoother expression changes.");
-    Assert.Equal(TimeSpan.FromMilliseconds(55), ExpressionTransitionSequence.FrameInterval, "More transition frames should stay brief overall.");
-    Assert.Equal(ExpressionTransitionSequence.InFrameCount, ExpressionTransitionSequence.InFramePaths.Count, "Transition-in paths should match frame count.");
-    Assert.Equal(ExpressionTransitionSequence.OutFrameCount, ExpressionTransitionSequence.OutFramePaths.Count, "Transition-out paths should match frame count.");
+    var transitionIn = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.ExpressionTransitionIn);
+    var transitionOut = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.ExpressionTransitionOut);
+
+    Assert.Equal(4, transitionIn.FramePaths.Count, "Transition-in should use four shared frames for smoother expression changes.");
+    Assert.Equal(4, transitionOut.FramePaths.Count, "Transition-out should use four shared frames for smoother expression changes.");
+    Assert.Equal(TimeSpan.FromMilliseconds(55), transitionIn.FrameInterval, "More transition frames should stay brief overall.");
+    Assert.Equal(TimeSpan.FromMilliseconds(55), transitionOut.FrameInterval, "More transition frames should stay brief overall.");
 }
 
 static void ExpressionTransitionPathsUseAppResources()
 {
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.00.png", ExpressionTransitionSequence.InFramePaths[0], "First transition-in path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.03.png", ExpressionTransitionSequence.InFramePaths[^1], "Last transition-in path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.00.png", ExpressionTransitionSequence.OutFramePaths[0], "First transition-out path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.03.png", ExpressionTransitionSequence.OutFramePaths[^1], "Last transition-out path should use the transition resource convention.");
+    var transitionIn = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.ExpressionTransitionIn);
+    var transitionOut = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.ExpressionTransitionOut);
+
+    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.00.png", transitionIn.FramePaths[0], "First transition-in path should use the transition resource convention.");
+    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.03.png", transitionIn.FramePaths[^1], "Last transition-in path should use the transition resource convention.");
+    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.00.png", transitionOut.FramePaths[0], "First transition-out path should use the transition resource convention.");
+    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.03.png", transitionOut.FramePaths[^1], "Last transition-out path should use the transition resource convention.");
 }
 
 static void ExpressionWheelStyleIsTextOnlyWithDividers()

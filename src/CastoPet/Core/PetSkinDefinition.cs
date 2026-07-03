@@ -8,7 +8,7 @@ public sealed record PetSkinDefinition(
     string DraggingCharacterPath,
     string InputReactiveBasePath,
     IReadOnlyList<PetActionDefinition> Actions,
-    IReadOnlyDictionary<string, string> Expressions)
+    IReadOnlyList<PetExpressionDefinition> Expressions)
 {
     public bool TryGetAction(PetActionKind kind, out PetActionDefinition action)
     {
