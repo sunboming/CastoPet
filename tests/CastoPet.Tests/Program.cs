@@ -24,6 +24,10 @@ var tests = new (string Name, Action Test)[]
     ("Runtime position starts at default", RuntimePositionStartsAtDefault),
     ("Runtime position tracks drag for current run only", RuntimePositionTracksDragForCurrentRunOnly),
     ("Show restore keeps hidden position but resets visible position", ShowRestoreKeepsHiddenPositionButResetsVisiblePosition),
+    ("Built-in Castorice skin defines required actions", BuiltInCastoriceSkinDefinesRequiredActions),
+    ("Built-in Castorice idle action preserves current frames", BuiltInCastoriceIdleActionPreservesCurrentFrames),
+    ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
+    ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
@@ -376,6 +380,53 @@ static void ShowRestoreKeepsHiddenPositionButResetsVisiblePosition()
     Assert.Equal(PetShowRestoreAction.ShowAtRuntimePosition, hiddenAction, "Hidden pet should reappear at current runtime position.");
     Assert.Equal(PetShowRestoreAction.RestoreDefaultPosition, visibleAction, "Visible pet should restore to default position.");
     Assert.False(state.HasRuntimePosition, "Restoring visible pet to default should clear runtime position.");
+}
+
+static void BuiltInCastoriceSkinDefinesRequiredActions()
+{
+    var skin = BuiltInPetSkins.Castorice;
+
+    Assert.Equal("castorice", skin.Id, "Built-in skin id should be stable.");
+    Assert.Equal("Castorice", skin.DisplayName, "Built-in skin display name should be stable.");
+    Assert.Equal("Assets/Castorice.png", skin.DefaultCharacterPath, "Default character path should stay compatible.");
+    Assert.Equal("Assets/States/Castorice.Dragging.png", skin.DraggingCharacterPath, "Dragging path should stay compatible.");
+    Assert.Equal("Assets/States/InputReactive/Castorice.InputReactive.Base.png", skin.InputReactiveBasePath, "Input reactive path should stay compatible.");
+    Assert.True(skin.TryGetAction(PetActionKind.Idle, out _), "Castorice should define idle.");
+    Assert.True(skin.TryGetAction(PetActionKind.Move, out _), "Castorice should define move.");
+    Assert.True(skin.TryGetAction(PetActionKind.Blink, out _), "Castorice should define blink.");
+    Assert.True(skin.TryGetAction(PetActionKind.ExpressionTransitionIn, out _), "Castorice should define transition in.");
+    Assert.True(skin.TryGetAction(PetActionKind.ExpressionTransitionOut, out _), "Castorice should define transition out.");
+}
+
+static void BuiltInCastoriceIdleActionPreservesCurrentFrames()
+{
+    var idle = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle);
+
+    Assert.Equal(8, idle.FramePaths.Count, "Idle should keep eight frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(200), idle.FrameInterval, "Idle frame timing should stay compatible.");
+    Assert.Equal("Assets/States/Idle/Castorice.Idle.00.png", idle.FramePaths[0], "First idle frame path should stay compatible.");
+    Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", idle.FramePaths[^1], "Last idle frame path should stay compatible.");
+}
+
+static void BuiltInCastoriceMoveActionPreservesMovementValues()
+{
+    var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
+
+    Assert.Equal(8, move.FramePaths.Count, "Move should keep eight frames.");
+    Assert.Equal(10d, move.DistancePerFrame, "Move distance per frame should stay compatible.");
+    Assert.Equal(90d, move.BaseSpeedPixelsPerSecond, "Move base speed should stay compatible.");
+    Assert.Equal(80d, move.MinSpeedPixelsPerSecond, "Move min speed should stay compatible.");
+    Assert.Equal(105d, move.MaxSpeedPixelsPerSecond, "Move max speed should stay compatible.");
+}
+
+static void BuiltInCastoriceBlinkActionPreservesSchedule()
+{
+    var blink = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Blink);
+
+    Assert.Equal(3, blink.FramePaths.Count, "Blink should keep three frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(90), blink.FrameInterval, "Blink frame interval should stay compatible.");
+    Assert.Equal(TimeSpan.FromSeconds(3), blink.MinScheduleDelay, "Blink min schedule should stay compatible.");
+    Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink max schedule should stay compatible.");
 }
 
 static void IdleFrameSequenceDefinesEightSlowFramePaths()
