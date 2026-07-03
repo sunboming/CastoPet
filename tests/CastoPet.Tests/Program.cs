@@ -28,6 +28,9 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice idle action preserves current frames", BuiltInCastoriceIdleActionPreservesCurrentFrames),
     ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
     ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
+    ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
+    ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
+    ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
     ("Idle frame sequence defines eight slow frame paths", IdleFrameSequenceDefinesEightSlowFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Blink frame sequence defines random blink frames", BlinkFrameSequenceDefinesRandomBlinkFrames),
@@ -427,6 +430,106 @@ static void BuiltInCastoriceBlinkActionPreservesSchedule()
     Assert.Equal(TimeSpan.FromMilliseconds(90), blink.FrameInterval, "Blink frame interval should stay compatible.");
     Assert.Equal(TimeSpan.FromSeconds(3), blink.MinScheduleDelay, "Blink min schedule should stay compatible.");
     Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink max schedule should stay compatible.");
+}
+
+static void PetSkinManifestLoadsJsonResourcePaths()
+{
+    var skin = PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 1,
+          "id": "custom",
+          "displayName": "Custom Skin",
+          "resourceRoot": "Skins/Custom",
+          "defaultCharacter": "Default.png",
+          "draggingCharacter": "States/Dragging.png",
+          "inputReactiveBase": "Input/Base.png",
+          "actions": [
+            {
+              "id": "idle",
+              "kind": "idle",
+              "frameIntervalMs": 200,
+              "frames": ["Idle/00.png", "Idle/01.png"]
+            },
+            {
+              "id": "move",
+              "kind": "move",
+              "distancePerFrame": 10,
+              "baseSpeedPixelsPerSecond": 90,
+              "minSpeedPixelsPerSecond": 80,
+              "maxSpeedPixelsPerSecond": 105,
+              "frames": ["Move/00.png"]
+            },
+            {
+              "id": "blink",
+              "kind": "blink",
+              "frameIntervalMs": 90,
+              "minScheduleDelayMs": 3000,
+              "maxScheduleDelayMs": 7000,
+              "frames": ["Blink/00.png"]
+            }
+          ],
+          "expressions": {
+            "Happy": "Expressions/Happy.png"
+          }
+        }
+        """);
+
+    Assert.Equal("custom", skin.Id, "Manifest id should load.");
+    Assert.Equal("Custom Skin", skin.DisplayName, "Manifest display name should load.");
+    Assert.Equal("Skins/Custom", skin.ResourceRoot, "Manifest resource root should load.");
+    Assert.Equal("Skins/Custom/Default.png", skin.DefaultCharacterPath, "JSON manifest paths should resolve under resource root.");
+    Assert.Equal("Skins/Custom/States/Dragging.png", skin.DraggingCharacterPath, "Optional dragging path should resolve under resource root.");
+    Assert.Equal("Skins/Custom/Input/Base.png", skin.InputReactiveBasePath, "Optional input base path should resolve under resource root.");
+    Assert.Equal("Skins/Custom/Idle/00.png", skin.GetRequiredAction(PetActionKind.Idle).FramePaths[0], "Action frames should resolve under resource root.");
+    Assert.Equal(TimeSpan.FromMilliseconds(200), skin.GetRequiredAction(PetActionKind.Idle).FrameInterval, "Action frame interval should load.");
+    Assert.Equal(10d, skin.GetRequiredAction(PetActionKind.Move).DistancePerFrame, "Move distance should load.");
+    Assert.Equal(TimeSpan.FromMilliseconds(3000), skin.GetRequiredAction(PetActionKind.Blink).MinScheduleDelay, "Blink min schedule should load.");
+    Assert.Equal("Skins/Custom/Expressions/Happy.png", skin.Expressions["Happy"], "Expression paths should resolve under resource root.");
+}
+
+static void PetSkinManifestLoadsFilePathsRelativeToManifest()
+{
+    using var temp = TempDirectory.Create();
+    var manifestDirectory = System.IO.Path.Combine(temp.Path, "Pack");
+    Directory.CreateDirectory(manifestDirectory);
+    var manifestPath = System.IO.Path.Combine(manifestDirectory, "skin.json");
+    File.WriteAllText(manifestPath, """
+        {
+          "schemaVersion": 1,
+          "id": "file-skin",
+          "displayName": "File Skin",
+          "resourceRoot": "Resources",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": ["Idle/00.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move/00.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink/00.png"] }
+          ]
+        }
+        """);
+
+    var skin = PetSkinManifestLoader.LoadFromFile(manifestPath);
+    var expectedRoot = System.IO.Path.Combine(manifestDirectory, "Resources");
+
+    Assert.Equal(System.IO.Path.Combine(expectedRoot, "Default.png"), skin.DefaultCharacterPath, "File manifest paths should resolve relative to manifest directory.");
+    Assert.Equal(System.IO.Path.Combine(expectedRoot, "Idle", "00.png"), skin.GetRequiredAction(PetActionKind.Idle).FramePaths[0], "File action paths should resolve relative to manifest directory.");
+}
+
+static void PetSkinManifestRequiresCoreActions()
+{
+    var ex = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 1,
+          "id": "broken",
+          "displayName": "Broken",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": ["Idle/00.png"] }
+          ]
+        }
+        """));
+
+    Assert.Contains(ex.Message, "Move", "Manifest validation should identify missing move action.");
 }
 
 static void IdleFrameSequenceDefinesEightSlowFramePaths()
@@ -1083,6 +1186,21 @@ static class Assert
         {
             throw new InvalidOperationException($"{message} Expected {expected}, got {actual}.");
         }
+    }
+
+    public static TException Throws<TException>(Action action)
+        where TException : Exception
+    {
+        try
+        {
+            action();
+        }
+        catch (TException ex)
+        {
+            return ex;
+        }
+
+        throw new InvalidOperationException($"Expected exception {typeof(TException).Name}.");
     }
 }
 
