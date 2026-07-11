@@ -55,15 +55,20 @@ There is no Apply button and no separate draft state. Startup-setting failure pr
 
 ## Visual Design
 
-The window uses a restrained purple-to-white palette:
+The window uses a mist-lavender and white palette with low saturation and restrained contrast:
 
-- White main surface with very light lavender section bands.
-- Deep muted purple for the title and active switch state.
-- Neutral dark gray for primary text and subdued violet-gray for descriptions.
-- Thin low-contrast lavender separators rather than nested cards.
-- Compact spacing, clear group headings, and consistent control alignment.
+- A cool near-white main surface replaces pure white.
+- Very pale gray-lavender bands distinguish groups without card borders.
+- Dusty muted violet is reserved for active switches, focus cues, and small accents.
+- Primary text uses a softened charcoal; descriptions use a cool violet-gray.
+- Dividers are faint and narrow so the interface does not look boxed in.
+- Spacing is compact and consistent, with smaller gaps between related rows.
 
-The title bar is integrated into the window styling and includes a standard close icon. Each setting row uses a label, a short purpose description where useful, and a right-aligned switch. Controls have visible hover, focus, enabled, and disabled states. Text must remain readable at the default Windows scaling levels.
+The font stack is `MiSans, Noto Sans SC, Microsoft YaHei UI`. MiSans is the preferred local face; the fallbacks preserve Chinese readability when the preferred font is unavailable. Headings use medium weight instead of large size or heavy bold styling.
+
+The title bar visually blends into the main surface. Its close command uses a familiar icon with a subtle circular hover background rather than a prominent rectangular button. Setting switches use a slimmer track, softer thumb shadow, and low-saturation active color. Group labels, setting rows, and descriptions maintain clear hierarchy without strong borders or large decorative containers.
+
+Controls have visible but quiet hover, focus, enabled, and disabled states. Text must remain readable at common Windows scaling levels, and the compact layout must not clip or overlap at 100% or 150% scaling.
 
 ## Components
 
