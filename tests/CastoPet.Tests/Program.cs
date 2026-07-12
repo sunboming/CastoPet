@@ -1825,8 +1825,10 @@ static void ShortcutLauncherRejectsMissingAndMalformedDefinitions()
     using var temp = TempDirectory.Create();
     var paths = new AppPaths(temp.Path);
     var existingFile = System.IO.Path.Combine(temp.Path, "not-a-program.txt");
+    var existingExecutable = System.IO.Path.Combine(temp.Path, "program.exe");
     var existingFolder = System.IO.Path.Combine(temp.Path, "Folder");
     File.WriteAllText(existingFile, "file fixture");
+    File.WriteAllText(existingExecutable, "program fixture");
     Directory.CreateDirectory(existingFolder);
     var startCount = 0;
     var launcher = new ShortcutLauncher(
@@ -1845,10 +1847,12 @@ static void ShortcutLauncherRejectsMissingAndMalformedDefinitions()
         new ShortcutDefinition("missing-folder", "Missing", ShortcutType.Folder, System.IO.Path.Combine(temp.Path, "MissingFolder"), "", null, 4),
         new ShortcutDefinition("file-as-folder", "Wrong", ShortcutType.Folder, existingFile, "", null, 5),
         new ShortcutDefinition("missing-link", "Missing", ShortcutType.WindowsShortcut, System.IO.Path.Combine(temp.Path, "missing.lnk"), "", null, 6),
-        new ShortcutDefinition("ftp", "FTP", ShortcutType.WebUrl, "ftp://example.com/file", "", null, 7),
-        new ShortcutDefinition("relative", "Relative", ShortcutType.WebUrl, "example.com/path", "", null, 8),
-        new ShortcutDefinition("hostless", "Hostless", ShortcutType.WebUrl, "http:///path", "", null, 9),
-        new ShortcutDefinition("unknown", "Unknown", (ShortcutType)999, existingFile, "", null, 10),
+        new ShortcutDefinition("wrong-link", "Wrong", ShortcutType.WindowsShortcut, existingFile, "", null, 7),
+        new ShortcutDefinition("exe-as-file", "Wrong", ShortcutType.File, existingExecutable, "", null, 8),
+        new ShortcutDefinition("ftp", "FTP", ShortcutType.WebUrl, "ftp://example.com/file", "", null, 9),
+        new ShortcutDefinition("relative", "Relative", ShortcutType.WebUrl, "example.com/path", "", null, 10),
+        new ShortcutDefinition("hostless", "Hostless", ShortcutType.WebUrl, "http:///path", "", null, 11),
+        new ShortcutDefinition("unknown", "Unknown", (ShortcutType)999, existingFile, "", null, 12),
     };
 
     foreach (var definition in invalidDefinitions)

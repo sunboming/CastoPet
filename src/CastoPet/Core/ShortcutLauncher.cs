@@ -12,7 +12,7 @@ public sealed class ShortcutLauncher
     private static readonly HashSet<string> UnsupportedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jse",
-        ".wsf", ".wsh", ".hta", ".com", ".scr", ".msi",
+        ".wsf", ".wsh", ".hta", ".com", ".scr", ".msi", ".exe",
     };
 
     private readonly LoggingService _logger;
@@ -101,9 +101,10 @@ public sealed class ShortcutLauncher
                 break;
 
             case ShortcutType.WindowsShortcut:
-                if (!File.Exists(definition.Target))
+                if (!File.Exists(definition.Target) ||
+                    !Path.GetExtension(definition.Target).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidOperationException("Windows shortcut target does not exist.");
+                    throw new InvalidOperationException("Windows shortcut target must be an existing .lnk file.");
                 }
 
                 break;
