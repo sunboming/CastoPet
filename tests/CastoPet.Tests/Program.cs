@@ -97,6 +97,11 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut drop handler rejects missing and unsafe inputs", ShortcutDropHandlerRejectsMissingAndUnsafeInputs),
     ("Shortcut drop handler aggregates mixed batch duplicates", ShortcutDropHandlerAggregatesMixedBatchDuplicates),
     ("Shortcut drop handler reports shortcut limit failures", ShortcutDropHandlerReportsShortcutLimitFailures),
+    ("Shortcut launcher creates structured shell start info", ShortcutLauncherCreatesStructuredShellStartInfo),
+    ("Shortcut launcher accepts every supported target type", ShortcutLauncherAcceptsEverySupportedTargetType),
+    ("Shortcut launcher rejects missing and malformed definitions", ShortcutLauncherRejectsMissingAndMalformedDefinitions),
+    ("Shortcut launcher rejects tampered executable file definitions", ShortcutLauncherRejectsTamperedExecutableFileDefinitions),
+    ("Shortcut launcher contains and logs start failures", ShortcutLauncherContainsAndLogsStartFailures),
     ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
     ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
     ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
@@ -1741,6 +1746,178 @@ static ShortcutService CreateShortcutService(string baseDirectory)
     var service = new ShortcutService(paths, new LoggingService(paths));
     service.Load();
     return service;
+}
+
+static void ShortcutLauncherCreatesStructuredShellStartInfo()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var programPath = System.IO.Path.Combine(temp.Path, "Editor.EXE");
+    var workingDirectory = System.IO.Path.Combine(temp.Path, "Workspace");
+    File.WriteAllText(programPath, "program fixture");
+    Directory.CreateDirectory(workingDirectory);
+    var launcher = new ShortcutLauncher(new LoggingService(paths), _ => null);
+    var program = new ShortcutDefinition(
+        "editor",
+        "Editor",
+        ShortcutType.Program,
+        programPath,
+        "--project \"demo file\"",
+        workingDirectory,
+        0);
+
+    var info = launcher.CreateStartInfo(program);
+
+    Assert.Equal(program.Target, info.FileName, "Target must remain a structured filename.");
+    Assert.Equal(program.Arguments, info.Arguments, "Arguments must remain separate from the target.");
+    Assert.Equal(workingDirectory, info.WorkingDirectory, "An explicit working directory should be preserved.");
+    Assert.True(info.UseShellExecute, "Windows shell behavior should open associated targets.");
+    Assert.False(info.Verb.Equals("runas", StringComparison.OrdinalIgnoreCase), "Shortcut launching must never request elevation.");
+
+    var filePath = System.IO.Path.Combine(temp.Path, "notes.txt");
+    File.WriteAllText(filePath, "file fixture");
+    var withoutWorkingDirectory = launcher.CreateStartInfo(
+        new ShortcutDefinition("notes", "Notes", ShortcutType.File, filePath, "", null, 1));
+    Assert.True(string.IsNullOrEmpty(withoutWorkingDirectory.WorkingDirectory), "Working directory should remain optional.");
+}
+
+static void ShortcutLauncherAcceptsEverySupportedTargetType()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var programPath = System.IO.Path.Combine(temp.Path, "Editor.exe");
+    var filePath = System.IO.Path.Combine(temp.Path, "notes.txt");
+    var folderPath = System.IO.Path.Combine(temp.Path, "Documents");
+    var linkPath = System.IO.Path.Combine(temp.Path, "Editor.lnk");
+    File.WriteAllText(programPath, "program fixture");
+    File.WriteAllText(filePath, "file fixture");
+    Directory.CreateDirectory(folderPath);
+    File.WriteAllText(linkPath, "shortcut fixture");
+    var startCount = 0;
+    var launcher = new ShortcutLauncher(
+        new LoggingService(paths),
+        _ =>
+        {
+            startCount++;
+            return null;
+        });
+    var definitions = new[]
+    {
+        new ShortcutDefinition("program", "Program", ShortcutType.Program, programPath, "", null, 0),
+        new ShortcutDefinition("file", "File", ShortcutType.File, filePath, "", null, 1),
+        new ShortcutDefinition("folder", "Folder", ShortcutType.Folder, folderPath, "", null, 2),
+        new ShortcutDefinition("link", "Link", ShortcutType.WindowsShortcut, linkPath, "", null, 3),
+        new ShortcutDefinition("http", "HTTP", ShortcutType.WebUrl, "http://example.com/start", "", null, 4),
+        new ShortcutDefinition("https", "HTTPS", ShortcutType.WebUrl, "https://example.com/docs", "", null, 5),
+    };
+
+    foreach (var definition in definitions)
+    {
+        var result = launcher.Launch(definition);
+        Assert.True(result.Succeeded, $"{definition.Type} should be launchable when its target is valid.");
+    }
+
+    Assert.Equal(definitions.Length, startCount, "Every valid definition should reach the injected process boundary once.");
+}
+
+static void ShortcutLauncherRejectsMissingAndMalformedDefinitions()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var existingFile = System.IO.Path.Combine(temp.Path, "not-a-program.txt");
+    var existingFolder = System.IO.Path.Combine(temp.Path, "Folder");
+    File.WriteAllText(existingFile, "file fixture");
+    Directory.CreateDirectory(existingFolder);
+    var startCount = 0;
+    var launcher = new ShortcutLauncher(
+        new LoggingService(paths),
+        _ =>
+        {
+            startCount++;
+            return null;
+        });
+    var invalidDefinitions = new[]
+    {
+        new ShortcutDefinition("missing-program", "Missing", ShortcutType.Program, System.IO.Path.Combine(temp.Path, "missing.exe"), "", null, 0),
+        new ShortcutDefinition("wrong-program", "Wrong", ShortcutType.Program, existingFile, "", null, 1),
+        new ShortcutDefinition("missing-file", "Missing", ShortcutType.File, System.IO.Path.Combine(temp.Path, "missing.txt"), "", null, 2),
+        new ShortcutDefinition("folder-as-file", "Wrong", ShortcutType.File, existingFolder, "", null, 3),
+        new ShortcutDefinition("missing-folder", "Missing", ShortcutType.Folder, System.IO.Path.Combine(temp.Path, "MissingFolder"), "", null, 4),
+        new ShortcutDefinition("file-as-folder", "Wrong", ShortcutType.Folder, existingFile, "", null, 5),
+        new ShortcutDefinition("missing-link", "Missing", ShortcutType.WindowsShortcut, System.IO.Path.Combine(temp.Path, "missing.lnk"), "", null, 6),
+        new ShortcutDefinition("ftp", "FTP", ShortcutType.WebUrl, "ftp://example.com/file", "", null, 7),
+        new ShortcutDefinition("relative", "Relative", ShortcutType.WebUrl, "example.com/path", "", null, 8),
+        new ShortcutDefinition("hostless", "Hostless", ShortcutType.WebUrl, "http:///path", "", null, 9),
+        new ShortcutDefinition("unknown", "Unknown", (ShortcutType)999, existingFile, "", null, 10),
+    };
+
+    foreach (var definition in invalidDefinitions)
+    {
+        var result = launcher.Launch(definition);
+        Assert.False(result.Succeeded, $"Invalid {definition.Id} definition should return a failure.");
+        Assert.True(!string.IsNullOrWhiteSpace(result.Error), $"Invalid {definition.Id} definition should explain its failure.");
+    }
+
+    Assert.Equal(0, startCount, "Rejected definitions must never reach the process boundary.");
+}
+
+static void ShortcutLauncherRejectsTamperedExecutableFileDefinitions()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var deniedExtensions = new[]
+    {
+        ".bat", ".CMD", ".Ps1", ".vbs", ".JS", ".jse",
+        ".wsf", ".WSH", ".hta", ".COM", ".scr", ".MSI",
+    };
+    var startCount = 0;
+    var launcher = new ShortcutLauncher(
+        new LoggingService(paths),
+        _ =>
+        {
+            startCount++;
+            return null;
+        });
+
+    foreach (var extension in deniedExtensions)
+    {
+        var path = System.IO.Path.Combine(temp.Path, $"Tampered{extension}");
+        File.WriteAllText(path, "denied fixture");
+        var definition = new ShortcutDefinition("tampered", "Tampered", ShortcutType.File, path, "", null, 0);
+
+        var result = launcher.Launch(definition);
+
+        Assert.False(result.Succeeded, $"A File definition must reject executable extension {extension}.");
+        Assert.True(!string.IsNullOrWhiteSpace(result.Error), "A safety rejection should include an error message.");
+    }
+
+    var linkPath = System.IO.Path.Combine(temp.Path, "Allowed.lnk");
+    File.WriteAllText(linkPath, "shortcut fixture");
+    var linkResult = launcher.Launch(
+        new ShortcutDefinition("link", "Link", ShortcutType.WindowsShortcut, linkPath, "", null, 0));
+    Assert.True(linkResult.Succeeded, "An explicit Windows shortcut definition should remain allowed.");
+    Assert.Equal(1, startCount, "Only the explicit Windows shortcut should reach the process boundary.");
+}
+
+static void ShortcutLauncherContainsAndLogsStartFailures()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var filePath = System.IO.Path.Combine(temp.Path, "notes.txt");
+    File.WriteAllText(filePath, "file fixture");
+    var launcher = new ShortcutLauncher(
+        new LoggingService(paths),
+        _ => throw new InvalidOperationException("simulated start failure"));
+
+    var result = launcher.Launch(
+        new ShortcutDefinition("notes", "Notes", ShortcutType.File, filePath, "", null, 0));
+
+    Assert.False(result.Succeeded, "Process start exceptions should be contained as failures.");
+    Assert.True(!string.IsNullOrWhiteSpace(result.Error), "Contained process failures should include an error message.");
+    Assert.True(File.Exists(paths.LogFile), "Contained process failures should be logged.");
+    var log = File.ReadAllText(paths.LogFile);
+    Assert.Contains(log, "simulated start failure", "The log should retain the process exception details.");
+    Assert.Contains(log, filePath, "The log should identify the target that failed to launch.");
 }
 
 static void SettingCatalogDefinesEveryBooleanSettingOnce()
