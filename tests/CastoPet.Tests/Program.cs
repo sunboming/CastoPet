@@ -83,6 +83,13 @@ var tests = new (string Name, Action Test)[]
     ("Radial wheel controller honors category dwell", RadialWheelControllerHonorsCategoryDwell),
     ("Radial wheel controller resets and collapses state", RadialWheelControllerResetsAndCollapsesState),
     ("Radial wheel controller paginates without persisting controls", RadialWheelControllerPaginatesWithoutPersistingControls),
+    ("Shortcut service loads empty state and round trips", ShortcutServiceLoadsEmptyStateAndRoundTrips),
+    ("Shortcut service normalizes duplicate identities", ShortcutServiceNormalizesDuplicateIdentities),
+    ("Shortcut service mutates ordered entries", ShortcutServiceMutatesOrderedEntries),
+    ("Shortcut service enforces its entry limit", ShortcutServiceEnforcesEntryLimit),
+    ("Shortcut service recovers malformed storage", ShortcutServiceRecoversMalformedStorage),
+    ("Shortcut service isolates malformed entries", ShortcutServiceIsolatesMalformedEntries),
+    ("Shortcut service notifies only after persisted mutations", ShortcutServiceNotifiesOnlyAfterPersistedMutations),
     ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
     ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
     ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
@@ -1407,6 +1414,133 @@ static WheelCatalog CreateWheelCatalog(int actionCount)
         new WheelCategory("primary", "Primary", actions),
         new WheelCategory("secondary", "Secondary", [new WheelActionItem("other", "Other", WheelActionType.Shortcut, "other")]),
     ]);
+}
+
+static void ShortcutServiceLoadsEmptyStateAndRoundTrips()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+
+    service.Load();
+    Assert.Equal(0, service.GetAll().Count, "Missing storage should load as empty.");
+    var added = service.TryAdd(new ShortcutDefinition("editor", "Editor", ShortcutType.Program, @"C:\Tools\Editor.exe", "--project demo", @"C:\Tools", 0));
+    Assert.True(added.Added, "A valid shortcut should be added.");
+    Assert.True(File.Exists(paths.ShortcutsFile), "Shortcut data should be persisted.");
+
+    var reloaded = new ShortcutService(paths, new LoggingService(paths));
+    reloaded.Load();
+    var item = reloaded.GetAll().Single();
+    Assert.Equal(@"C:\Tools\Editor.exe", item.Target, "Target should round trip separately.");
+    Assert.Equal("--project demo", item.Arguments, "Arguments should remain separate from target.");
+}
+
+static void ShortcutServiceNormalizesDuplicateIdentities()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+    service.Load();
+
+    Assert.True(service.TryAdd(new ShortcutDefinition("file-a", "File", ShortcutType.File, @"C:\Work\..\Work\Readme.txt", "", null, 0)).Added, "First path should be added.");
+    Assert.False(service.TryAdd(new ShortcutDefinition("file-b", "File duplicate", ShortcutType.File, @"c:\work\README.TXT", "", null, 0)).Added, "Equivalent Windows paths should be duplicates.");
+    Assert.True(service.TryAdd(new ShortcutDefinition("web-a", "Web", ShortcutType.WebUrl, "HTTPS://Example.com:443/docs/", "", null, 0)).Added, "First URL should be added.");
+    Assert.False(service.TryAdd(new ShortcutDefinition("web-b", "Web duplicate", ShortcutType.WebUrl, "https://example.com/docs", "", null, 0)).Added, "Equivalent URLs should be duplicates.");
+    Assert.True(service.TryAdd(new ShortcutDefinition("link-a", "Link", ShortcutType.WindowsShortcut, @"C:\Links\Tool.lnk", "", null, 0)).Added, "First link should be added.");
+    Assert.False(service.TryAdd(new ShortcutDefinition("link-b", "Link duplicate", ShortcutType.WindowsShortcut, @"c:\links\TOOL.LNK", "", null, 0)).Added, "Link identity should use its own path.");
+}
+
+static void ShortcutServiceMutatesOrderedEntries()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+    service.Load();
+    service.TryAdd(new ShortcutDefinition("a", "A", ShortcutType.File, @"C:\A.txt", "", null, 5));
+    service.TryAdd(new ShortcutDefinition("b", "B", ShortcutType.File, @"C:\B.txt", "", null, 2));
+
+    Assert.Equal("b", service.GetAll()[0].Id, "Entries should load in sort order.");
+    Assert.True(service.Rename("a", "Renamed").Succeeded, "Rename should succeed.");
+    Assert.True(service.Move("a", 0).Succeeded, "Reorder should succeed.");
+    Assert.Equal("a", service.GetAll()[0].Id, "Moved entry should occupy requested index.");
+    Assert.Equal("Renamed", service.GetAll()[0].Name, "Rename should persist through reorder.");
+    Assert.True(service.Delete("b").Succeeded, "Delete should succeed.");
+    Assert.Equal(1, service.GetAll().Count, "Deleted entry should be removed.");
+}
+
+static void ShortcutServiceEnforcesEntryLimit()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+    service.Load();
+    for (var index = 0; index < ShortcutService.MaxEntries; index++)
+    {
+        Assert.True(service.TryAdd(new ShortcutDefinition($"id-{index}", $"Item {index}", ShortcutType.File, $@"C:\Items\{index}.txt", "", null, index)).Added, "Entries within the limit should be added.");
+    }
+
+    Assert.False(service.TryAdd(new ShortcutDefinition("overflow", "Overflow", ShortcutType.File, @"C:\overflow.txt", "", null, 129)).Added, "The 129th entry should be rejected.");
+    Assert.Equal(ShortcutService.MaxEntries, service.GetAll().Count, "Rejected entries must not alter state.");
+}
+
+static void ShortcutServiceRecoversMalformedStorage()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    Directory.CreateDirectory(paths.ShortcutsDirectory);
+    File.WriteAllText(paths.ShortcutsFile, "{ malformed");
+    var service = new ShortcutService(paths, new LoggingService(paths));
+
+    service.Load();
+
+    Assert.Equal(0, service.GetAll().Count, "Malformed storage should recover to empty.");
+    Assert.Equal(1, Directory.GetFiles(paths.ShortcutsDirectory, "shortcuts.invalid-*.json").Length, "Malformed storage should receive a timestamped backup.");
+}
+
+static void ShortcutServiceIsolatesMalformedEntries()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    Directory.CreateDirectory(paths.ShortcutsDirectory);
+    File.WriteAllText(paths.ShortcutsFile, """
+        [
+          { "id":"good", "name":"Good", "type":"File", "target":"C:\\\\Good.txt", "arguments":"", "workingDirectory":null, "sortOrder":0 },
+          { "id":"bad", "name":42, "type":"Unknown", "target":null }
+        ]
+        """);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+
+    service.Load();
+
+    Assert.Equal(1, service.GetAll().Count, "A malformed entry should not discard valid siblings.");
+    Assert.Equal("good", service.GetAll()[0].Id, "The valid entry should survive.");
+}
+
+static void ShortcutServiceNotifiesOnlyAfterPersistedMutations()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+    service.Load();
+    var changed = 0;
+    service.Changed += (_, _) => changed++;
+
+    Assert.True(service.TryAdd(new ShortcutDefinition("a", "A", ShortcutType.File, @"C:\A.txt", "", null, 0)).Added, "Successful mutation should be reported.");
+    Assert.Equal(1, changed, "Successful persisted mutation should notify once.");
+    Assert.False(service.TryAdd(new ShortcutDefinition("duplicate", "A", ShortcutType.File, @"c:\a.TXT", "", null, 0)).Added, "Duplicate should fail without mutation.");
+    Assert.Equal(1, changed, "Rejected mutation should not notify.");
+
+    using var blocked = TempDirectory.Create();
+    var blockedRoot = System.IO.Path.Combine(blocked.Path, "not-a-directory");
+    File.WriteAllText(blockedRoot, "blocked");
+    var blockedPaths = new AppPaths(blockedRoot);
+    var blockedService = new ShortcutService(blockedPaths, new LoggingService(blockedPaths));
+    var blockedChanges = 0;
+    blockedService.Changed += (_, _) => blockedChanges++;
+    var failed = blockedService.TryAdd(new ShortcutDefinition("failed", "Failed", ShortcutType.File, @"C:\Failed.txt", "", null, 0));
+    Assert.False(failed.Succeeded, "File-system failures should be contained.");
+    Assert.Equal(0, blockedChanges, "Failed persistence must not notify.");
+    Assert.Equal(0, blockedService.GetAll().Count, "Failed persistence must not alter memory.");
 }
 
 static void SettingCatalogDefinesEveryBooleanSettingOnce()
