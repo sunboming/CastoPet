@@ -42,13 +42,13 @@ public partial class PetWindow : Window
     private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyList<ImageSource> _moveFrames;
-    private readonly IReadOnlyDictionary<ExpressionWheelItem, ImageSource> _expressionImages;
+    private readonly IReadOnlyDictionary<ExpressionWheelItem, PetExpressionAsset> _expressionAssets;
     private readonly ImageSource? _inputReactiveBase;
     private readonly PetActionDefinition _idleAction;
     private readonly PetActionDefinition _moveAction;
     private readonly PetActionDefinition _blinkAction;
-    private readonly PetActionDefinition _expressionTransitionInAction;
-    private readonly PetActionDefinition _expressionTransitionOutAction;
+    private readonly PetActionDefinition? _expressionTransitionInAction;
+    private readonly PetActionDefinition? _expressionTransitionOutAction;
     private readonly InputReactiveState _inputReactiveState = new();
     private readonly WindowsInputHookService _inputHookService = new();
     private readonly DispatcherTimer _inputReactiveRenderTimer;
@@ -74,7 +74,10 @@ public partial class PetWindow : Window
     private bool _inputReactiveModeEnabled;
     private bool _hasActiveMovementTarget;
     private int? _selectedExpressionWheelIndex;
-    private ImageSource? _pendingExpressionImage;
+    private PetExpressionAsset? _pendingExpressionAsset;
+    private PetExpressionAsset? _activeExpressionAsset;
+    private IReadOnlyList<ImageSource> _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
+    private bool _activeExpressionUsesSpecificTransition;
     private TimeSpan? _lastActiveMovementRenderTime;
     private TimeSpan? _lastManualCursorMovementTime;
     private TimeSpan? _cursorPushStartedAt;
@@ -107,8 +110,12 @@ public partial class PetWindow : Window
         _idleAction = assets.Skin.GetRequiredAction(PetActionKind.Idle);
         _moveAction = assets.Skin.GetRequiredAction(PetActionKind.Move);
         _blinkAction = assets.Skin.GetRequiredAction(PetActionKind.Blink);
-        _expressionTransitionInAction = assets.Skin.GetRequiredAction(PetActionKind.ExpressionTransitionIn);
-        _expressionTransitionOutAction = assets.Skin.GetRequiredAction(PetActionKind.ExpressionTransitionOut);
+        _expressionTransitionInAction = assets.Skin.TryGetAction(PetActionKind.ExpressionTransitionIn, out var transitionInAction)
+            ? transitionInAction
+            : null;
+        _expressionTransitionOutAction = assets.Skin.TryGetAction(PetActionKind.ExpressionTransitionOut, out var transitionOutAction)
+            ? transitionOutAction
+            : null;
         _idleFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_idleAction, DefaultIdleFrameInterval) };
         _idleFrameTimer.Tick += (_, _) => AdvanceIdleFrame();
         _blinkScheduleTimer = new DispatcherTimer();
@@ -139,7 +146,7 @@ public partial class PetWindow : Window
             _inputReactiveBase = assets.TryLoadInputReactiveBase();
             _expressionTransitionInFrames = assets.LoadExpressionTransitionInFrames();
             _expressionTransitionOutFrames = assets.LoadExpressionTransitionOutFrames();
-            _expressionImages = assets.LoadExpressionWheelImages();
+            _expressionAssets = assets.LoadExpressionAssets();
             BuildExpressionWheel(assets.Skin.Expressions);
             CharacterImage.Source = GetCurrentIdleFrame();
         }
@@ -153,7 +160,7 @@ public partial class PetWindow : Window
             _inputReactiveBase = null;
             _expressionTransitionInFrames = Array.Empty<ImageSource>();
             _expressionTransitionOutFrames = Array.Empty<ImageSource>();
-            _expressionImages = new Dictionary<ExpressionWheelItem, ImageSource>();
+            _expressionAssets = new Dictionary<ExpressionWheelItem, PetExpressionAsset>();
             System.Windows.MessageBox.Show(
                 "CastoPet 无法加载内置角色图片 Castorice.png。",
                 "CastoPet",
@@ -216,22 +223,23 @@ public partial class PetWindow : Window
     public void AttachContextMenu(MenuCommandService commands)
     {
         var menu = new WpfControls.ContextMenu();
+        var directSettings = SettingCatalog.Create(commands)
+            .Where(definition => definition.ShowInDirectMenu)
+            .ToArray();
 
         menu.Items.Add(CreateMenuItem(TrayService.ShowOrRestoreText, commands.ShowOrRestore));
         menu.Items.Add(new WpfControls.Separator());
-        menu.Items.Add(CreateCheckedMenuItem(TrayService.AlwaysOnTopText, () => commands.Settings.Topmost, commands.ToggleTopmost));
-        menu.Items.Add(CreateCheckedMenuItem(TrayService.MouseClickThroughText, () => commands.Settings.ClickThrough, commands.ToggleClickThrough));
-        menu.Items.Add(CreateCheckedMenuItem(TrayService.ActiveMovementText, () => commands.Settings.ActiveMovement, commands.ToggleActiveMovement));
-        menu.Items.Add(CreateCheckedMenuItem(TrayService.PushCursorText, () => commands.Settings.PushCursor, commands.TogglePushCursor));
-        menu.Items.Add(CreateCheckedMenuItem(TrayService.InputReactiveModeText, () => commands.Settings.InputReactiveMode, commands.ToggleInputReactiveMode));
-        menu.Items.Add(CreateCheckedMenuItem(TrayService.ShowTaskbarIconText, () => commands.Settings.ShowInTaskbar, commands.ToggleShowInTaskbar));
-        menu.Items.Add(CreateCheckedMenuItem(TrayService.StartWithWindowsText, () => commands.Settings.StartWithWindows, commands.ToggleStartWithWindows));
+        foreach (var definition in directSettings)
+        {
+            menu.Items.Add(CreateCheckedMenuItem(definition));
+        }
+        menu.Items.Add(CreateMenuItem(TrayService.SettingsText, commands.ShowSettings));
         menu.Items.Add(new WpfControls.Separator());
         menu.Items.Add(CreateMenuItem(TrayService.ExitText, commands.Exit));
 
-        menu.Opened += (_, _) => RefreshContextMenuChecks(menu, commands);
+        menu.Opened += (_, _) => RefreshContextMenuChecks(menu);
         ContextMenu = menu;
-        commands.SettingsChanged += () => RefreshContextMenuChecks(menu, commands);
+        commands.SettingsChanged += () => RefreshContextMenuChecks(menu);
     }
 
     public void ShowOrRestore()
@@ -976,7 +984,7 @@ public partial class PetWindow : Window
         foreach (var expression in expressions)
         {
             var item = new ExpressionWheelItem(expression.Label, expression.ResourcePath);
-            if (!_expressionImages.ContainsKey(item))
+            if (!_expressionAssets.ContainsKey(item))
             {
                 continue;
             }
@@ -994,7 +1002,7 @@ public partial class PetWindow : Window
     private FrameworkElement CreateExpressionWheelItemVisual(ExpressionWheelItem item)
     {
         var itemIndex = _expressionWheelItems.Count;
-        var itemCount = _expressionImages.Count;
+        var itemCount = _expressionAssets.Count;
         var panel = new WpfControls.Canvas
         {
             Width = ExpressionWheelSurface.Width,
@@ -1253,7 +1261,7 @@ public partial class PetWindow : Window
         }
 
         var item = _expressionWheelItems[index];
-        if (!_expressionImages.TryGetValue(item, out var image))
+        if (!_expressionAssets.TryGetValue(item, out var asset))
         {
             return;
         }
@@ -1263,7 +1271,8 @@ public partial class PetWindow : Window
         StopInputReactiveMode(restoreIdle: false);
         StopIdleAnimation();
         StopBlinkAnimation();
-        _pendingExpressionImage = image;
+        _pendingExpressionAsset = asset;
+        _activeExpressionAsset = asset;
         PlayExpressionTransitionIn();
         UpdateActiveMovementTimer();
     }
@@ -1272,7 +1281,8 @@ public partial class PetWindow : Window
     {
         _temporaryExpressionTimer.Stop();
         StopExpressionTransition();
-        _pendingExpressionImage = null;
+        _pendingExpressionAsset = null;
+        _activeExpressionAsset = null;
         ResetCharacterTransitionAnimations();
         UpdateActiveMovementTimer();
     }
@@ -1290,7 +1300,7 @@ public partial class PetWindow : Window
     private void RestoreAfterTemporaryExpression()
     {
         _temporaryExpressionTimer.Stop();
-        _pendingExpressionImage = null;
+        _pendingExpressionAsset = null;
         StopIdleAnimation();
         StopBlinkAnimation();
         StopInputReactiveMode(restoreIdle: false);
@@ -1300,7 +1310,15 @@ public partial class PetWindow : Window
 
     private void PlayExpressionTransitionIn()
     {
-        if (_expressionTransitionInFrames.Count == 0)
+        if (_pendingExpressionAsset is null)
+        {
+            return;
+        }
+
+        var specificFrames = _pendingExpressionAsset.TransitionFrames;
+        _activeExpressionUsesSpecificTransition = specificFrames.Count > 0;
+        _activeExpressionTransitionFrames = ExpressionTransitionPlanner.EnterFrames(specificFrames, _expressionTransitionInFrames);
+        if (_activeExpressionTransitionFrames.Count == 0)
         {
             ShowPendingExpression();
             return;
@@ -1309,15 +1327,20 @@ public partial class PetWindow : Window
         ResetCharacterTransitionAnimations();
         _expressionTransitionMode = ExpressionTransitionMode.In;
         _expressionTransitionFrameIndex = 0;
-        _expressionTransitionFrameTimer.Interval = GetActionFrameInterval(_expressionTransitionInAction, DefaultExpressionTransitionFrameInterval);
-        CharacterImage.Source = _expressionTransitionInFrames[_expressionTransitionFrameIndex];
+        _expressionTransitionFrameTimer.Interval = _activeExpressionUsesSpecificTransition
+            ? _pendingExpressionAsset.Definition.TransitionFrameInterval ?? DefaultExpressionTransitionFrameInterval
+            : GetActionFrameInterval(_expressionTransitionInAction, DefaultExpressionTransitionFrameInterval);
+        CharacterImage.Source = _activeExpressionTransitionFrames[_expressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
     }
 
     private void PlayExpressionTransitionOut()
     {
-        if (_expressionTransitionOutFrames.Count == 0)
+        var specificFrames = _activeExpressionAsset?.TransitionFrames ?? Array.Empty<ImageSource>();
+        _activeExpressionUsesSpecificTransition = specificFrames.Count > 0;
+        _activeExpressionTransitionFrames = ExpressionTransitionPlanner.ExitFrames(specificFrames, _expressionTransitionOutFrames);
+        if (_activeExpressionTransitionFrames.Count == 0)
         {
             CompleteExpressionRestore();
             return;
@@ -1326,17 +1349,17 @@ public partial class PetWindow : Window
         ResetCharacterTransitionAnimations();
         _expressionTransitionMode = ExpressionTransitionMode.Out;
         _expressionTransitionFrameIndex = 0;
-        _expressionTransitionFrameTimer.Interval = GetActionFrameInterval(_expressionTransitionOutAction, DefaultExpressionTransitionFrameInterval);
-        CharacterImage.Source = _expressionTransitionOutFrames[_expressionTransitionFrameIndex];
+        _expressionTransitionFrameTimer.Interval = _activeExpressionUsesSpecificTransition
+            ? _activeExpressionAsset?.Definition.TransitionFrameInterval ?? DefaultExpressionTransitionFrameInterval
+            : GetActionFrameInterval(_expressionTransitionOutAction, DefaultExpressionTransitionFrameInterval);
+        CharacterImage.Source = _activeExpressionTransitionFrames[_expressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
     }
 
     private void AdvanceExpressionTransitionFrame()
     {
-        var frames = _expressionTransitionMode == ExpressionTransitionMode.In
-            ? _expressionTransitionInFrames
-            : _expressionTransitionOutFrames;
+        var frames = _activeExpressionTransitionFrames;
 
         if (_expressionTransitionMode == ExpressionTransitionMode.None || frames.Count == 0)
         {
@@ -1365,14 +1388,23 @@ public partial class PetWindow : Window
 
     private void ShowPendingExpression()
     {
-        if (_pendingExpressionImage is null || _isDragging || _isExpressionWheelOpen)
+        if (_pendingExpressionAsset is null || _isDragging || _isExpressionWheelOpen)
         {
             return;
         }
 
-        var image = _pendingExpressionImage;
-        _pendingExpressionImage = null;
-        AnimateCharacterImageSwap(image);
+        var asset = _pendingExpressionAsset;
+        _pendingExpressionAsset = null;
+        _activeExpressionAsset = asset;
+        if (_activeExpressionUsesSpecificTransition)
+        {
+            ResetCharacterTransitionAnimations();
+            CharacterImage.Source = asset.Image;
+        }
+        else
+        {
+            AnimateCharacterImageSwap(asset.Image);
+        }
         _temporaryExpressionTimer.Start();
         UpdateActiveMovementTimer();
     }
@@ -1385,6 +1417,10 @@ public partial class PetWindow : Window
         }
 
         _idleFrameIndex = 0;
+        _pendingExpressionAsset = null;
+        _activeExpressionAsset = null;
+        _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
+        _activeExpressionUsesSpecificTransition = false;
         ResetCharacterTransitionAnimations();
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
@@ -1398,6 +1434,7 @@ public partial class PetWindow : Window
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionMode = ExpressionTransitionMode.None;
         _expressionTransitionFrameIndex = 0;
+        _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
     }
 
     private void StartIdleBreathing()
@@ -1510,9 +1547,9 @@ public partial class PetWindow : Window
         _blinkScheduleTimer.Start();
     }
 
-    private static TimeSpan GetActionFrameInterval(PetActionDefinition action, TimeSpan fallback)
+    private static TimeSpan GetActionFrameInterval(PetActionDefinition? action, TimeSpan fallback)
     {
-        return action.FrameInterval ?? fallback;
+        return action?.FrameInterval ?? fallback;
     }
 
     private static double CalculateMoveStep(PetActionDefinition action, TimeSpan elapsed, double distanceToTarget)
@@ -1594,35 +1631,27 @@ public partial class PetWindow : Window
         return item;
     }
 
-    private static WpfControls.MenuItem CreateCheckedMenuItem(string header, Func<bool> isChecked, Action action)
+    private static WpfControls.MenuItem CreateCheckedMenuItem(SettingDefinition definition)
     {
         var item = new WpfControls.MenuItem
         {
-            Header = header,
+            Header = definition.Label,
             IsCheckable = true,
-            IsChecked = isChecked(),
+            IsChecked = definition.GetValue(),
+            Tag = definition,
         };
-        item.SubmenuOpened += (_, _) => item.IsChecked = isChecked();
-        item.Click += (_, _) => action();
+        item.Click += (_, _) => definition.Toggle();
         return item;
     }
 
-    private static void RefreshContextMenuChecks(WpfControls.ContextMenu menu, MenuCommandService commands)
+    private static void RefreshContextMenuChecks(WpfControls.ContextMenu menu)
     {
         foreach (var item in menu.Items.OfType<WpfControls.MenuItem>())
         {
-            var header = item.Header as string;
-            item.IsChecked = header switch
+            if (item.Tag is SettingDefinition definition)
             {
-                TrayService.AlwaysOnTopText => commands.Settings.Topmost,
-                TrayService.MouseClickThroughText => commands.Settings.ClickThrough,
-                TrayService.ActiveMovementText => commands.Settings.ActiveMovement,
-                TrayService.PushCursorText => commands.Settings.PushCursor,
-                TrayService.InputReactiveModeText => commands.Settings.InputReactiveMode,
-                TrayService.ShowTaskbarIconText => commands.Settings.ShowInTaskbar,
-                TrayService.StartWithWindowsText => commands.Settings.StartWithWindows,
-                _ => item.IsChecked,
-            };
+                item.IsChecked = definition.GetValue();
+            }
         }
     }
 }

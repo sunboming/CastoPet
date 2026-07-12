@@ -31,9 +31,16 @@ public sealed class MenuCommandService
 
     public event Action? SettingsChanged;
 
+    public event Action? SettingsRequested;
+
     public void ShowOrRestore()
     {
         _window.ShowOrRestore();
+    }
+
+    public void ShowSettings()
+    {
+        SettingsRequested?.Invoke();
     }
 
     public void ToggleTopmost()

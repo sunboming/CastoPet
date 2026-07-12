@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "canvas": {
+    "width": 320,
+    "height": 320,
+    "previewBackground": "#f6f0fb"
+  },
+  "actions": [
+    {
+      "id": "blink",
+      "frames": 3,
+      "fps": 12,
+      "loop": true,
+      "exportName": "Castorice.Blink.{frame}.png",
+      "layers": [
+        {
+          "id": "base",
+          "src": "../layers/base.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 160
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        }
+      ],
+      "keyframes": {
+        "base": [
+          {
+            "frame": 0,
+            "y": 0,
+            "easing": "easeInOutSine"
+          }
+        ]
+      }
+    }
+  ]
+}

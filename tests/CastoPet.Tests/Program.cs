@@ -12,6 +12,26 @@ var tests = new (string Name, Action Test)[]
     ("Settings round trip includes push cursor", SettingsRoundTripIncludesPushCursor),
     ("Settings round trip includes input reactive mode", SettingsRoundTripIncludesInputReactiveMode),
     ("Settings round trip includes skin manifest path", SettingsRoundTripIncludesSkinManifestPath),
+    ("App paths include local crash reports", AppPathsIncludeLocalCrashReports),
+    ("Settings round trip includes crash and update state", SettingsRoundTripIncludesCrashAndUpdateState),
+    ("Settings clone includes crash and update state", SettingsCloneIncludesCrashAndUpdateState),
+    ("Crash reports sanitize user paths and include exception chains", CrashReportsSanitizeUserPathsAndIncludeExceptionChains),
+    ("Crash reports keep a bounded log tail", CrashReportsKeepABoundedLogTail),
+    ("Crash report service writes and acknowledges reports", CrashReportServiceWritesAndAcknowledgesReports),
+    ("Crash report service contains file system failures", CrashReportServiceContainsFileSystemFailures),
+    ("Application registers all unhandled exception sources", ApplicationRegistersAllUnhandledExceptionSources),
+    ("Crash notification is local only", CrashNotificationIsLocalOnly),
+    ("Update policy checks at most once per local day", UpdatePolicyChecksAtMostOncePerLocalDay),
+    ("Manual update checks bypass the daily gate", ManualUpdateChecksBypassTheDailyGate),
+    ("Update coordinator skips development builds", UpdateCoordinatorSkipsDevelopmentBuilds),
+    ("Update coordinator records automatic attempts before network", UpdateCoordinatorRecordsAutomaticAttemptsBeforeNetwork),
+    ("Update coordinator maps network failures", UpdateCoordinatorMapsNetworkFailures),
+    ("Update coordinator rejects concurrent checks", UpdateCoordinatorRejectsConcurrentChecks),
+    ("Project pins semantic version and Velopack", ProjectPinsSemanticVersionAndVelopack),
+    ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
+    ("Update source points to the public releases repository", UpdateSourcePointsToThePublicReleasesRepository),
+    ("Settings window exposes crash and update actions", SettingsWindowExposesCrashAndUpdateActions),
+    ("Local packaging script cannot publish artifacts", LocalPackagingScriptCannotPublishArtifacts),
     ("Pet window settings snapshot copies runtime flags", PetWindowSettingsSnapshotCopiesRuntimeFlags),
     ("Pet window settings snapshot copies input reactive mode", PetWindowSettingsSnapshotCopiesInputReactiveMode),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
@@ -26,11 +46,13 @@ var tests = new (string Name, Action Test)[]
     ("Runtime position tracks drag for current run only", RuntimePositionTracksDragForCurrentRunOnly),
     ("Show restore keeps hidden position but resets visible position", ShowRestoreKeepsHiddenPositionButResetsVisiblePosition),
     ("Built-in Castorice skin defines required actions", BuiltInCastoriceSkinDefinesRequiredActions),
+    ("Built-in Castorice skin uses runtime asset root", BuiltInCastoriceSkinUsesRuntimeAssetRoot),
     ("Built-in Castorice idle action preserves current frames", BuiltInCastoriceIdleActionPreservesCurrentFrames),
     ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
     ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
     ("Built-in Castorice expressions are ordered skin definitions", BuiltInCastoriceExpressionsAreOrderedSkinDefinitions),
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
+    ("Pet skin manifest loads expression transition metadata", PetSkinManifestLoadsExpressionTransitionMetadata),
     ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
     ("Pet skin manifest writer emits loadable JSON", PetSkinManifestWriterEmitsLoadableJson),
@@ -41,7 +63,8 @@ var tests = new (string Name, Action Test)[]
     ("Asset service defaults to built-in skin", AssetServiceDefaultsToBuiltInSkin),
     ("Asset service uses configured skin paths", AssetServiceUsesConfiguredSkinPaths),
     ("Asset service loads file system skin image paths", AssetServiceLoadsFileSystemSkinImagePaths),
-    ("Built-in idle action defines eight slow frame paths", BuiltInIdleActionDefinesEightSlowFramePaths),
+    ("Asset service loads expression images with isolated transitions", AssetServiceLoadsExpressionImagesWithIsolatedTransitions),
+    ("Built-in idle action defines eight authored-rate frame paths", BuiltInIdleActionDefinesEightAuthoredRateFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Built-in blink action defines random blink frames", BuiltInBlinkActionDefinesRandomBlinkFrames),
     ("Built-in move action defines eight distance-driven paths", BuiltInMoveActionDefinesEightDistanceDrivenPaths),
@@ -51,11 +74,16 @@ var tests = new (string Name, Action Test)[]
     ("Expression wheel paths use app resources", ExpressionWheelPathsUseAppResources),
     ("Built-in expression transition actions define shared frames", BuiltInExpressionTransitionActionsDefineSharedFrames),
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
+    ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
     ("Expression wheel selector maps pointer positions", ExpressionWheelSelectorMapsPointerPositions),
-    ("Tray menu exposes active movement text", TrayMenuExposesActiveMovementText),
-    ("Tray menu exposes push cursor text", TrayMenuExposesPushCursorText),
-    ("Tray menu exposes input reactive mode text", TrayMenuExposesInputReactiveModeText),
+    ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
+    ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
+    ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
+    ("Settings window service reuses the open window", SettingsWindowServiceReusesTheOpenWindow),
+    ("Settings window service releases a closed window", SettingsWindowServiceReleasesAClosedWindow),
+    ("Settings window defines the approved visual structure", SettingsWindowDefinesTheApprovedVisualStructure),
+    ("Direct menus expose the settings command", DirectMenusExposeTheSettingsCommand),
     ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
     ("Input keyboard layout exposes drawable keys", InputKeyboardLayoutExposesDrawableKeys),
     ("Input keyboard layout exposes key labels", InputKeyboardLayoutExposesKeyLabels),
@@ -81,6 +109,7 @@ var tests = new (string Name, Action Test)[]
     ("Input reactive asset path uses app resource", InputReactiveAssetPathUsesAppResource),
     ("Input reactive asset is packaged", InputReactiveAssetIsPackaged),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
+    ("Packaged expression transitions have complete source and runtime endpoints", PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints),
 };
 
 var failures = 0;
@@ -234,6 +263,271 @@ static void SettingsRoundTripIncludesSkinManifestPath()
     var loaded = service.Load();
 
     Assert.Equal(@"D:\Skins\Custom\skin.json", loaded.SkinManifestPath, "Skin manifest path should round trip.");
+}
+
+static void AppPathsIncludeLocalCrashReports()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+
+    Assert.Equal(
+        System.IO.Path.Combine(temp.Path, "Crashes"),
+        paths.CrashesDirectory,
+        "Crash reports should live beside settings and logs in the application data directory.");
+}
+
+static void SettingsRoundTripIncludesCrashAndUpdateState()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new SettingsService(paths, new LoggingService(paths));
+    var settings = new AppSettings
+    {
+        LastAcknowledgedCrashId = "crash-20260711-120000-test",
+        LastAutomaticUpdateCheckDate = "2026-07-11",
+    };
+
+    service.Save(settings);
+    var loaded = service.Load();
+
+    Assert.Equal(settings.LastAcknowledgedCrashId, loaded.LastAcknowledgedCrashId, "Crash acknowledgement should round trip.");
+    Assert.Equal(settings.LastAutomaticUpdateCheckDate, loaded.LastAutomaticUpdateCheckDate, "Update check date should round trip.");
+}
+
+static void SettingsCloneIncludesCrashAndUpdateState()
+{
+    var settings = new AppSettings
+    {
+        LastAcknowledgedCrashId = "crash-id",
+        LastAutomaticUpdateCheckDate = "2026-07-11",
+    };
+
+    var clone = settings.Clone();
+
+    Assert.Equal(settings.LastAcknowledgedCrashId, clone.LastAcknowledgedCrashId, "Clone should retain crash acknowledgement.");
+    Assert.Equal(settings.LastAutomaticUpdateCheckDate, clone.LastAutomaticUpdateCheckDate, "Clone should retain update check date.");
+}
+
+static void CrashReportsSanitizeUserPathsAndIncludeExceptionChains()
+{
+    var context = new CrashReportContext(
+        TimestampUtc: new DateTimeOffset(2026, 7, 11, 8, 30, 0, TimeSpan.Zero),
+        AppVersion: "0.1.0",
+        OperatingSystem: "Windows 11",
+        ProcessArchitecture: "X64",
+        UserProfilePath: @"C:\Users\lemon",
+        UserName: "lemon");
+    var exception = new InvalidOperationException(
+        @"Failed at C:\Users\lemon\Documents\CastoPet",
+        new IOException("inner failure"));
+
+    var report = CrashReportFormatter.Format(context, exception, Array.Empty<string>());
+
+    Assert.Contains(report, "2026-07-11T08:30:00.0000000+00:00", "Report should include the UTC timestamp.");
+    Assert.Contains(report, "CastoPet version: 0.1.0", "Report should include the application version.");
+    Assert.Contains(report, "InvalidOperationException", "Report should include the outer exception.");
+    Assert.Contains(report, "IOException", "Report should include the inner exception.");
+    Assert.Contains(report, "%USERPROFILE%", "User profile paths should use a neutral placeholder.");
+    Assert.False(report.Contains("lemon", StringComparison.OrdinalIgnoreCase), "Report should not contain the Windows username.");
+}
+
+static void CrashReportsKeepABoundedLogTail()
+{
+    var context = new CrashReportContext(
+        DateTimeOffset.UtcNow,
+        "0.1.0",
+        "Windows",
+        "X64",
+        @"C:\Users\TestUser",
+        "TestUser");
+    var lines = Enumerable.Range(0, 100).Select(index => $"log-{index:000}").ToArray();
+
+    var report = CrashReportFormatter.Format(context, new Exception("failure"), lines);
+
+    Assert.False(report.Contains("log-019", StringComparison.Ordinal), "Old log lines should be excluded.");
+    Assert.Contains(report, "log-020", "The last 80 log lines should be included.");
+    Assert.Contains(report, "log-099", "The newest log line should be included.");
+}
+
+static void CrashReportServiceWritesAndAcknowledgesReports()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new CrashReportService(paths, new LoggingService(paths));
+
+    var written = service.TryWriteReport(new InvalidOperationException("test crash"), out var report);
+
+    Assert.True(written, "Crash report write should succeed in a writable data directory.");
+    Assert.True(report is not null, "A successful write should return report metadata.");
+    Assert.True(File.Exists(report!.Path), "Crash report metadata should point to the written file.");
+    Assert.Equal(report.Id, System.IO.Path.GetFileNameWithoutExtension(report.Path), "Report ID should match its filename.");
+    Assert.Equal(report.Id, service.GetLatestUnacknowledged(null)?.Id, "An unacknowledged report should be discovered.");
+    Assert.True(service.GetLatestUnacknowledged(report.Id) is null, "Acknowledged reports should not be returned again.");
+}
+
+static void CrashReportServiceContainsFileSystemFailures()
+{
+    using var temp = TempDirectory.Create();
+    var blockedDataPath = System.IO.Path.Combine(temp.Path, "blocked");
+    File.WriteAllText(blockedDataPath, "not a directory");
+    var paths = new AppPaths(blockedDataPath);
+    var service = new CrashReportService(paths, new LoggingService(paths));
+
+    var written = service.TryWriteReport(new Exception("failure"), out var report);
+
+    Assert.False(written, "Crash report failures should be contained.");
+    Assert.True(report is null, "Failed writes should not return report metadata.");
+}
+
+static void ApplicationRegistersAllUnhandledExceptionSources()
+{
+    var workspace = FindWorkspaceRoot();
+    var appSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+
+    Assert.Contains(appSource, "DispatcherUnhandledException", "WPF dispatcher exceptions should be recorded.");
+    Assert.Contains(appSource, "AppDomain.CurrentDomain.UnhandledException", "Non-UI fatal exceptions should be recorded.");
+    Assert.Contains(appSource, "TaskScheduler.UnobservedTaskException", "Unobserved task exceptions should be recorded.");
+}
+
+static void CrashNotificationIsLocalOnly()
+{
+    var workspace = FindWorkspaceRoot();
+    var xamlPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "CrashNotificationWindow.xaml");
+    var xaml = File.ReadAllText(xamlPath);
+
+    Assert.Contains(xaml, "打开日志目录", "Crash notification should provide local report access.");
+    Assert.Contains(xaml, "忽略", "Crash notification should support acknowledgement.");
+    Assert.False(xaml.Contains("上传", StringComparison.Ordinal), "Crash notification should not imply network upload.");
+}
+
+static void UpdatePolicyChecksAtMostOncePerLocalDay()
+{
+    var today = new DateOnly(2026, 7, 11);
+
+    Assert.True(UpdateCheckPolicy.ShouldCheckAutomatically(null, today), "A missing date should allow an automatic check.");
+    Assert.True(UpdateCheckPolicy.ShouldCheckAutomatically("2026-07-10", today), "An older date should allow an automatic check.");
+    Assert.True(UpdateCheckPolicy.ShouldCheckAutomatically("invalid", today), "An invalid date should allow recovery through a check.");
+    Assert.False(UpdateCheckPolicy.ShouldCheckAutomatically("2026-07-11", today), "The same local day should not check twice.");
+    Assert.Equal("2026-07-11", UpdateCheckPolicy.FormatDate(today), "Persisted dates should use ISO format.");
+}
+
+static void ManualUpdateChecksBypassTheDailyGate()
+{
+    Assert.True(
+        UpdateCheckPolicy.ShouldCheck(manual: true, "2026-07-11", new DateOnly(2026, 7, 11)),
+        "Manual checks should bypass the daily gate.");
+}
+
+static void UpdateCoordinatorSkipsDevelopmentBuilds()
+{
+    var service = new FakeUpdateService { IsInstalled = false };
+    var settings = AppSettings.Default;
+    var coordinator = new UpdateCoordinator(service, settings, _ => true, () => new DateOnly(2026, 7, 11));
+
+    var result = coordinator.CheckAsync(manual: true).GetAwaiter().GetResult();
+
+    Assert.Equal(UpdateCheckStatus.DevelopmentBuild, result.Status, "Direct builds should not invoke installed update operations.");
+    Assert.Equal(0, service.CheckCount, "Development builds should not contact the update source.");
+}
+
+static void UpdateCoordinatorRecordsAutomaticAttemptsBeforeNetwork()
+{
+    var settings = AppSettings.Default;
+    var savedBeforeCheck = false;
+    var service = new FakeUpdateService
+    {
+        OnCheck = () =>
+        {
+            savedBeforeCheck = settings.LastAutomaticUpdateCheckDate == "2026-07-11";
+            return null;
+        },
+    };
+    var coordinator = new UpdateCoordinator(service, settings, _ => true, () => new DateOnly(2026, 7, 11));
+
+    var result = coordinator.CheckAsync(manual: false).GetAwaiter().GetResult();
+
+    Assert.True(savedBeforeCheck, "The daily attempt should be persisted before awaiting the network.");
+    Assert.Equal(UpdateCheckStatus.Current, result.Status, "No available release should report current.");
+}
+
+static void UpdateCoordinatorMapsNetworkFailures()
+{
+    var service = new FakeUpdateService { Exception = new HttpRequestException("offline") };
+    var coordinator = new UpdateCoordinator(service, AppSettings.Default, _ => true, () => new DateOnly(2026, 7, 11));
+
+    var result = coordinator.CheckAsync(manual: true).GetAwaiter().GetResult();
+
+    Assert.Equal(UpdateCheckStatus.Failed, result.Status, "Network errors should map to a retryable failed status.");
+}
+
+static void UpdateCoordinatorRejectsConcurrentChecks()
+{
+    var gate = new TaskCompletionSource<UpdateAvailability?>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var service = new FakeUpdateService { PendingCheck = gate.Task };
+    var coordinator = new UpdateCoordinator(service, AppSettings.Default, _ => true, () => new DateOnly(2026, 7, 11));
+
+    var first = coordinator.CheckAsync(manual: true);
+    var second = coordinator.CheckAsync(manual: true).GetAwaiter().GetResult();
+    gate.SetResult(null);
+    first.GetAwaiter().GetResult();
+
+    Assert.Equal(UpdateCheckStatus.Busy, second.Status, "A second in-flight check should return busy.");
+    Assert.Equal(1, service.CheckCount, "Only one source request should run concurrently.");
+}
+
+static void ProjectPinsSemanticVersionAndVelopack()
+{
+    var workspace = FindWorkspaceRoot();
+    var project = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "CastoPet.csproj"));
+
+    Assert.Contains(project, "<Version>0.1.0</Version>", "The application should have an explicit semantic version.");
+    Assert.Contains(project, "<PackageReference Include=\"Velopack\" Version=\"1.2.0\"", "Velopack should be pinned to the verified stable version.");
+}
+
+static void VelopackRunsAtTheApplicationEntryPoint()
+{
+    var workspace = FindWorkspaceRoot();
+    var program = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Program.cs"));
+    var app = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+
+    Assert.Contains(program, "VelopackApp.Build().Run();", "Velopack hooks should run at the beginning of Main.");
+    Assert.Contains(program, "static void Main", "The application should expose an explicit entry point.");
+    Assert.False(app.Contains("VelopackApp.Build().Run();", StringComparison.Ordinal), "Velopack hooks should not wait until the App constructor.");
+}
+
+static void UpdateSourcePointsToThePublicReleasesRepository()
+{
+    Assert.Equal(
+        "https://github.com/sunboming/CastoPet-Releases",
+        VelopackUpdateService.RepositoryUrl,
+        "Installed builds should use the public releases repository without a client token.");
+}
+
+static void SettingsWindowExposesCrashAndUpdateActions()
+{
+    var workspace = FindWorkspaceRoot();
+    var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml"));
+
+    Assert.Contains(xaml, "OpenCrashReportsButton", "Settings should expose local crash reports.");
+    Assert.Contains(xaml, "CheckForUpdatesButton", "Settings should expose manual update checks.");
+    Assert.Contains(xaml, "UpdateStatusText", "Settings should display update status.");
+    Assert.Contains(xaml, "CurrentVersionText", "Settings should display the current version.");
+}
+
+static void LocalPackagingScriptCannotPublishArtifacts()
+{
+    var workspace = FindWorkspaceRoot();
+    var script = File.ReadAllText(System.IO.Path.Combine(workspace, "tools", "package-local.ps1"));
+    var gitignore = File.ReadAllText(System.IO.Path.Combine(workspace, ".gitignore"));
+
+    Assert.Contains(script, "dotnet publish", "Local packaging should publish a self-contained application first.");
+    Assert.Contains(script, "--self-contained", "Local packaging should not require a preinstalled runtime.");
+    Assert.Contains(script, "win-x64", "The first installer should target Windows x64.");
+    Assert.Contains(script, "vpk pack", "Local packaging should create a Velopack installer.");
+    Assert.Contains(script, "--packId CastoPet.App", "Installer files must not share the CastoPet user-data directory.");
+    Assert.False(script.Contains("vpk upload", StringComparison.OrdinalIgnoreCase), "Local packaging must not upload packages.");
+    Assert.False(script.Contains("gh release", StringComparison.OrdinalIgnoreCase), "Local packaging must not create GitHub Releases.");
+    Assert.Contains(gitignore, "artifacts/local-package/", "Generated local packages should stay outside version control.");
 }
 
 static void PetWindowSettingsSnapshotCopiesRuntimeFlags()
@@ -419,9 +713,9 @@ static void BuiltInCastoriceSkinDefinesRequiredActions()
 
     Assert.Equal("castorice", skin.Id, "Built-in skin id should be stable.");
     Assert.Equal("Castorice", skin.DisplayName, "Built-in skin display name should be stable.");
-    Assert.Equal("Assets/Castorice.png", skin.DefaultCharacterPath, "Default character path should stay compatible.");
-    Assert.Equal("Assets/States/Castorice.Dragging.png", skin.DraggingCharacterPath, "Dragging path should stay compatible.");
-    Assert.Equal("Assets/States/InputReactive/Castorice.InputReactive.Base.png", skin.InputReactiveBasePath, "Input reactive path should stay compatible.");
+    Assert.Equal("Assets/Runtime/Castorice/Castorice.png", skin.DefaultCharacterPath, "Default character path should use runtime root.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Castorice.Dragging.png", skin.DraggingCharacterPath, "Dragging path should use runtime root.");
+    Assert.Equal("Assets/Runtime/Castorice/States/InputReactive/Castorice.InputReactive.Base.png", skin.InputReactiveBasePath, "Input reactive path should use runtime root.");
     Assert.True(skin.TryGetAction(PetActionKind.Idle, out _), "Castorice should define idle.");
     Assert.True(skin.TryGetAction(PetActionKind.Move, out _), "Castorice should define move.");
     Assert.True(skin.TryGetAction(PetActionKind.Blink, out _), "Castorice should define blink.");
@@ -429,14 +723,29 @@ static void BuiltInCastoriceSkinDefinesRequiredActions()
     Assert.True(skin.TryGetAction(PetActionKind.ExpressionTransitionOut, out _), "Castorice should define transition out.");
 }
 
+static void BuiltInCastoriceSkinUsesRuntimeAssetRoot()
+{
+    var skin = BuiltInPetSkins.Castorice;
+    var paths = new List<string>
+    {
+        skin.DefaultCharacterPath,
+        skin.DraggingCharacterPath,
+        skin.InputReactiveBasePath,
+    };
+    paths.AddRange(skin.Actions.SelectMany(action => action.FramePaths));
+    paths.AddRange(skin.Expressions.Select(expression => expression.ResourcePath));
+
+    Assert.True(paths.All(path => path.StartsWith("Assets/Runtime/Castorice/", StringComparison.Ordinal)), "Built-in runtime paths should live under Assets/Runtime/Castorice.");
+}
+
 static void BuiltInCastoriceIdleActionPreservesCurrentFrames()
 {
     var idle = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle);
 
     Assert.Equal(8, idle.FramePaths.Count, "Idle should keep eight frames.");
-    Assert.Equal(TimeSpan.FromMilliseconds(200), idle.FrameInterval, "Idle frame timing should stay compatible.");
-    Assert.Equal("Assets/States/Idle/Castorice.Idle.00.png", idle.FramePaths[0], "First idle frame path should stay compatible.");
-    Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", idle.FramePaths[^1], "Last idle frame path should stay compatible.");
+    Assert.Equal(TimeSpan.FromMilliseconds(125), idle.FrameInterval, "Idle should play at the authored 8 FPS rate.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Idle/Castorice.Idle.00.png", idle.FramePaths[0], "First idle frame path should stay compatible.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Idle/Castorice.Idle.07.png", idle.FramePaths[^1], "Last idle frame path should stay compatible.");
 }
 
 static void BuiltInCastoriceMoveActionPreservesMovementValues()
@@ -467,7 +776,10 @@ static void BuiltInCastoriceExpressionsAreOrderedSkinDefinitions()
     Assert.Equal(8, expressions.Count, "Castorice should keep eight expression wheel items.");
     Assert.Equal("happy", expressions[0].Id, "First expression id should be stable.");
     Assert.Equal("Happy", expressions[0].Label, "First expression label should be stable.");
-    Assert.Equal("Assets/Expressions/Castorice.Expression.Happy.png", expressions[0].ResourcePath, "First expression path should stay compatible.");
+    Assert.Equal("Assets/Runtime/Castorice/Expressions/Castorice.Expression.Happy.png", expressions[0].ResourcePath, "First expression path should stay compatible.");
+    Assert.Equal(6, expressions[0].TransitionFramePaths?.Count, "Each built-in expression should define six transition frames.");
+    Assert.Equal("Assets/Runtime/Castorice/Expressions/Happy/Transition/Castorice.Expression.Happy.Transition.00.png", expressions[0].TransitionFramePaths?[0], "First expression transition frame should use the runtime convention.");
+    Assert.Equal(TimeSpan.FromMilliseconds(1000d / 15d), expressions[0].TransitionFrameInterval, "Expression transitions should play at 15 FPS.");
     Assert.Equal("crying", expressions[^1].Id, "Last expression id should be stable.");
     Assert.Equal("Crying", expressions[^1].Label, "Last expression label should be stable.");
 }
@@ -526,6 +838,40 @@ static void PetSkinManifestLoadsJsonResourcePaths()
     Assert.Equal(TimeSpan.FromMilliseconds(3000), skin.GetRequiredAction(PetActionKind.Blink).MinScheduleDelay, "Blink min schedule should load.");
     Assert.Equal("Happy", skin.Expressions[0].Label, "Expression labels should load.");
     Assert.Equal("Skins/Custom/Expressions/Happy.png", skin.Expressions[0].ResourcePath, "Expression paths should resolve under resource root.");
+}
+
+static void PetSkinManifestLoadsExpressionTransitionMetadata()
+{
+    var skin = PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "animated",
+          "displayName": "Animated Skin",
+          "resourceRoot": "Skins/Animated",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": ["Idle/00.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move/00.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink/00.png"] }
+          ],
+          "expressions": {
+            "Happy": {
+              "image": "Expressions/Happy.png",
+              "transitionFrames": [
+                "Expressions/Happy/Transition/00.png",
+                "Expressions/Happy/Transition/01.png"
+              ],
+              "transitionFrameIntervalMs": 66.6667
+            }
+          }
+        }
+        """);
+
+    var expression = skin.Expressions.Single();
+    Assert.Equal("Skins/Animated/Expressions/Happy.png", expression.ResourcePath, "Expression image should resolve under resource root.");
+    Assert.Equal(2, expression.TransitionFramePaths?.Count, "Expression transition frames should load.");
+    Assert.Equal("Skins/Animated/Expressions/Happy/Transition/00.png", expression.TransitionFramePaths?[0], "Transition frame path should resolve under resource root.");
+    Assert.Equal(TimeSpan.FromMilliseconds(66.6667), expression.TransitionFrameInterval, "Expression transition interval should load.");
 }
 
 static void PetSkinManifestLoadsFilePathsRelativeToManifest()
@@ -595,7 +941,7 @@ static void PetSkinManifestWriterStoresPathsRelativeToResourceRoot()
     PetSkinManifestWriter.WriteToFile(manifestPath, BuiltInPetSkins.Castorice);
     var json = File.ReadAllText(manifestPath);
 
-    Assert.Contains(json, @"""resourceRoot"": ""Assets""", "Written manifest should keep the resource root.");
+    Assert.Contains(json, @"""resourceRoot"": ""Assets/Runtime/Castorice""", "Written manifest should keep the runtime resource root.");
     Assert.Contains(json, @"""defaultCharacter"": ""Castorice.png""", "Default character should be stored relative to resource root.");
     Assert.Contains(json, @"""States/Idle/Castorice.Idle.00.png""", "Action frame paths should be stored relative to resource root.");
 }
@@ -688,7 +1034,7 @@ static void AssetServiceUsesConfiguredSkinPaths()
 static void AssetServiceLoadsFileSystemSkinImagePaths()
 {
     using var temp = TempDirectory.Create();
-    var sourcePath = System.IO.Path.Combine(FindWorkspaceRoot(), "src", "CastoPet", "Assets", "Castorice.png");
+    var sourcePath = System.IO.Path.Combine(FindWorkspaceRoot(), "src", "CastoPet", "Assets", "Runtime", "Castorice", "Castorice.png");
     var skinImagePath = System.IO.Path.Combine(temp.Path, "Skin", "Default.png");
     Directory.CreateDirectory(System.IO.Path.GetDirectoryName(skinImagePath)!);
     File.Copy(sourcePath, skinImagePath);
@@ -706,14 +1052,48 @@ static void AssetServiceLoadsFileSystemSkinImagePaths()
     Assert.True(image.PixelWidth > 0, "File-system skin images should load through AssetService.");
 }
 
-static void BuiltInIdleActionDefinesEightSlowFramePaths()
+static void AssetServiceLoadsExpressionImagesWithIsolatedTransitions()
+{
+    using var temp = TempDirectory.Create();
+    var sourcePath = System.IO.Path.Combine(FindWorkspaceRoot(), "src", "CastoPet", "Assets", "Runtime", "Castorice", "Castorice.png");
+    var finalPath = System.IO.Path.Combine(temp.Path, "Happy.png");
+    var transitionPath = System.IO.Path.Combine(temp.Path, "Happy.00.png");
+    File.Copy(sourcePath, finalPath);
+    File.Copy(sourcePath, transitionPath);
+    var paths = new AppPaths(System.IO.Path.Combine(temp.Path, "Data"));
+    var logger = new LoggingService(paths);
+    var expression = new PetExpressionDefinition(
+        "happy",
+        "Happy",
+        finalPath,
+        new[] { transitionPath, System.IO.Path.Combine(temp.Path, "Missing.png") },
+        TimeSpan.FromMilliseconds(66));
+    var skin = BuiltInPetSkins.Castorice with
+    {
+        Expressions = new[] { expression },
+        Actions = BuiltInPetSkins.Castorice.Actions
+            .Where(action => action.Kind is not (PetActionKind.ExpressionTransitionIn or PetActionKind.ExpressionTransitionOut))
+            .ToArray(),
+    };
+    var service = new AssetService(logger, skin);
+
+    var assets = service.LoadExpressionAssets();
+
+    Assert.Equal(1, assets.Count, "A valid final expression image should remain available.");
+    Assert.Equal(0, assets.Values.Single().TransitionFrames.Count, "One missing transition frame should discard only that transition sequence.");
+    Assert.Equal(expression, assets.Values.Single().Definition, "Loaded expression assets should retain their definition.");
+    Assert.Equal(0, service.LoadExpressionTransitionInFrames().Count, "A missing generic transition-in action should return no fallback frames.");
+    Assert.Equal(0, service.LoadExpressionTransitionOutFrames().Count, "A missing generic transition-out action should return no fallback frames.");
+}
+
+static void BuiltInIdleActionDefinesEightAuthoredRateFramePaths()
 {
     var idle = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle);
 
     Assert.Equal(8, idle.FramePaths.Count, "Idle should use eight frames.");
-    Assert.Equal(TimeSpan.FromMilliseconds(200), idle.FrameInterval, "Idle frames should advance slowly.");
-    Assert.Equal("Assets/States/Idle/Castorice.Idle.00.png", idle.FramePaths[0], "First idle frame path should be zero padded.");
-    Assert.Equal("Assets/States/Idle/Castorice.Idle.07.png", idle.FramePaths[^1], "Last idle frame path should be zero padded.");
+    Assert.Equal(TimeSpan.FromMilliseconds(125), idle.FrameInterval, "Idle frames should advance at the authored 8 FPS rate.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Idle/Castorice.Idle.00.png", idle.FramePaths[0], "First idle frame path should be zero padded.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Idle/Castorice.Idle.07.png", idle.FramePaths[^1], "Last idle frame path should be zero padded.");
 }
 
 static void IdleFrameDiagnosticsReadAllPackagedFrames()
@@ -737,8 +1117,8 @@ static void BuiltInBlinkActionDefinesRandomBlinkFrames()
     Assert.Equal(TimeSpan.FromMilliseconds(90), blink.FrameInterval, "Blink frames should advance quickly.");
     Assert.Equal(TimeSpan.FromSeconds(3), blink.MinScheduleDelay, "Blink should not repeat too frequently.");
     Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink should remain occasional.");
-    Assert.Equal("Assets/States/Blink/Castorice.Blink.00.png", blink.FramePaths[0], "First blink frame path should be zero padded.");
-    Assert.Equal("Assets/States/Blink/Castorice.Blink.02.png", blink.FramePaths[^1], "Last blink frame path should be zero padded.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Blink/Castorice.Blink.00.png", blink.FramePaths[0], "First blink frame path should be zero padded.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Blink/Castorice.Blink.02.png", blink.FramePaths[^1], "Last blink frame path should be zero padded.");
 }
 
 static void BuiltInMoveActionDefinesEightDistanceDrivenPaths()
@@ -747,8 +1127,8 @@ static void BuiltInMoveActionDefinesEightDistanceDrivenPaths()
 
     Assert.Equal(8, move.FramePaths.Count, "Move should use eight frames.");
     Assert.Equal(10d, move.DistancePerFrame, "Move frames should advance by travel distance.");
-    Assert.Equal("Assets/States/Move/Castorice.Move.00.png", move.FramePaths[0], "First move frame path should be zero padded.");
-    Assert.Equal("Assets/States/Move/Castorice.Move.07.png", move.FramePaths[^1], "Last move frame path should be zero padded.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Move/Castorice.Move.00.png", move.FramePaths[0], "First move frame path should be zero padded.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Move/Castorice.Move.07.png", move.FramePaths[^1], "Last move frame path should be zero padded.");
 }
 
 static void MoveFramePathsUseAppResources()
@@ -757,7 +1137,7 @@ static void MoveFramePathsUseAppResources()
 
     for (var index = 0; index < move.FramePaths.Count; index++)
     {
-        Assert.Equal($"Assets/States/Move/Castorice.Move.{index:00}.png", move.FramePaths[index], "Move frame should use the resource path convention.");
+        Assert.Equal($"Assets/Runtime/Castorice/States/Move/Castorice.Move.{index:00}.png", move.FramePaths[index], "Move frame should use the resource path convention.");
     }
 }
 
@@ -791,7 +1171,7 @@ static void ExpressionWheelPathsUseAppResources()
 {
     foreach (var item in BuiltInPetSkins.Castorice.Expressions)
     {
-        var expected = $"Assets/Expressions/Castorice.Expression.{item.Label}.png";
+        var expected = $"Assets/Runtime/Castorice/Expressions/Castorice.Expression.{item.Label}.png";
         Assert.Equal(expected, item.ResourcePath, $"{item.Label} should use the expression resource path convention.");
     }
 }
@@ -812,10 +1192,23 @@ static void ExpressionTransitionPathsUseAppResources()
     var transitionIn = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.ExpressionTransitionIn);
     var transitionOut = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.ExpressionTransitionOut);
 
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.00.png", transitionIn.FramePaths[0], "First transition-in path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.In.03.png", transitionIn.FramePaths[^1], "Last transition-in path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.00.png", transitionOut.FramePaths[0], "First transition-out path should use the transition resource convention.");
-    Assert.Equal("Assets/Expressions/Transition/Castorice.ExpressionTransition.Out.03.png", transitionOut.FramePaths[^1], "Last transition-out path should use the transition resource convention.");
+    Assert.Equal("Assets/Runtime/Castorice/Expressions/Transition/Castorice.ExpressionTransition.In.00.png", transitionIn.FramePaths[0], "First transition-in path should use the transition resource convention.");
+    Assert.Equal("Assets/Runtime/Castorice/Expressions/Transition/Castorice.ExpressionTransition.In.03.png", transitionIn.FramePaths[^1], "Last transition-in path should use the transition resource convention.");
+    Assert.Equal("Assets/Runtime/Castorice/Expressions/Transition/Castorice.ExpressionTransition.Out.00.png", transitionOut.FramePaths[0], "First transition-out path should use the transition resource convention.");
+    Assert.Equal("Assets/Runtime/Castorice/Expressions/Transition/Castorice.ExpressionTransition.Out.03.png", transitionOut.FramePaths[^1], "Last transition-out path should use the transition resource convention.");
+}
+
+static void ExpressionTransitionPlannerPrefersSpecificReversibleFrames()
+{
+    var specific = new[] { "specific-0", "specific-1", "specific-2" };
+    var fallbackIn = new[] { "fallback-in-0", "fallback-in-1" };
+    var fallbackOut = new[] { "fallback-out-0", "fallback-out-1" };
+
+    Assert.True(specific.SequenceEqual(ExpressionTransitionPlanner.EnterFrames(specific, fallbackIn)), "Specific enter frames should keep forward order.");
+    Assert.True(new[] { "specific-2", "specific-1", "specific-0" }.SequenceEqual(ExpressionTransitionPlanner.ExitFrames(specific, fallbackOut)), "Specific exit frames should reverse the enter sequence.");
+    Assert.True(fallbackIn.SequenceEqual(ExpressionTransitionPlanner.EnterFrames(Array.Empty<string>(), fallbackIn)), "Missing specific enter frames should use generic in frames.");
+    Assert.True(fallbackOut.SequenceEqual(ExpressionTransitionPlanner.ExitFrames(Array.Empty<string>(), fallbackOut)), "Missing specific exit frames should keep generic out order.");
+    Assert.Equal(0, ExpressionTransitionPlanner.EnterFrames(Array.Empty<string>(), Array.Empty<string>()).Count, "Missing specific and fallback frames should return an empty sequence.");
 }
 
 static void ExpressionWheelStyleIsTextOnlyWithDividers()
@@ -877,19 +1270,93 @@ static void ExpressionWheelSelectorMapsPointerPositions()
         "Pointer below the origin should select the bottom item.");
 }
 
-static void TrayMenuExposesActiveMovementText()
+static void SettingCatalogDefinesEveryBooleanSettingOnce()
 {
-    Assert.Equal("主动移动", TrayService.ActiveMovementText, "Active movement menu text should be localized.");
+    var definitions = SettingCatalog.Create(AppSettings.Default, SettingActions.None);
+
+    Assert.Equal(
+        "topmost,active-movement,click-through,push-cursor,input-reactive-mode,show-in-taskbar,start-with-windows",
+        string.Join(',', definitions.Select(item => item.Id)),
+        "The settings catalog should contain every boolean setting exactly once in group order.");
+    Assert.Equal(
+        "Behavior,Behavior,Interaction,Interaction,Interaction,System,System",
+        string.Join(',', definitions.Select(item => item.Group)),
+        "Settings should remain in stable behavior, interaction, and system groups.");
 }
 
-static void TrayMenuExposesPushCursorText()
+static void SettingCatalogExposesOnlyCommonDirectMenuSettings()
 {
-    Assert.Equal("推动鼠标", TrayService.PushCursorText, "Push cursor menu text should be localized.");
+    var definitions = SettingCatalog.Create(AppSettings.Default, SettingActions.None);
+
+    Assert.Equal(
+        "topmost,click-through",
+        string.Join(',', definitions.Where(item => item.ShowInDirectMenu).Select(item => item.Id)),
+        "Only always-on-top and mouse click-through should remain in direct menus.");
 }
 
-static void TrayMenuExposesInputReactiveModeText()
+static void SettingCatalogReadsSharedSettingsLive()
 {
-    Assert.Equal("输入响应模式", TrayService.InputReactiveModeText, "Input reactive menu text should be localized.");
+    var settings = AppSettings.Default;
+    var definitions = SettingCatalog.Create(settings, SettingActions.None);
+    var activeMovement = definitions.Single(item => item.Id == "active-movement");
+
+    Assert.False(activeMovement.GetValue(), "Active movement should initially read false.");
+    settings.ActiveMovement = true;
+    Assert.True(activeMovement.GetValue(), "Definitions should read the shared settings instance instead of caching values.");
+}
+
+static void SettingsWindowServiceReusesTheOpenWindow()
+{
+    var created = 0;
+    var window = new FakeSettingsWindow();
+    using var service = new SettingsWindowService(() =>
+    {
+        created++;
+        return window;
+    });
+
+    service.ShowOrActivate();
+    service.ShowOrActivate();
+
+    Assert.Equal(1, created, "Repeated settings commands should reuse the open window.");
+    Assert.Equal(1, window.ShowCount, "The settings window should only be shown once.");
+    Assert.Equal(2, window.ActivateCount, "Every settings command should activate the window.");
+}
+
+static void SettingsWindowServiceReleasesAClosedWindow()
+{
+    var windows = new List<FakeSettingsWindow>();
+    using var service = new SettingsWindowService(() =>
+    {
+        var window = new FakeSettingsWindow();
+        windows.Add(window);
+        return window;
+    });
+
+    service.ShowOrActivate();
+    windows[0].CloseFromUser();
+    service.ShowOrActivate();
+
+    Assert.Equal(2, windows.Count, "Opening settings after close should create a fresh window.");
+}
+
+static void SettingsWindowDefinesTheApprovedVisualStructure()
+{
+    var workspace = FindWorkspaceRoot();
+    var xamlPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml");
+    var xaml = File.ReadAllText(xamlPath);
+
+    Assert.Contains(xaml, "SettingsItemsHost", "The settings window should expose its catalog host.");
+    Assert.Contains(xaml, "MiSans, Noto Sans SC, Microsoft YaHei UI", "The window should use the approved Chinese font stack.");
+    Assert.Contains(xaml, "#8C7AA5", "Active controls should use dusty mist violet.");
+    Assert.Contains(xaml, "#FAF9FC", "The main surface should use cool near-white.");
+    Assert.False(xaml.Contains("#6F4AA8", StringComparison.Ordinal), "The old saturated purple should be removed.");
+    Assert.Contains(xaml, "CloseButton", "The custom title bar should expose a close button.");
+}
+
+static void DirectMenusExposeTheSettingsCommand()
+{
+    Assert.Equal("设置", TrayService.SettingsText, "Direct menus should expose the settings window command.");
 }
 
 static void InputKeyboardLayoutMapsCommonKeys()
@@ -1174,16 +1641,16 @@ static void CharacterAssetsDecodeAtPetDisplayWidth()
 
 static void AssetDiagnosticsIncludeGroupAndResourcePath()
 {
-    var message = AssetService.FormatLoadFailureMessage("Idle frames", "Assets/States/Idle/Castorice.Idle.03.png");
+    var message = AssetService.FormatLoadFailureMessage("Idle frames", "Assets/Runtime/Castorice/States/Idle/Castorice.Idle.03.png");
 
     Assert.Contains(message, "Idle frames", "Asset diagnostics should include the resource group.");
-    Assert.Contains(message, "Assets/States/Idle/Castorice.Idle.03.png", "Asset diagnostics should include the resource path.");
+    Assert.Contains(message, "Assets/Runtime/Castorice/States/Idle/Castorice.Idle.03.png", "Asset diagnostics should include the resource path.");
 }
 
 static void InputReactiveAssetPathUsesAppResource()
 {
     Assert.Equal(
-        "Assets/States/InputReactive/Castorice.InputReactive.Base.png",
+        "Assets/Runtime/Castorice/States/InputReactive/Castorice.InputReactive.Base.png",
         AssetService.InputReactiveBasePath,
         "Input reactive base should use an app resource path.");
 }
@@ -1196,18 +1663,15 @@ static void InputReactiveAssetIsPackaged()
 
     Assert.Contains(
         projectText,
-        @"Assets\States\InputReactive\Castorice.InputReactive.Base.png",
+        @"Assets\Runtime\Castorice\States\InputReactive\Castorice.InputReactive.Base.png",
         "Input reactive base should be packaged as a WPF resource.");
 }
 
 static void PackagedCharacterAssetsAreDisplaySized()
 {
     var workspace = FindWorkspaceRoot();
-    var assetsRoot = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets");
-    var excludedSegments = new[]
-    {
-        $"{System.IO.Path.DirectorySeparatorChar}CandidateSet{System.IO.Path.DirectorySeparatorChar}",
-    };
+    var assetsRoot = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets", "Runtime", "Castorice");
+    var excludedSegments = Array.Empty<string>();
     var assets = Directory
         .EnumerateFiles(assetsRoot, "*.png", SearchOption.AllDirectories)
         .Where(path => !System.IO.Path.GetFileName(path).Equals("blink-preview.png", StringComparison.OrdinalIgnoreCase))
@@ -1223,10 +1687,46 @@ static void PackagedCharacterAssetsAreDisplaySized()
     }
 }
 
+static void PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints()
+{
+    var workspace = FindWorkspaceRoot();
+    var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+    var labels = new[] { "Happy", "Shy", "Sleepy", "Surprised", "Pouting", "Confused", "Proud", "Crying" };
+    var idlePath = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "Idle", "Castorice.Idle.00.png");
+    var idleBytes = File.ReadAllBytes(idlePath);
+
+    foreach (var label in labels)
+    {
+        var id = label.ToLowerInvariant();
+        var targetPath = System.IO.Path.Combine(projectRoot, "Assets", "Skins", "Castorice", "expressions", "targets", $"{label}.png");
+        var projectPath = System.IO.Path.Combine(projectRoot, "Assets", "Skins", "Castorice", "actions", "expressions", $"{id}.transition.animator.json");
+        var finalPath = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "Expressions", $"Castorice.Expression.{label}.png");
+        var transitionRoot = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "Expressions", label, "Transition");
+        Assert.True(File.Exists(targetPath), $"{label} should keep a CastoPet-owned source target.");
+        Assert.True(File.Exists(projectPath), $"{label} should keep an editable transition project.");
+
+        var frames = Enumerable.Range(0, 6)
+            .Select(index => System.IO.Path.Combine(transitionRoot, $"Castorice.Expression.{label}.Transition.{index:00}.png"))
+            .ToArray();
+        Assert.True(frames.All(File.Exists), $"{label} should include six consecutive runtime transition frames.");
+        foreach (var frame in frames)
+        {
+            using var bitmap = new Bitmap(frame);
+            Assert.Equal(320, bitmap.Width, $"{System.IO.Path.GetFileName(frame)} should be 320 pixels wide.");
+            Assert.Equal(320, bitmap.Height, $"{System.IO.Path.GetFileName(frame)} should be 320 pixels high.");
+        }
+        Assert.True(idleBytes.SequenceEqual(File.ReadAllBytes(frames[0])), $"{label} transition frame 00 should equal Idle.00.");
+        Assert.True(File.ReadAllBytes(finalPath).SequenceEqual(File.ReadAllBytes(frames[^1])), $"{label} transition frame 05 should equal its final expression image.");
+    }
+
+    var projectText = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
+    Assert.Contains(projectText, @"Assets\Runtime\Castorice\Expressions\*\Transition\*.png", "Expression transition PNGs should be packaged with a WPF resource glob.");
+}
+
 static IReadOnlyList<IdleFrameDiagnostic> ReadIdleFrameDiagnostics()
 {
     var workspace = FindWorkspaceRoot();
-    var idleRoot = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets", "States", "Idle");
+    var idleRoot = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets", "Runtime", "Castorice", "States", "Idle");
     var frames = Directory
         .EnumerateFiles(idleRoot, "Castorice.Idle.*.png", SearchOption.TopDirectoryOnly)
         .OrderBy(System.IO.Path.GetFileName, StringComparer.Ordinal)
@@ -1426,3 +1926,74 @@ readonly record struct IdleFrameDiagnostic(
     Rectangle Bounds,
     double CenterX,
     double AdjacentAverageDelta);
+
+sealed class FakeSettingsWindow : ISettingsWindow
+{
+    public event EventHandler? Closed;
+
+    public bool IsVisible { get; private set; }
+    public int ShowCount { get; private set; }
+    public int ActivateCount { get; private set; }
+
+    public void Show()
+    {
+        ShowCount++;
+        IsVisible = true;
+    }
+
+    public bool Activate()
+    {
+        ActivateCount++;
+        return true;
+    }
+
+    public void Close()
+    {
+        CloseFromUser();
+    }
+
+    public void CloseFromUser()
+    {
+        IsVisible = false;
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+sealed class FakeUpdateService : IUpdateService
+{
+    public bool IsInstalled { get; set; } = true;
+    public string CurrentVersion => "0.1.0";
+    public int CheckCount { get; private set; }
+    public Exception? Exception { get; set; }
+    public Func<UpdateAvailability?>? OnCheck { get; set; }
+    public Task<UpdateAvailability?>? PendingCheck { get; set; }
+
+    public Task<UpdateAvailability?> CheckForUpdatesAsync(CancellationToken cancellationToken)
+    {
+        CheckCount++;
+        if (Exception is not null)
+        {
+            return Task.FromException<UpdateAvailability?>(Exception);
+        }
+
+        if (PendingCheck is not null)
+        {
+            return PendingCheck;
+        }
+
+        return Task.FromResult(OnCheck?.Invoke());
+    }
+
+    public Task DownloadUpdatesAsync(
+        UpdateAvailability update,
+        IProgress<int>? progress,
+        CancellationToken cancellationToken)
+    {
+        progress?.Report(100);
+        return Task.CompletedTask;
+    }
+
+    public void ApplyUpdatesAndRestart(UpdateAvailability update)
+    {
+    }
+}

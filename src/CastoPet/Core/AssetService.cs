@@ -6,9 +6,9 @@ namespace CastoPet.Core;
 
 public sealed class AssetService
 {
-    public const string DefaultCharacterPath = "Assets/Castorice.png";
-    public const string DraggingCharacterPath = "Assets/States/Castorice.Dragging.png";
-    public const string InputReactiveBasePath = "Assets/States/InputReactive/Castorice.InputReactive.Base.png";
+    public const string DefaultCharacterPath = "Assets/Runtime/Castorice/Castorice.png";
+    public const string DraggingCharacterPath = "Assets/Runtime/Castorice/States/Castorice.Dragging.png";
+    public const string InputReactiveBasePath = "Assets/Runtime/Castorice/States/InputReactive/Castorice.InputReactive.Base.png";
     public const int CharacterDecodePixelWidth = 320;
 
     private readonly LoggingService _logger;
@@ -65,31 +65,38 @@ public sealed class AssetService
 
     public IReadOnlyList<ImageSource> LoadExpressionTransitionInFrames()
     {
-        return LoadActionFrames(PetActionKind.ExpressionTransitionIn, "Expression transition in frames");
+        return LoadOptionalActionFrames(PetActionKind.ExpressionTransitionIn, "Expression transition in frames");
     }
 
     public IReadOnlyList<ImageSource> LoadExpressionTransitionOutFrames()
     {
-        return LoadActionFrames(PetActionKind.ExpressionTransitionOut, "Expression transition out frames");
+        return LoadOptionalActionFrames(PetActionKind.ExpressionTransitionOut, "Expression transition out frames");
     }
 
     public IReadOnlyDictionary<ExpressionWheelItem, ImageSource> LoadExpressionWheelImages()
     {
-        var images = new Dictionary<ExpressionWheelItem, ImageSource>();
+        return LoadExpressionAssets().ToDictionary(item => item.Key, item => item.Value.Image);
+    }
+
+    public IReadOnlyDictionary<ExpressionWheelItem, PetExpressionAsset> LoadExpressionAssets()
+    {
+        var assets = new Dictionary<ExpressionWheelItem, PetExpressionAsset>();
 
         foreach (var expression in Skin.Expressions)
         {
             try
             {
                 var item = new ExpressionWheelItem(expression.Label, expression.ResourcePath);
-                images[item] = LoadCharacter(expression.ResourcePath, "Expression wheel images");
+                var image = LoadCharacter(expression.ResourcePath, "Expression wheel images");
+                var transitionFrames = LoadOptionalExpressionTransitionFrames(expression);
+                assets[item] = new PetExpressionAsset(expression, image, transitionFrames);
             }
             catch
             {
             }
         }
 
-        return images;
+        return assets;
     }
 
     public static string FormatLoadFailureMessage(string resourceGroup, string resourcePath)
@@ -104,6 +111,42 @@ public sealed class AssetService
             .FramePaths
             .Select(path => LoadCharacter(path, resourceGroup))
             .ToArray();
+    }
+
+    private IReadOnlyList<ImageSource> LoadOptionalActionFrames(PetActionKind kind, string resourceGroup)
+    {
+        if (!Skin.TryGetAction(kind, out var action))
+        {
+            return Array.Empty<ImageSource>();
+        }
+
+        try
+        {
+            return action.FramePaths.Select(path => (ImageSource)LoadCharacter(path, resourceGroup)).ToArray();
+        }
+        catch
+        {
+            return Array.Empty<ImageSource>();
+        }
+    }
+
+    private IReadOnlyList<ImageSource> LoadOptionalExpressionTransitionFrames(PetExpressionDefinition expression)
+    {
+        if (expression.TransitionFramePaths is not { Count: > 0 })
+        {
+            return Array.Empty<ImageSource>();
+        }
+
+        try
+        {
+            return expression.TransitionFramePaths
+                .Select(path => (ImageSource)LoadCharacter(path, $"{expression.Label} transition frames"))
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<ImageSource>();
+        }
     }
 
     private BitmapImage LoadCharacter(string resourcePath, string resourceGroup)

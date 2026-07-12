@@ -27,7 +27,7 @@ public static class PetSkinManifestWriter
     public static string ToJson(PetSkinDefinition skin)
     {
         var manifest = new SkinManifest(
-            SchemaVersion: 1,
+            SchemaVersion: 2,
             Id: skin.Id,
             DisplayName: skin.DisplayName,
             ResourceRoot: skin.ResourceRoot,
@@ -47,7 +47,12 @@ public static class PetSkinManifestWriter
                 MaxSpeedPixelsPerSecond: action.MaxSpeedPixelsPerSecond)).ToArray(),
             Expressions: skin.Expressions.ToDictionary(
                 item => item.Label,
-                item => ToManifestPath(item.ResourcePath, skin.ResourceRoot),
+                item => new ExpressionManifest(
+                    Image: ToManifestPath(item.ResourcePath, skin.ResourceRoot),
+                    TransitionFrames: item.TransitionFramePaths is { Count: > 0 }
+                        ? item.TransitionFramePaths.Select(path => ToManifestPath(path, skin.ResourceRoot)).ToArray()
+                        : null,
+                    TransitionFrameIntervalMs: ToMilliseconds(item.TransitionFrameInterval)),
                 StringComparer.OrdinalIgnoreCase));
 
         return JsonSerializer.Serialize(manifest, JsonOptions);
@@ -100,7 +105,12 @@ public static class PetSkinManifestWriter
         string? DraggingCharacter,
         string? InputReactiveBase,
         IReadOnlyList<ActionManifest> Actions,
-        IReadOnlyDictionary<string, string> Expressions);
+        IReadOnlyDictionary<string, ExpressionManifest> Expressions);
+
+    private sealed record ExpressionManifest(
+        string Image,
+        IReadOnlyList<string>? TransitionFrames,
+        double? TransitionFrameIntervalMs);
 
     private sealed record ActionManifest(
         string Id,

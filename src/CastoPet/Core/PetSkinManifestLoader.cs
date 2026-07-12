@@ -43,10 +43,7 @@ public static class PetSkinManifestLoader
         {
             foreach (var item in manifest.Expressions)
             {
-                expressions.Add(new PetExpressionDefinition(
-                    Id: ToExpressionId(item.Key),
-                    Label: item.Key,
-                    ResourcePath: resolver.Resolve(item.Value)));
+                expressions.Add(BuildExpression(item.Key, item.Value, resolver));
             }
         }
 
@@ -76,7 +73,7 @@ public static class PetSkinManifestLoader
 
     private static void ValidateManifest(SkinManifest manifest)
     {
-        if (manifest.SchemaVersion != 1)
+        if (manifest.SchemaVersion is not (1 or 2))
         {
             throw new InvalidDataException($"Unsupported skin manifest schemaVersion {manifest.SchemaVersion}.");
         }
@@ -89,6 +86,31 @@ public static class PetSkinManifestLoader
         {
             throw new InvalidDataException("Manifest must define actions.");
         }
+    }
+
+    private static PetExpressionDefinition BuildExpression(string label, JsonElement value, PathResolver resolver)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            return new PetExpressionDefinition(
+                Id: ToExpressionId(label),
+                Label: label,
+                ResourcePath: resolver.Resolve(RequiredText(value.GetString(), $"expression.{label}")));
+        }
+
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException($"Expression {label} must be a path string or object.");
+        }
+
+        var manifest = value.Deserialize<ExpressionManifest>(JsonOptions)
+            ?? throw new InvalidDataException($"Expression {label} is invalid.");
+        return new PetExpressionDefinition(
+            Id: ToExpressionId(label),
+            Label: label,
+            ResourcePath: resolver.Resolve(RequiredText(manifest.Image, $"expression.{label}.image")),
+            TransitionFramePaths: manifest.TransitionFrames?.Select(resolver.Resolve).ToArray(),
+            TransitionFrameInterval: MillisecondsToTimeSpan(manifest.TransitionFrameIntervalMs));
     }
 
     private static PetActionDefinition BuildAction(ActionManifest manifest, PathResolver resolver)
@@ -210,7 +232,7 @@ public static class PetSkinManifestLoader
         public string? DraggingCharacter { get; set; }
         public string? InputReactiveBase { get; set; }
         public List<ActionManifest>? Actions { get; set; }
-        public Dictionary<string, string>? Expressions { get; set; }
+        public Dictionary<string, JsonElement>? Expressions { get; set; }
     }
 
     private sealed class ActionManifest
@@ -225,5 +247,12 @@ public static class PetSkinManifestLoader
         public double? BaseSpeedPixelsPerSecond { get; set; }
         public double? MinSpeedPixelsPerSecond { get; set; }
         public double? MaxSpeedPixelsPerSecond { get; set; }
+    }
+
+    private sealed class ExpressionManifest
+    {
+        public string? Image { get; set; }
+        public List<string>? TransitionFrames { get; set; }
+        public double? TransitionFrameIntervalMs { get; set; }
     }
 }

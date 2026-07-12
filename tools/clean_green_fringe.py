@@ -7,7 +7,7 @@ from typing import Iterable
 from PIL import Image
 
 
-DEFAULT_ROOT = Path("src/CastoPet/Assets")
+DEFAULT_ROOT = Path("src/CastoPet/Assets/Runtime/Castorice")
 DEFAULT_EXCLUDED_PARTS = {
     "CandidateSet",
     "_green-clean-backup",

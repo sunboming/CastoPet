@@ -10,6 +10,8 @@ public sealed class AppSettings
     public bool PushCursor { get; set; }
     public bool InputReactiveMode { get; set; }
     public string? SkinManifestPath { get; set; }
+    public string? LastAcknowledgedCrashId { get; set; }
+    public string? LastAutomaticUpdateCheckDate { get; set; }
 
     public static AppSettings Default => new();
 
@@ -25,6 +27,8 @@ public sealed class AppSettings
             PushCursor = PushCursor,
             InputReactiveMode = InputReactiveMode,
             SkinManifestPath = SkinManifestPath,
+            LastAcknowledgedCrashId = LastAcknowledgedCrashId,
+            LastAutomaticUpdateCheckDate = LastAutomaticUpdateCheckDate,
         };
     }
 }

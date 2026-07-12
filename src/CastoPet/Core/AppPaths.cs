@@ -10,12 +10,14 @@ public sealed class AppPaths
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "CastoPet");
         LogsDirectory = Path.Combine(DataDirectory, "logs");
+        CrashesDirectory = Path.Combine(DataDirectory, "Crashes");
         SettingsFile = Path.Combine(DataDirectory, "settings.json");
         LogFile = Path.Combine(LogsDirectory, $"{DateTime.Now:yyyy-MM-dd}.log");
     }
 
     public string DataDirectory { get; }
     public string LogsDirectory { get; }
+    public string CrashesDirectory { get; }
     public string SettingsFile { get; }
     public string LogFile { get; }
 }

@@ -3,4 +3,6 @@ namespace CastoPet.Core;
 public sealed record PetExpressionDefinition(
     string Id,
     string Label,
-    string ResourcePath);
+    string ResourcePath,
+    IReadOnlyList<string>? TransitionFramePaths = null,
+    TimeSpan? TransitionFrameInterval = null);

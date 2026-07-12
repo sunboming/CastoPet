@@ -2,10 +2,12 @@ namespace CastoPet.Core;
 
 public static class BuiltInPetSkins
 {
+    private const string CastoriceRuntimeRoot = "Assets/Runtime/Castorice";
+
     public static readonly PetSkinDefinition Castorice = new(
         Id: "castorice",
         DisplayName: "Castorice",
-        ResourceRoot: "Assets",
+        ResourceRoot: CastoriceRuntimeRoot,
         DefaultCharacterPath: AssetService.DefaultCharacterPath,
         DraggingCharacterPath: AssetService.DraggingCharacterPath,
         InputReactiveBasePath: AssetService.InputReactiveBasePath,
@@ -15,7 +17,7 @@ public static class BuiltInPetSkins
                 Id: "idle",
                 Kind: PetActionKind.Idle,
                 FramePaths: CreateFramePaths("States/Idle/Castorice.Idle", 8),
-                FrameInterval: TimeSpan.FromMilliseconds(200)),
+                FrameInterval: TimeSpan.FromMilliseconds(125)),
             new PetActionDefinition(
                 Id: "move",
                 Kind: PetActionKind.Move,
@@ -56,14 +58,23 @@ public static class BuiltInPetSkins
 
     private static PetExpressionDefinition CreateExpression(string id, string label)
     {
-        return new PetExpressionDefinition(id, label, $"Assets/Expressions/Castorice.Expression.{label}.png");
+        var transitionFrames = Enumerable
+            .Range(0, 6)
+            .Select(index => $"{CastoriceRuntimeRoot}/Expressions/{label}/Transition/Castorice.Expression.{label}.Transition.{index:00}.png")
+            .ToArray();
+        return new PetExpressionDefinition(
+            id,
+            label,
+            $"{CastoriceRuntimeRoot}/Expressions/Castorice.Expression.{label}.png",
+            transitionFrames,
+            TimeSpan.FromMilliseconds(1000d / 15d));
     }
 
     private static IReadOnlyList<string> CreateFramePaths(string prefix, int count)
     {
         return Enumerable
             .Range(0, count)
-            .Select(index => $"Assets/{prefix}.{index:00}.png")
+            .Select(index => $"{CastoriceRuntimeRoot}/{prefix}.{index:00}.png")
             .ToArray();
     }
 }

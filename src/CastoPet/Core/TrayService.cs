@@ -6,46 +6,29 @@ namespace CastoPet.Core;
 public sealed class TrayService : IDisposable
 {
     public const string ShowOrRestoreText = "显示/恢复";
-    public const string AlwaysOnTopText = "始终置顶";
-    public const string MouseClickThroughText = "鼠标穿透";
-    public const string ActiveMovementText = "主动移动";
-    public const string PushCursorText = "推动鼠标";
-    public const string InputReactiveModeText = "输入响应模式";
-    public const string ShowTaskbarIconText = "显示任务栏图标";
-    public const string StartWithWindowsText = "开机自启动";
+    public const string SettingsText = "设置";
     public const string ExitText = "退出";
 
     private readonly MenuCommandService _commands;
     private readonly Forms.NotifyIcon _notifyIcon;
-    private readonly Forms.ToolStripMenuItem _topmostItem;
-    private readonly Forms.ToolStripMenuItem _clickThroughItem;
-    private readonly Forms.ToolStripMenuItem _activeMovementItem;
-    private readonly Forms.ToolStripMenuItem _pushCursorItem;
-    private readonly Forms.ToolStripMenuItem _inputReactiveModeItem;
-    private readonly Forms.ToolStripMenuItem _taskbarItem;
-    private readonly Forms.ToolStripMenuItem _startupItem;
+    private readonly IReadOnlyList<(SettingDefinition Definition, Forms.ToolStripMenuItem Item)> _settingItems;
 
     public TrayService(MenuCommandService commands)
     {
         _commands = commands;
-        _topmostItem = CreateCheckedItem(AlwaysOnTopText, _commands.ToggleTopmost);
-        _clickThroughItem = CreateCheckedItem(MouseClickThroughText, _commands.ToggleClickThrough);
-        _activeMovementItem = CreateCheckedItem(ActiveMovementText, _commands.ToggleActiveMovement);
-        _pushCursorItem = CreateCheckedItem(PushCursorText, _commands.TogglePushCursor);
-        _inputReactiveModeItem = CreateCheckedItem(InputReactiveModeText, _commands.ToggleInputReactiveMode);
-        _taskbarItem = CreateCheckedItem(ShowTaskbarIconText, _commands.ToggleShowInTaskbar);
-        _startupItem = CreateCheckedItem(StartWithWindowsText, _commands.ToggleStartWithWindows);
+        _settingItems = SettingCatalog.Create(commands)
+            .Where(definition => definition.ShowInDirectMenu)
+            .Select(definition => (definition, CreateCheckedItem(definition.Label, definition.Toggle)))
+            .ToArray();
 
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add(ShowOrRestoreText, null, (_, _) => _commands.ShowOrRestore());
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add(_topmostItem);
-        menu.Items.Add(_clickThroughItem);
-        menu.Items.Add(_activeMovementItem);
-        menu.Items.Add(_pushCursorItem);
-        menu.Items.Add(_inputReactiveModeItem);
-        menu.Items.Add(_taskbarItem);
-        menu.Items.Add(_startupItem);
+        foreach (var (_, item) in _settingItems)
+        {
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(SettingsText, null, (_, _) => _commands.ShowSettings());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(ExitText, null, (_, _) => _commands.Exit());
 
@@ -71,13 +54,10 @@ public sealed class TrayService : IDisposable
 
     private void RefreshChecks()
     {
-        _topmostItem.Checked = _commands.Settings.Topmost;
-        _clickThroughItem.Checked = _commands.Settings.ClickThrough;
-        _activeMovementItem.Checked = _commands.Settings.ActiveMovement;
-        _pushCursorItem.Checked = _commands.Settings.PushCursor;
-        _inputReactiveModeItem.Checked = _commands.Settings.InputReactiveMode;
-        _taskbarItem.Checked = _commands.Settings.ShowInTaskbar;
-        _startupItem.Checked = _commands.Settings.StartWithWindows;
+        foreach (var (definition, item) in _settingItems)
+        {
+            item.Checked = definition.GetValue();
+        }
     }
 
     public void Dispose()

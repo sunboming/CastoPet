@@ -1,0 +1,540 @@
+{
+  "version": 1,
+  "canvas": {
+    "width": 320,
+    "height": 320,
+    "previewBackground": "#f6f0fb"
+  },
+  "actions": [
+    {
+      "id": "expression-surprised-transition",
+      "frames": 6,
+      "fps": 15,
+      "loop": false,
+      "exportName": "Castorice.Expression.Surprised.Transition.{frame}.png",
+      "layers": [
+        {
+          "id": "backHair",
+          "src": "../../layers/manual/backHair.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 132
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "bodyDress",
+          "src": "../../layers/manual/bodyDress.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 214
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenLeftLeg",
+          "src": "../../layers/manual/screenLeftLeg.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 136,
+            "y": 264
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenRightLeg",
+          "src": "../../layers/manual/screenRightLeg.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 184,
+            "y": 264
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenLeftArm",
+          "src": "../../layers/manual/screenLeftArm.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 116,
+            "y": 176
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenRightArm",
+          "src": "../../layers/manual/screenRightArm.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 204,
+            "y": 176
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "face",
+          "src": "../../layers/manual/face.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 116
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "frontHair",
+          "src": "../../layers/manual/frontHair.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 104
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "expressionTarget",
+          "src": "../../expressions/targets/Surprised.png",
+          "visible": true,
+          "locked": true,
+          "pivot": {
+            "x": 160,
+            "y": 160
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 0
+          }
+        }
+      ],
+      "keyframes": {
+        "backHair": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "y": -0.75,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "y": -1.9500000000000002,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "y": -3,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "bodyDress": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "scaleY": 0.98,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "y": -3.25,
+            "scaleY": 1.013,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "y": -5,
+            "scaleY": 1.02,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "y": -5,
+            "scaleY": 1.02,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "y": -5,
+            "scaleY": 1.02,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "screenLeftLeg": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "y": -0.75,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "y": -1.9500000000000002,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "y": -3,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "screenRightLeg": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "y": -0.75,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "y": -1.9500000000000002,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "y": -3,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "screenLeftArm": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "x": -1,
+            "y": -1,
+            "rotation": -2.5,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "x": -2.6,
+            "y": -2.6,
+            "rotation": -6.5,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "x": -4,
+            "y": -4,
+            "rotation": -10,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "x": -4,
+            "y": -4,
+            "rotation": -10,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "x": -4,
+            "y": -4,
+            "rotation": -10,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "screenRightArm": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "x": 1,
+            "y": -1,
+            "rotation": 2.5,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "x": 2.6,
+            "y": -2.6,
+            "rotation": 6.5,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "x": 4,
+            "y": -4,
+            "rotation": 10,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "x": 4,
+            "y": -4,
+            "rotation": 10,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "x": 4,
+            "y": -4,
+            "rotation": 10,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "face": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "y": -1.25,
+            "scaleY": 1.005,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "y": -3.25,
+            "scaleY": 1.013,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "y": -5,
+            "scaleY": 1.02,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "y": -5,
+            "scaleY": 1.02,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "y": -5,
+            "scaleY": 1.02,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "frontHair": [
+          {
+            "frame": 0,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "y": -0.75,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "y": -1.9500000000000002,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "y": -3,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "y": -3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          }
+        ],
+        "expressionTarget": [
+          {
+            "frame": 0,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 1,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 2,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 3,
+            "opacity": 0,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 4,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          },
+          {
+            "frame": 5,
+            "opacity": 1,
+            "easing": "easeInOutSine"
+          }
+        ]
+      }
+    }
+  ]
+}
