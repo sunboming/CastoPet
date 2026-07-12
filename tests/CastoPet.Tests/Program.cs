@@ -85,6 +85,7 @@ var tests = new (string Name, Action Test)[]
     ("Radial wheel controller paginates without persisting controls", RadialWheelControllerPaginatesWithoutPersistingControls),
     ("Shortcut service loads empty state and round trips", ShortcutServiceLoadsEmptyStateAndRoundTrips),
     ("Shortcut service normalizes duplicate identities", ShortcutServiceNormalizesDuplicateIdentities),
+    ("Shortcut service appends candidates with contiguous ordering", ShortcutServiceAppendsCandidatesWithContiguousOrdering),
     ("Shortcut service mutates ordered entries", ShortcutServiceMutatesOrderedEntries),
     ("Shortcut service enforces its entry limit", ShortcutServiceEnforcesEntryLimit),
     ("Shortcut service recovers malformed storage", ShortcutServiceRecoversMalformedStorage),
@@ -1450,6 +1451,21 @@ static void ShortcutServiceNormalizesDuplicateIdentities()
     Assert.False(service.TryAdd(new ShortcutDefinition("link-b", "Link duplicate", ShortcutType.WindowsShortcut, @"c:\links\TOOL.LNK", "", null, 0)).Added, "Link identity should use its own path.");
 }
 
+static void ShortcutServiceAppendsCandidatesWithContiguousOrdering()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+    service.Load();
+    service.TryAdd(new ShortcutDefinition("first", "First", ShortcutType.File, @"C:\First.txt", "", null, 40));
+    service.TryAdd(new ShortcutDefinition("second", "Second", ShortcutType.File, @"C:\Second.txt", "", null, -100));
+
+    var entries = service.GetAll();
+    Assert.Equal("first", entries[0].Id, "A candidate-provided sort order must not insert before existing entries.");
+    Assert.Equal("second", entries[1].Id, "New shortcuts should append after existing entries.");
+    Assert.True(new[] { 0, 1 }.SequenceEqual(entries.Select(entry => entry.SortOrder)), "Persisted sort orders should remain contiguous.");
+}
+
 static void ShortcutServiceMutatesOrderedEntries()
 {
     using var temp = TempDirectory.Create();
@@ -1459,13 +1475,14 @@ static void ShortcutServiceMutatesOrderedEntries()
     service.TryAdd(new ShortcutDefinition("a", "A", ShortcutType.File, @"C:\A.txt", "", null, 5));
     service.TryAdd(new ShortcutDefinition("b", "B", ShortcutType.File, @"C:\B.txt", "", null, 2));
 
-    Assert.Equal("b", service.GetAll()[0].Id, "Entries should load in sort order.");
+    Assert.Equal("a", service.GetAll()[0].Id, "New entries should append regardless of candidate sort order.");
     Assert.True(service.Rename("a", "Renamed").Succeeded, "Rename should succeed.");
-    Assert.True(service.Move("a", 0).Succeeded, "Reorder should succeed.");
-    Assert.Equal("a", service.GetAll()[0].Id, "Moved entry should occupy requested index.");
-    Assert.Equal("Renamed", service.GetAll()[0].Name, "Rename should persist through reorder.");
+    Assert.True(service.Move("b", 0).Succeeded, "Reorder should succeed.");
+    Assert.Equal("b", service.GetAll()[0].Id, "Moved entry should occupy requested index.");
+    Assert.Equal("Renamed", service.GetAll()[1].Name, "Rename should persist through reorder.");
     Assert.True(service.Delete("b").Succeeded, "Delete should succeed.");
     Assert.Equal(1, service.GetAll().Count, "Deleted entry should be removed.");
+    Assert.Equal("Renamed", service.GetAll()[0].Name, "Remaining entry should preserve its edited name.");
 }
 
 static void ShortcutServiceEnforcesEntryLimit()

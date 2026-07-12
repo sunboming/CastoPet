@@ -102,7 +102,7 @@ public sealed class ShortcutService
                 return new(false, Error: "Shortcut limit reached.");
             }
 
-            var next = OrderEntries([.. _entries, candidate]);
+            var next = Renumber([.. _entries.OrderBy(entry => entry.SortOrder), candidate]);
             return PersistMutation(next, added: true);
         }
     }
@@ -282,6 +282,4 @@ public sealed class ShortcutService
             .Select((entry, index) => entry with { SortOrder = index })
             .ToList();
 
-    private static List<ShortcutDefinition> OrderEntries(IEnumerable<ShortcutDefinition> entries) =>
-        entries.OrderBy(entry => entry.SortOrder).ToList();
 }
