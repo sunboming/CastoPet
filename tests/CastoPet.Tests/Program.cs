@@ -91,6 +91,11 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut service recovers malformed storage", ShortcutServiceRecoversMalformedStorage),
     ("Shortcut service isolates malformed entries", ShortcutServiceIsolatesMalformedEntries),
     ("Shortcut service notifies only after persisted mutations", ShortcutServiceNotifiesOnlyAfterPersistedMutations),
+    ("Shortcut drop handler classifies existing file system items", ShortcutDropHandlerClassifiesExistingFileSystemItems),
+    ("Shortcut drop handler accepts safe web targets", ShortcutDropHandlerAcceptsSafeWebTargets),
+    ("Shortcut drop handler rejects missing and unsafe inputs", ShortcutDropHandlerRejectsMissingAndUnsafeInputs),
+    ("Shortcut drop handler aggregates mixed batch duplicates", ShortcutDropHandlerAggregatesMixedBatchDuplicates),
+    ("Shortcut drop handler reports shortcut limit failures", ShortcutDropHandlerReportsShortcutLimitFailures),
     ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
     ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
     ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
@@ -1558,6 +1563,143 @@ static void ShortcutServiceNotifiesOnlyAfterPersistedMutations()
     Assert.False(failed.Succeeded, "File-system failures should be contained.");
     Assert.Equal(0, blockedChanges, "Failed persistence must not notify.");
     Assert.Equal(0, blockedService.GetAll().Count, "Failed persistence must not alter memory.");
+}
+
+static void ShortcutDropHandlerClassifiesExistingFileSystemItems()
+{
+    using var temp = TempDirectory.Create();
+    var executablePath = System.IO.Path.Combine(temp.Path, "Editor.ExE");
+    var filePath = System.IO.Path.Combine(temp.Path, "notes.txt");
+    var folderPath = System.IO.Path.Combine(temp.Path, "Archive.exe");
+    var linkPath = System.IO.Path.Combine(temp.Path, "Launch.lNk");
+    File.WriteAllText(executablePath, "executable fixture");
+    File.WriteAllText(filePath, "ordinary file fixture");
+    Directory.CreateDirectory(folderPath);
+    File.WriteAllText(linkPath, "shortcut fixture");
+    var service = CreateShortcutService(temp.Path);
+    var handler = new ShortcutDropHandler(service);
+
+    var result = handler.AddDroppedItems([executablePath, filePath, folderPath, linkPath], []);
+
+    Assert.Equal(4, result.AddedCount, "Every supported file-system item should be added.");
+    Assert.Equal(0, result.DuplicateCount, "Distinct file-system items should not be duplicates.");
+    Assert.Equal(0, result.UnsupportedCount, "Supported file-system items should not be rejected.");
+    Assert.Equal(0, result.FailedCount, "Supported file-system items should not fail.");
+    var entries = service.GetAll().ToDictionary(entry => entry.Target, StringComparer.OrdinalIgnoreCase);
+    Assert.Equal(ShortcutType.Program, entries[executablePath].Type, "Executable extensions should be matched case-insensitively.");
+    Assert.Equal("Editor", entries[executablePath].Name, "Executable names should omit their extension.");
+    Assert.Equal(ShortcutType.File, entries[filePath].Type, "Ordinary files should remain files.");
+    Assert.Equal("notes.txt", entries[filePath].Name, "Ordinary file names should retain their extension.");
+    Assert.Equal(ShortcutType.Folder, entries[folderPath].Type, "Directories must be classified before their extension.");
+    Assert.Equal(ShortcutType.WindowsShortcut, entries[linkPath].Type, "Windows shortcuts should retain their own type.");
+    Assert.Equal(linkPath, entries[linkPath].Target, "Windows shortcuts should retain their own path.");
+    Assert.Equal("executable fixture", File.ReadAllText(executablePath), "Drop recognition must not modify executable files.");
+    Assert.Equal("ordinary file fixture", File.ReadAllText(filePath), "Drop recognition must not modify ordinary files.");
+    Assert.True(Directory.Exists(folderPath), "Drop recognition must not move or remove directories.");
+    Assert.Equal("shortcut fixture", File.ReadAllText(linkPath), "Drop recognition must not modify Windows shortcuts.");
+}
+
+static void ShortcutDropHandlerAcceptsSafeWebTargets()
+{
+    using var temp = TempDirectory.Create();
+    var internetShortcutPath = System.IO.Path.Combine(temp.Path, "Docs.URL");
+    var internetShortcutContents = "[InternetShortcut]\r\n URL = https://example.com/docs \r\nIconIndex=0\r\n";
+    File.WriteAllText(internetShortcutPath, internetShortcutContents);
+    var service = CreateShortcutService(temp.Path);
+    var handler = new ShortcutDropHandler(service);
+
+    var result = handler.AddDroppedItems(
+        [internetShortcutPath],
+        [" HTTP://example.org/start ", "https://sub.example.net/path?q=1"]);
+
+    Assert.Equal(3, result.AddedCount, "Internet shortcuts and direct HTTP/HTTPS text should be added.");
+    Assert.Equal(0, result.DuplicateCount, "Distinct web targets should not be duplicates.");
+    Assert.Equal(0, result.UnsupportedCount, "HTTP and HTTPS targets should be supported.");
+    Assert.Equal(0, result.FailedCount, "Valid web targets should not fail.");
+    var entries = service.GetAll();
+    Assert.True(entries.All(entry => entry.Type == ShortcutType.WebUrl), "Every accepted web target should use the web URL type.");
+    Assert.Equal("Docs", entries.Single(entry => entry.Target == "https://example.com/docs").Name, "Internet shortcuts should use their file name.");
+    Assert.Equal("example.org", entries.Single(entry => entry.Target == "HTTP://example.org/start").Name, "Direct web targets should use a readable host name.");
+    Assert.True(entries.All(entry => !string.IsNullOrWhiteSpace(entry.Id)), "Generated shortcut IDs should be non-empty.");
+    Assert.Equal(internetShortcutContents, File.ReadAllText(internetShortcutPath), "Reading an internet shortcut must not modify it.");
+}
+
+static void ShortcutDropHandlerRejectsMissingAndUnsafeInputs()
+{
+    using var temp = TempDirectory.Create();
+    var unsafeInternetShortcut = System.IO.Path.Combine(temp.Path, "Unsafe.url");
+    var malformedInternetShortcut = System.IO.Path.Combine(temp.Path, "Malformed.url");
+    File.WriteAllText(unsafeInternetShortcut, "[InternetShortcut]\nURL=ftp://example.com/file\n");
+    File.WriteAllText(malformedInternetShortcut, "[InternetShortcut]\nIconIndex=0\n");
+    var missingPath = System.IO.Path.Combine(temp.Path, "missing.txt");
+    var service = CreateShortcutService(temp.Path);
+    var handler = new ShortcutDropHandler(service);
+
+    var result = handler.AddDroppedItems(
+        [missingPath, unsafeInternetShortcut, malformedInternetShortcut, ""],
+        ["ftp://example.com/file", "file:///C:/secret.txt", "javascript:alert(1)", "cmd.exe /c calc", "not a URL"]);
+
+    Assert.Equal(0, result.AddedCount, "Unsafe and missing inputs must not be added.");
+    Assert.Equal(0, result.DuplicateCount, "Rejected inputs are not duplicates.");
+    Assert.Equal(9, result.UnsupportedCount, "Every missing, malformed, unsafe, or arbitrary input should be reported unsupported.");
+    Assert.Equal(0, result.FailedCount, "Parser rejections should not be reported as storage failures.");
+    Assert.Equal(0, service.GetAll().Count, "Rejected text must never become a command shortcut.");
+    Assert.True(File.Exists(unsafeInternetShortcut), "Rejected internet shortcuts must remain untouched.");
+    Assert.True(File.Exists(malformedInternetShortcut), "Malformed internet shortcuts must remain untouched.");
+}
+
+static void ShortcutDropHandlerAggregatesMixedBatchDuplicates()
+{
+    using var temp = TempDirectory.Create();
+    var filePath = System.IO.Path.Combine(temp.Path, "Report.txt");
+    var internetShortcutPath = System.IO.Path.Combine(temp.Path, "Portal.url");
+    File.WriteAllText(filePath, "report");
+    File.WriteAllText(internetShortcutPath, "[InternetShortcut]\nURL=https://example.com/portal/\n");
+    var service = CreateShortcutService(temp.Path);
+    var handler = new ShortcutDropHandler(service);
+
+    var result = handler.AddDroppedItems(
+        [filePath, filePath, internetShortcutPath],
+        ["https://EXAMPLE.com:443/portal", "ftp://example.com/portal"]);
+
+    Assert.Equal(2, result.AddedCount, "The mixed batch should add one file and one web target.");
+    Assert.Equal(2, result.DuplicateCount, "Repeated paths and normalized URLs should be counted as duplicates.");
+    Assert.Equal(1, result.UnsupportedCount, "The unsupported scheme should be counted once.");
+    Assert.Equal(0, result.FailedCount, "The mixed batch should not contain storage failures.");
+    Assert.Equal(5, result.AddedCount + result.DuplicateCount + result.UnsupportedCount + result.FailedCount, "Aggregate counts should concisely account for every dropped value.");
+    Assert.Equal(2, service.GetAll().Count, "Duplicates and unsupported values must not create entries.");
+}
+
+static void ShortcutDropHandlerReportsShortcutLimitFailures()
+{
+    using var temp = TempDirectory.Create();
+    var service = CreateShortcutService(temp.Path);
+    for (var index = 0; index < ShortcutService.MaxEntries; index++)
+    {
+        var seed = new ShortcutDefinition($"seed-{index}", $"Seed {index}", ShortcutType.File, $@"C:\Seed\{index}.txt", "", null, index);
+        Assert.True(service.TryAdd(seed).Added, "Limit test setup should fill the shortcut service.");
+    }
+
+    var overflowPath = System.IO.Path.Combine(temp.Path, "Overflow.exe");
+    File.WriteAllText(overflowPath, "overflow fixture");
+    var handler = new ShortcutDropHandler(service);
+
+    var result = handler.AddDroppedItems([overflowPath], []);
+
+    Assert.Equal(0, result.AddedCount, "Items beyond the shortcut limit must not be added.");
+    Assert.Equal(0, result.DuplicateCount, "A new target beyond the limit is not a duplicate.");
+    Assert.Equal(0, result.UnsupportedCount, "A valid executable remains supported at the limit.");
+    Assert.Equal(1, result.FailedCount, "The shortcut limit should be reported as a failed addition.");
+    Assert.Equal(ShortcutService.MaxEntries, service.GetAll().Count, "A limit failure must not alter stored entries.");
+    Assert.Equal("overflow fixture", File.ReadAllText(overflowPath), "A limit failure must not modify the dropped executable.");
+}
+
+static ShortcutService CreateShortcutService(string baseDirectory)
+{
+    var paths = new AppPaths(baseDirectory);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+    service.Load();
+    return service;
 }
 
 static void SettingCatalogDefinesEveryBooleanSettingOnce()
