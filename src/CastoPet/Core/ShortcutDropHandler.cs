@@ -4,6 +4,12 @@ namespace CastoPet.Core;
 
 public sealed class ShortcutDropHandler
 {
+    private static readonly HashSet<string> UnsupportedExecutableExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jse",
+        ".wsf", ".wsh", ".hta", ".com", ".scr", ".msi",
+    };
+
     private readonly ShortcutService _shortcutService;
 
     public ShortcutDropHandler(ShortcutService shortcutService)
@@ -68,6 +74,12 @@ public sealed class ShortcutDropHandler
         if (extension.Equals(".url", StringComparison.OrdinalIgnoreCase))
         {
             AddInternetShortcut(path, counts);
+            return;
+        }
+
+        if (UnsupportedExecutableExtensions.Contains(extension))
+        {
+            counts.Unsupported++;
             return;
         }
 

@@ -92,6 +92,7 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut service isolates malformed entries", ShortcutServiceIsolatesMalformedEntries),
     ("Shortcut service notifies only after persisted mutations", ShortcutServiceNotifiesOnlyAfterPersistedMutations),
     ("Shortcut drop handler classifies existing file system items", ShortcutDropHandlerClassifiesExistingFileSystemItems),
+    ("Shortcut drop handler rejects executable scripts", ShortcutDropHandlerRejectsExecutableScripts),
     ("Shortcut drop handler accepts safe web targets", ShortcutDropHandlerAcceptsSafeWebTargets),
     ("Shortcut drop handler rejects missing and unsafe inputs", ShortcutDropHandlerRejectsMissingAndUnsafeInputs),
     ("Shortcut drop handler aggregates mixed batch duplicates", ShortcutDropHandlerAggregatesMixedBatchDuplicates),
@@ -1597,6 +1598,46 @@ static void ShortcutDropHandlerClassifiesExistingFileSystemItems()
     Assert.Equal("ordinary file fixture", File.ReadAllText(filePath), "Drop recognition must not modify ordinary files.");
     Assert.True(Directory.Exists(folderPath), "Drop recognition must not move or remove directories.");
     Assert.Equal("shortcut fixture", File.ReadAllText(linkPath), "Drop recognition must not modify Windows shortcuts.");
+}
+
+static void ShortcutDropHandlerRejectsExecutableScripts()
+{
+    using var temp = TempDirectory.Create();
+    var deniedExtensions = new[]
+    {
+        ".bat", ".CMD", ".Ps1", ".vbs", ".JS", ".jse",
+        ".wsf", ".WSH", ".hta", ".COM", ".scr", ".MSI",
+    };
+    var deniedPaths = deniedExtensions
+        .Select((extension, index) => System.IO.Path.Combine(temp.Path, $"Denied-{index}{extension}"))
+        .ToArray();
+    foreach (var path in deniedPaths)
+    {
+        File.WriteAllText(path, "denied fixture");
+    }
+
+    var textPath = System.IO.Path.Combine(temp.Path, "Readme.txt");
+    var executablePath = System.IO.Path.Combine(temp.Path, "Editor.EXE");
+    var linkPath = System.IO.Path.Combine(temp.Path, "Editor.LnK");
+    File.WriteAllText(textPath, "text fixture");
+    File.WriteAllText(executablePath, "executable fixture");
+    File.WriteAllText(linkPath, "shortcut fixture");
+    var service = CreateShortcutService(temp.Path);
+    var handler = new ShortcutDropHandler(service);
+
+    var result = handler.AddDroppedItems([.. deniedPaths, textPath, executablePath, linkPath], []);
+
+    Assert.Equal(3, result.AddedCount, "Only the ordinary file, executable, and Windows shortcut should be added.");
+    Assert.Equal(0, result.DuplicateCount, "Distinct safety fixtures should not be duplicates.");
+    Assert.Equal(deniedPaths.Length, result.UnsupportedCount, "Every executable script or installer extension should be unsupported.");
+    Assert.Equal(0, result.FailedCount, "Safety rejections should not be reported as storage failures.");
+    var entries = service.GetAll();
+    Assert.Equal(3, entries.Count, "Denied executable content must not be persisted.");
+    Assert.Equal(ShortcutType.File, entries.Single(entry => entry.Target == textPath).Type, "Ordinary text files should remain allowed.");
+    Assert.Equal(ShortcutType.Program, entries.Single(entry => entry.Target == executablePath).Type, "Explicit executable programs should remain allowed.");
+    Assert.Equal(ShortcutType.WindowsShortcut, entries.Single(entry => entry.Target == linkPath).Type, "Windows shortcuts should remain explicitly allowed.");
+    Assert.False(entries.Any(entry => deniedPaths.Contains(entry.Target, StringComparer.OrdinalIgnoreCase)), "Denied paths must never enter shortcut storage.");
+    Assert.True(deniedPaths.All(File.Exists), "Rejected files must remain untouched.");
 }
 
 static void ShortcutDropHandlerAcceptsSafeWebTargets()
