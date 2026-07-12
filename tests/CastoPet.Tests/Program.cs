@@ -79,6 +79,10 @@ var tests = new (string Name, Action Test)[]
     ("Expression wheel selector maps pointer positions", ExpressionWheelSelectorMapsPointerPositions),
     ("Wheel catalog preserves ordered action references", WheelCatalogPreservesOrderedActionReferences),
     ("Wheel catalog exposes disabled empty shortcut content", WheelCatalogExposesDisabledEmptyShortcutContent),
+    ("Radial wheel selector distinguishes all pointer regions", RadialWheelSelectorDistinguishesAllPointerRegions),
+    ("Radial wheel controller honors category dwell", RadialWheelControllerHonorsCategoryDwell),
+    ("Radial wheel controller resets and collapses state", RadialWheelControllerResetsAndCollapsesState),
+    ("Radial wheel controller paginates without persisting controls", RadialWheelControllerPaginatesWithoutPersistingControls),
     ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
     ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
     ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
@@ -1307,6 +1311,102 @@ static void WheelCatalogExposesDisabledEmptyShortcutContent()
     Assert.Equal(1, shortcutCategory.Items.Count, "An empty shortcut category should contain guidance.");
     Assert.Equal(WheelActionType.Disabled, shortcutCategory.Items[0].ActionType, "Empty guidance should not be actionable.");
     Assert.False(shortcutCategory.Items[0].IsEnabled, "Empty shortcut guidance should be disabled.");
+}
+
+static void RadialWheelSelectorDistinguishesAllPointerRegions()
+{
+    Assert.Equal(RadialWheelRing.Center, RadialWheelSelector.GetSelection(0, 0, 2, 4).Ring, "Origin should be center.");
+    var first = RadialWheelSelector.GetSelection(0, -80, 2, 4);
+    Assert.Equal(RadialWheelRing.First, first.Ring, "First ring point should select a category.");
+    Assert.Equal(0, first.SectorIndex, "Top should map to the first clockwise sector.");
+    Assert.Equal(RadialWheelRing.Second, RadialWheelSelector.GetSelection(0, -170, 2, 4).Ring, "Outer ring point should select level two.");
+    Assert.Equal(RadialWheelRing.Outside, RadialWheelSelector.GetSelection(0, -220, 2, 4).Ring, "Point beyond the wheel should be outside.");
+}
+
+static void RadialWheelControllerHonorsCategoryDwell()
+{
+    var controller = new RadialWheelController(CreateWheelCatalog(3));
+    var now = DateTimeOffset.UtcNow;
+    controller.Open(now);
+    controller.UpdatePointer(0, -80, now);
+    controller.UpdatePointer(0, -80, now + TimeSpan.FromMilliseconds(119));
+    Assert.False(controller.IsSecondLevelOpen, "Second level must remain closed before 120 ms.");
+    controller.UpdatePointer(0, -80, now + TimeSpan.FromMilliseconds(120));
+    Assert.True(controller.IsSecondLevelOpen, "Second level should open at 120 ms.");
+    Assert.Equal(0, controller.SelectedCategoryIndex, "The dwelled category should remain selected.");
+}
+
+static void RadialWheelControllerResetsAndCollapsesState()
+{
+    var controller = new RadialWheelController(CreateWheelCatalog(3));
+    var now = DateTimeOffset.UtcNow;
+    controller.Open(now);
+    controller.UpdatePointer(0, -80, now);
+    controller.UpdatePointer(-80, 0, now + TimeSpan.FromMilliseconds(119));
+    controller.UpdatePointer(-80, 0, now + TimeSpan.FromMilliseconds(120));
+    Assert.False(controller.IsSecondLevelOpen, "Changing category should reset dwell time.");
+    controller.UpdatePointer(-80, 0, now + TimeSpan.FromMilliseconds(239));
+    Assert.True(controller.IsSecondLevelOpen, "The replacement category should open after its own dwell.");
+
+    controller.UpdatePointer(0, 0, now + TimeSpan.FromMilliseconds(240));
+    Assert.False(controller.IsSecondLevelOpen, "Returning to center should collapse level two.");
+    Assert.True(controller.IsOpen, "Center collapse should keep level one open.");
+    controller.UpdatePointer(0, -220, now + TimeSpan.FromMilliseconds(241));
+    Assert.False(controller.IsOpen, "Moving outside should cancel the wheel.");
+
+    controller.Open(now);
+    var result = controller.Cancel();
+    Assert.Equal(WheelReleaseKind.Cancel, result.Kind, "Escape-style cancellation should return Cancel.");
+    Assert.False(controller.IsOpen, "Cancellation should close the wheel.");
+}
+
+static void RadialWheelControllerPaginatesWithoutPersistingControls()
+{
+    foreach (var actionCount in new[] { 9, 15, 17 })
+    {
+        var catalog = CreateWheelCatalog(actionCount);
+        var persistedIds = catalog.Categories[0].Items.Select(item => item.Id).ToArray();
+        var controller = new RadialWheelController(catalog);
+        var now = DateTimeOffset.UtcNow;
+        controller.Open(now);
+        controller.UpdatePointer(0, -80, now);
+        controller.UpdatePointer(0, -80, now + WheelCatalog.CategoryDwellDelay);
+
+        var visitedActions = new HashSet<string>();
+        while (true)
+        {
+            Assert.True(controller.VisibleSecondLevelItems.Count <= WheelCatalog.MaxVisibleItemsPerRing, "Every rendered page must have at most eight sectors.");
+            foreach (var item in controller.VisibleSecondLevelItems.Where(item => item.ActionType == WheelActionType.Shortcut))
+            {
+                visitedActions.Add(item.Id);
+            }
+
+            var nextIndex = controller.VisibleSecondLevelItems.ToList().FindIndex(item => item.ActionType == WheelActionType.NextPage);
+            if (nextIndex < 0)
+            {
+                break;
+            }
+
+            var pageResult = controller.ReleaseSecondLevelItem(nextIndex);
+            Assert.Equal(WheelReleaseKind.PageChanged, pageResult.Kind, "Page controls should update controller state.");
+            Assert.True(controller.IsOpen, "Paging should keep the wheel open.");
+        }
+
+        Assert.Equal(actionCount, visitedActions.Count, "Pagination should expose every persisted action.");
+        Assert.Equal(string.Join(',', persistedIds), string.Join(',', catalog.Categories[0].Items.Select(item => item.Id)), "Page controls must not be persisted in category actions.");
+        Assert.False(catalog.Categories[0].Items.Any(item => item.ActionType is WheelActionType.PreviousPage or WheelActionType.NextPage), "Catalog data must not contain runtime page controls.");
+    }
+}
+
+static WheelCatalog CreateWheelCatalog(int actionCount)
+{
+    var actions = Enumerable.Range(0, actionCount)
+        .Select(index => new WheelActionItem($"action-{index}", $"Action {index}", WheelActionType.Shortcut, $"ref-{index}"))
+        .ToArray();
+    return new WheelCatalog([
+        new WheelCategory("primary", "Primary", actions),
+        new WheelCategory("secondary", "Secondary", [new WheelActionItem("other", "Other", WheelActionType.Shortcut, "other")]),
+    ]);
 }
 
 static void SettingCatalogDefinesEveryBooleanSettingOnce()
