@@ -77,6 +77,8 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
     ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
     ("Expression wheel selector maps pointer positions", ExpressionWheelSelectorMapsPointerPositions),
+    ("Wheel catalog preserves ordered action references", WheelCatalogPreservesOrderedActionReferences),
+    ("Wheel catalog exposes disabled empty shortcut content", WheelCatalogExposesDisabledEmptyShortcutContent),
     ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
     ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
     ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
@@ -1268,6 +1270,43 @@ static void ExpressionWheelSelectorMapsPointerPositions()
             originY: 0,
             itemCount: 8),
         "Pointer below the origin should select the bottom item.");
+}
+
+static void WheelCatalogPreservesOrderedActionReferences()
+{
+    var expressions = new[]
+    {
+        new PetExpressionDefinition("happy", "Happy", "happy.png"),
+        new PetExpressionDefinition("sleepy", "Sleepy", "sleepy.png"),
+    };
+    var shortcuts = new[]
+    {
+        new WheelActionItem("editor", "Editor", WheelActionType.Shortcut, "shortcut-editor"),
+        new WheelActionItem("browser", "Browser", WheelActionType.Shortcut, "shortcut-browser"),
+    };
+
+    var catalog = WheelCatalogService.Create(expressions, shortcuts);
+
+    Assert.Equal(2, catalog.Categories.Count, "The catalog should contain two categories.");
+    Assert.Equal("expressions", catalog.Categories[0].Id, "Expressions should remain first.");
+    Assert.Equal("shortcuts", catalog.Categories[1].Id, "Shortcuts should remain second.");
+    Assert.Equal(WheelActionType.Expression, catalog.Categories[0].Items[0].ActionType, "Expression actions should be typed.");
+    Assert.Equal("happy", catalog.Categories[0].Items[0].ActionReference, "Expression IDs should remain action references.");
+    Assert.Equal("shortcut-editor", catalog.Categories[1].Items[0].ActionReference, "Shortcut references should be preserved.");
+}
+
+static void WheelCatalogExposesDisabledEmptyShortcutContent()
+{
+    var expressions = new[]
+    {
+        new PetExpressionDefinition("happy", "Happy", "happy.png"),
+    };
+
+    var shortcutCategory = WheelCatalogService.Create(expressions, []).Categories[1];
+
+    Assert.Equal(1, shortcutCategory.Items.Count, "An empty shortcut category should contain guidance.");
+    Assert.Equal(WheelActionType.Disabled, shortcutCategory.Items[0].ActionType, "Empty guidance should not be actionable.");
+    Assert.False(shortcutCategory.Items[0].IsEnabled, "Empty shortcut guidance should be disabled.");
 }
 
 static void SettingCatalogDefinesEveryBooleanSettingOnce()
