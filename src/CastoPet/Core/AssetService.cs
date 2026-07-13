@@ -73,23 +73,17 @@ public sealed class AssetService
         return LoadOptionalActionFrames(PetActionKind.ExpressionTransitionOut, "Expression transition out frames");
     }
 
-    public IReadOnlyDictionary<ExpressionWheelItem, ImageSource> LoadExpressionWheelImages()
+    public IReadOnlyDictionary<string, PetExpressionAsset> LoadExpressionAssets()
     {
-        return LoadExpressionAssets().ToDictionary(item => item.Key, item => item.Value.Image);
-    }
-
-    public IReadOnlyDictionary<ExpressionWheelItem, PetExpressionAsset> LoadExpressionAssets()
-    {
-        var assets = new Dictionary<ExpressionWheelItem, PetExpressionAsset>();
+        var assets = new Dictionary<string, PetExpressionAsset>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var expression in Skin.Expressions)
         {
             try
             {
-                var item = new ExpressionWheelItem(expression.Label, expression.ResourcePath);
                 var image = LoadCharacter(expression.ResourcePath, "Expression wheel images");
                 var transitionFrames = LoadOptionalExpressionTransitionFrames(expression);
-                assets[item] = new PetExpressionAsset(expression, image, transitionFrames);
+                assets[expression.Id] = new PetExpressionAsset(expression, image, transitionFrames);
             }
             catch
             {

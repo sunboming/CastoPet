@@ -188,7 +188,7 @@
 
             <Border Grid.Row="3" Background="{StaticResource LavenderBrush}" BorderBrush="{StaticResource DividerBrush}"
                     BorderThickness="0,1,0,0" CornerRadius="0,0,8,8">
-                <TextBlock Margin="24,0" VerticalAlignment="Center" Text="更改将立即生效并自动保存"
+                <TextBlock Margin="24,0" VerticalAlignment="Center" Text="常规设置立即生效；快捷项编辑后请保存"
                            FontSize="12" Foreground="{StaticResource SecondaryTextBrush}" />
             </Border>
         </Grid>

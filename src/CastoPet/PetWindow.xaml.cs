@@ -212,9 +212,7 @@ public partial class PetWindow : Window
             _inputReactiveBase = assets.TryLoadInputReactiveBase();
             _expressionTransitionInFrames = assets.LoadExpressionTransitionInFrames();
             _expressionTransitionOutFrames = assets.LoadExpressionTransitionOutFrames();
-            _expressionAssetsById = assets.LoadExpressionAssets()
-                .Values
-                .ToDictionary(asset => asset.Definition.Id, StringComparer.OrdinalIgnoreCase);
+            _expressionAssetsById = assets.LoadExpressionAssets();
             CharacterImage.Source = GetCurrentIdleFrame();
         }
         catch

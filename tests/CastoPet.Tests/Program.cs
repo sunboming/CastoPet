@@ -1115,6 +1115,7 @@ static void AssetServiceLoadsExpressionImagesWithIsolatedTransitions()
     var assets = service.LoadExpressionAssets();
 
     Assert.Equal(1, assets.Count, "A valid final expression image should remain available.");
+    Assert.True(assets.ContainsKey(expression.Id), "Expression assets should be keyed directly by stable expression ID.");
     Assert.Equal(0, assets.Values.Single().TransitionFrames.Count, "One missing transition frame should discard only that transition sequence.");
     Assert.Equal(expression, assets.Values.Single().Definition, "Loaded expression assets should retain their definition.");
     Assert.Equal(0, service.LoadExpressionTransitionInFrames().Count, "A missing generic transition-in action should return no fallback frames.");
@@ -2172,6 +2173,7 @@ static void SettingsWindowExposesShortcutLauncherManagement()
     Assert.Contains(xaml, "ShortcutWorkingDirectoryTextBox", "Program working directory should be editable.");
     Assert.Contains(xaml, "ShortcutUrlTextBox", "A manual URL input should be present.");
     Assert.Contains(xaml, "ShortcutUrlErrorText", "Unsafe URL validation should be shown inline.");
+    Assert.Contains(xaml, "常规设置立即生效；快捷项编辑后请保存", "The footer should describe both immediate and explicit-save behavior accurately.");
 }
 
 static void SettingsWindowSharesShortcutServicesAndLiveUpdates()
