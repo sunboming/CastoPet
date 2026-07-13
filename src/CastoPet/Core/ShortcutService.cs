@@ -142,6 +142,42 @@ public sealed class ShortcutService
         }
     }
 
+    public ShortcutMutationResult UpdateLaunchOptions(
+        string id,
+        string? arguments,
+        string? workingDirectory)
+    {
+        lock (_gate)
+        {
+            var index = _entries.FindIndex(entry => entry.Id == id);
+            if (index < 0)
+            {
+                return new(false, Error: "Shortcut was not found.");
+            }
+
+            if (_entries[index].Type != ShortcutType.Program)
+            {
+                return new(false, Error: "Launch options are only available for programs.");
+            }
+
+            var normalizedDirectory = string.IsNullOrWhiteSpace(workingDirectory)
+                ? null
+                : workingDirectory.Trim();
+            if (normalizedDirectory is not null && !Directory.Exists(normalizedDirectory))
+            {
+                return new(false, Error: "Working directory does not exist.");
+            }
+
+            var next = _entries.ToList();
+            next[index] = next[index] with
+            {
+                Arguments = arguments?.Trim() ?? "",
+                WorkingDirectory = normalizedDirectory,
+            };
+            return PersistMutation(OrderAndRenumber(next));
+        }
+    }
+
     public ShortcutMutationResult Move(string id, int destinationIndex)
     {
         lock (_gate)

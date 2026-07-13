@@ -90,6 +90,7 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut service normalizes duplicate identities", ShortcutServiceNormalizesDuplicateIdentities),
     ("Shortcut service appends candidates with contiguous ordering", ShortcutServiceAppendsCandidatesWithContiguousOrdering),
     ("Shortcut service mutates ordered entries", ShortcutServiceMutatesOrderedEntries),
+    ("Shortcut service updates program launch options safely", ShortcutServiceUpdatesProgramLaunchOptionsSafely),
     ("Shortcut service enforces its entry limit", ShortcutServiceEnforcesEntryLimit),
     ("Shortcut service recovers malformed storage", ShortcutServiceRecoversMalformedStorage),
     ("Shortcut service isolates malformed entries", ShortcutServiceIsolatesMalformedEntries),
@@ -115,6 +116,8 @@ var tests = new (string Name, Action Test)[]
     ("Settings window service reuses the open window", SettingsWindowServiceReusesTheOpenWindow),
     ("Settings window service releases a closed window", SettingsWindowServiceReleasesAClosedWindow),
     ("Settings window defines the approved visual structure", SettingsWindowDefinesTheApprovedVisualStructure),
+    ("Settings window exposes shortcut launcher management", SettingsWindowExposesShortcutLauncherManagement),
+    ("Settings window shares shortcut services and live updates", SettingsWindowSharesShortcutServicesAndLiveUpdates),
     ("Direct menus expose the settings command", DirectMenusExposeTheSettingsCommand),
     ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
     ("Input keyboard layout exposes drawable keys", InputKeyboardLayoutExposesDrawableKeys),
@@ -1546,6 +1549,38 @@ static void ShortcutServiceMutatesOrderedEntries()
     Assert.Equal("Renamed", service.GetAll()[0].Name, "Remaining entry should preserve its edited name.");
 }
 
+static void ShortcutServiceUpdatesProgramLaunchOptionsSafely()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new ShortcutService(paths, new LoggingService(paths));
+    service.Load();
+    var workingDirectory = System.IO.Path.Combine(temp.Path, "Workspace");
+    Directory.CreateDirectory(workingDirectory);
+    service.TryAdd(new ShortcutDefinition("program", "Program", ShortcutType.Program, @"C:\Tools\Editor.exe", "", null, 0));
+    service.TryAdd(new ShortcutDefinition("file", "File", ShortcutType.File, @"C:\Notes.txt", "", null, 1));
+    var changed = 0;
+    service.Changed += (_, _) => changed++;
+
+    var updated = service.UpdateLaunchOptions("program", "--project demo", $"  {workingDirectory}  ");
+
+    Assert.True(updated.Succeeded, "Program launch options should be persisted.");
+    var program = service.GetAll().Single(entry => entry.Id == "program");
+    Assert.Equal("--project demo", program.Arguments, "Arguments should remain separate from the target.");
+    Assert.Equal(workingDirectory, program.WorkingDirectory!, "Working directory should be trimmed before persistence.");
+    Assert.Equal(1, changed, "A successful launch-option update should notify once.");
+
+    var rejectedType = service.UpdateLaunchOptions("file", "--unsafe", workingDirectory);
+    var rejectedDirectory = service.UpdateLaunchOptions("program", "changed", System.IO.Path.Combine(temp.Path, "Missing"));
+
+    Assert.False(rejectedType.Succeeded, "Non-program entries must reject launch options.");
+    Assert.False(rejectedDirectory.Succeeded, "A missing working directory must be rejected.");
+    Assert.Equal(1, changed, "Rejected updates should not notify or mutate state.");
+    program = service.GetAll().Single(entry => entry.Id == "program");
+    Assert.Equal("--project demo", program.Arguments, "Rejected updates must preserve existing arguments.");
+    Assert.Equal(2, service.GetAll().Count, "Validation must not auto-delete any shortcut.");
+}
+
 static void ShortcutServiceEnforcesEntryLimit()
 {
     using var temp = TempDirectory.Create();
@@ -1892,6 +1927,7 @@ static void ShortcutLauncherRejectsMissingAndMalformedDefinitions()
     {
         new ShortcutDefinition("missing-program", "Missing", ShortcutType.Program, System.IO.Path.Combine(temp.Path, "missing.exe"), "", null, 0),
         new ShortcutDefinition("wrong-program", "Wrong", ShortcutType.Program, existingFile, "", null, 1),
+        new ShortcutDefinition("missing-workdir", "Workdir", ShortcutType.Program, existingExecutable, "", System.IO.Path.Combine(temp.Path, "MissingWorkdir"), 2),
         new ShortcutDefinition("missing-file", "Missing", ShortcutType.File, System.IO.Path.Combine(temp.Path, "missing.txt"), "", null, 2),
         new ShortcutDefinition("folder-as-file", "Wrong", ShortcutType.File, existingFolder, "", null, 3),
         new ShortcutDefinition("missing-folder", "Missing", ShortcutType.Folder, System.IO.Path.Combine(temp.Path, "MissingFolder"), "", null, 4),
@@ -2113,6 +2149,48 @@ static void SettingsWindowDefinesTheApprovedVisualStructure()
     Assert.Contains(xaml, "#FAF9FC", "The main surface should use cool near-white.");
     Assert.False(xaml.Contains("#6F4AA8", StringComparison.Ordinal), "The old saturated purple should be removed.");
     Assert.Contains(xaml, "CloseButton", "The custom title bar should expose a close button.");
+}
+
+static void SettingsWindowExposesShortcutLauncherManagement()
+{
+    var workspace = FindWorkspaceRoot();
+    var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml"));
+
+    Assert.Contains(xaml, "SettingsNavigation", "Settings should expose explicit segmented navigation.");
+    Assert.Contains(xaml, "GeneralView", "Existing settings should remain available in a general view.");
+    Assert.Contains(xaml, "ShortcutLauncherView", "Shortcut management should have its own view.");
+    Assert.Contains(xaml, "ShortcutList", "Shortcut entries should render in a dedicated list.");
+    Assert.Contains(xaml, "名称", "The shortcut list should label names concisely.");
+    Assert.Contains(xaml, "类型", "The shortcut list should show item types.");
+    Assert.Contains(xaml, "目标", "The shortcut list should show targets.");
+    Assert.Contains(xaml, "状态", "The shortcut list should show validity.");
+    Assert.Contains(xaml, "ToolTip=\"上移\"", "Move-up should be an icon-like button with a tooltip.");
+    Assert.Contains(xaml, "ToolTip=\"下移\"", "Move-down should be an icon-like button with a tooltip.");
+    Assert.Contains(xaml, "ToolTip=\"删除\"", "Delete should be an icon-like button with a tooltip.");
+    Assert.Contains(xaml, "ShortcutNameTextBox", "The selected shortcut name should be editable.");
+    Assert.Contains(xaml, "ShortcutArgumentsTextBox", "Program arguments should be editable.");
+    Assert.Contains(xaml, "ShortcutWorkingDirectoryTextBox", "Program working directory should be editable.");
+    Assert.Contains(xaml, "ShortcutUrlTextBox", "A manual URL input should be present.");
+    Assert.Contains(xaml, "ShortcutUrlErrorText", "Unsafe URL validation should be shown inline.");
+}
+
+static void SettingsWindowSharesShortcutServicesAndLiveUpdates()
+{
+    var workspace = FindWorkspaceRoot();
+    var windowSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
+    var appSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+
+    Assert.Contains(windowSource, "ShortcutService shortcutService", "Settings should receive the shared shortcut service.");
+    Assert.Contains(windowSource, "ShortcutDropHandler shortcutDropHandler", "Manual URL add should reuse safe shortcut parsing.");
+    Assert.Contains(windowSource, "ShortcutLauncher shortcutLauncher", "Validity should reuse launcher validation.");
+    Assert.Contains(windowSource, "_shortcutService.Changed +=", "Settings should refresh when shared shortcut data changes.");
+    Assert.Contains(windowSource, "_shortcutService.Changed -=", "Settings should unsubscribe when the window closes.");
+    Assert.Contains(windowSource, "_shortcutDropHandler.AddDroppedItems", "Manual URL add should use the existing HTTP/HTTPS-safe parser.");
+    Assert.Contains(windowSource, "_shortcutService.Rename", "Name editing should persist through the shortcut service.");
+    Assert.Contains(windowSource, "_shortcutService.Move", "Reorder actions should persist through the shortcut service.");
+    Assert.Contains(windowSource, "_shortcutService.Delete", "Delete actions should persist through the shortcut service.");
+    Assert.Contains(windowSource, "_shortcutService.UpdateLaunchOptions", "Program launch options should persist through the shortcut service.");
+    Assert.Contains(appSource, "new SettingsWindow(commands, _crashReports, _updates, _shortcutService, _shortcutDropHandler, _shortcutLauncher)", "App should pass the same composed shortcut dependencies to settings.");
 }
 
 static void DirectMenusExposeTheSettingsCommand()

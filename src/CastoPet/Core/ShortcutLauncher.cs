@@ -77,6 +77,12 @@ public sealed class ShortcutLauncher
                     throw new InvalidOperationException("Program target must be an existing .exe file.");
                 }
 
+                if (!string.IsNullOrWhiteSpace(definition.WorkingDirectory) &&
+                    !Directory.Exists(definition.WorkingDirectory))
+                {
+                    throw new InvalidOperationException("Program working directory does not exist.");
+                }
+
                 break;
 
             case ShortcutType.File:

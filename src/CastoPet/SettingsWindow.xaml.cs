@@ -11,26 +11,37 @@ public partial class SettingsWindow : Window, ISettingsWindow
     private readonly MenuCommandService _commands;
     private readonly CrashReportService _crashReports;
     private readonly UpdateCoordinator _updates;
+    private readonly ShortcutService _shortcutService;
+    private readonly ShortcutDropHandler _shortcutDropHandler;
+    private readonly ShortcutLauncher _shortcutLauncher;
     private readonly IReadOnlyList<SettingDefinition> _definitions;
     private readonly Dictionary<string, WpfControls.CheckBox> _switches = new(StringComparer.Ordinal);
 
     public SettingsWindow(
         MenuCommandService commands,
         CrashReportService crashReports,
-        UpdateCoordinator updates)
+        UpdateCoordinator updates,
+        ShortcutService shortcutService,
+        ShortcutDropHandler shortcutDropHandler,
+        ShortcutLauncher shortcutLauncher)
     {
         InitializeComponent();
         _commands = commands;
         _crashReports = crashReports;
         _updates = updates;
+        _shortcutService = shortcutService;
+        _shortcutDropHandler = shortcutDropHandler;
+        _shortcutLauncher = shortcutLauncher;
         _definitions = SettingCatalog.Create(commands);
         BuildSettingsRows();
         RefreshValues();
+        RefreshShortcutRows();
         CurrentVersionText.Text = $"当前版本 {_updates.CurrentVersion}";
         UpdateStatusText.Text = _updates.IsInstalled
             ? "每天启动时检查一次"
             : "开发版本不支持自动更新";
         _commands.SettingsChanged += RefreshValues;
+        _shortcutService.Changed += OnShortcutsChanged;
         Closed += OnSettingsWindowClosed;
     }
 
@@ -130,6 +141,173 @@ public partial class SettingsWindow : Window, ISettingsWindow
         };
     }
 
+    private void ViewNavigation_Checked(object sender, RoutedEventArgs e)
+    {
+        if (GeneralView is null || ShortcutLauncherView is null || sender is not WpfControls.RadioButton button)
+        {
+            return;
+        }
+
+        var showShortcuts = string.Equals(button.Tag as string, "Shortcuts", StringComparison.Ordinal);
+        GeneralView.Visibility = showShortcuts ? Visibility.Collapsed : Visibility.Visible;
+        ShortcutLauncherView.Visibility = showShortcuts ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void RefreshShortcutRows(string? selectedId = null)
+    {
+        selectedId ??= (ShortcutList.SelectedItem as ShortcutListItem)?.Definition.Id;
+        var rows = _shortcutService.GetAll().Select(CreateShortcutRow).ToArray();
+        ShortcutList.ItemsSource = rows;
+        ShortcutList.SelectedItem = rows.FirstOrDefault(row => row.Definition.Id == selectedId);
+        if (ShortcutList.SelectedItem is null && rows.Length > 0)
+        {
+            ShortcutList.SelectedIndex = 0;
+        }
+
+        RefreshShortcutEditor();
+    }
+
+    private ShortcutListItem CreateShortcutRow(ShortcutDefinition definition)
+    {
+        var validity = "可用";
+        try
+        {
+            _shortcutLauncher.CreateStartInfo(definition);
+        }
+        catch (Exception)
+        {
+            validity = "失效";
+        }
+
+        return new ShortcutListItem(
+            definition,
+            GetShortcutTypeLabel(definition.Type),
+            validity);
+    }
+
+    private static string GetShortcutTypeLabel(ShortcutType type) => type switch
+    {
+        ShortcutType.Program => "程序",
+        ShortcutType.File => "文件",
+        ShortcutType.Folder => "文件夹",
+        ShortcutType.WindowsShortcut => "快捷方式",
+        ShortcutType.WebUrl => "网页",
+        _ => "未知",
+    };
+
+    private void ShortcutList_SelectionChanged(object sender, WpfControls.SelectionChangedEventArgs e)
+    {
+        RefreshShortcutEditor();
+    }
+
+    private void RefreshShortcutEditor()
+    {
+        var row = ShortcutList.SelectedItem as ShortcutListItem;
+        var hasSelection = row is not null;
+        var isProgram = row?.Definition.Type == ShortcutType.Program;
+        ShortcutNameTextBox.IsEnabled = hasSelection;
+        ShortcutArgumentsTextBox.IsEnabled = isProgram;
+        ShortcutWorkingDirectoryTextBox.IsEnabled = isProgram;
+        SaveShortcutButton.IsEnabled = hasSelection;
+        DeleteShortcutButton.IsEnabled = hasSelection;
+        MoveShortcutUpButton.IsEnabled = hasSelection && ShortcutList.SelectedIndex > 0;
+        MoveShortcutDownButton.IsEnabled = hasSelection && ShortcutList.SelectedIndex < ShortcutList.Items.Count - 1;
+        ShortcutNameTextBox.Text = row?.Definition.Name ?? "";
+        ShortcutArgumentsTextBox.Text = isProgram ? row!.Definition.Arguments : "";
+        ShortcutWorkingDirectoryTextBox.Text = isProgram ? row!.Definition.WorkingDirectory ?? "" : "";
+    }
+
+    private void AddShortcutUrlButton_Click(object sender, RoutedEventArgs e)
+    {
+        var result = _shortcutDropHandler.AddDroppedItems([], [ShortcutUrlTextBox.Text]);
+        if (result.AddedCount > 0)
+        {
+            ShortcutUrlTextBox.Clear();
+            ShortcutUrlErrorText.Text = "";
+        }
+        else if (result.DuplicateCount > 0)
+        {
+            ShortcutUrlErrorText.Text = "该网址已存在";
+        }
+        else if (result.UnsupportedCount > 0)
+        {
+            ShortcutUrlErrorText.Text = "仅支持 http 或 https 地址";
+        }
+        else
+        {
+            ShortcutUrlErrorText.Text = "添加失败，请稍后重试";
+        }
+    }
+
+    private void SaveShortcutButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ShortcutList.SelectedItem is not ShortcutListItem row)
+        {
+            return;
+        }
+
+        var name = ShortcutNameTextBox.Text.Trim();
+        if (name.Length == 0)
+        {
+            ShortcutUrlErrorText.Text = "名称不能为空";
+            return;
+        }
+
+        if (row.Definition.Type == ShortcutType.Program)
+        {
+            var launchResult = _shortcutService.UpdateLaunchOptions(
+                row.Definition.Id,
+                ShortcutArgumentsTextBox.Text,
+                ShortcutWorkingDirectoryTextBox.Text);
+            if (!launchResult.Succeeded)
+            {
+                ShortcutUrlErrorText.Text = "工作目录不存在";
+                return;
+            }
+        }
+
+        var renameResult = _shortcutService.Rename(row.Definition.Id, name);
+        ShortcutUrlErrorText.Text = renameResult.Succeeded ? "" : "保存失败";
+    }
+
+    private void MoveShortcutUpButton_Click(object sender, RoutedEventArgs e) => MoveSelectedShortcut(-1);
+
+    private void MoveShortcutDownButton_Click(object sender, RoutedEventArgs e) => MoveSelectedShortcut(1);
+
+    private void MoveSelectedShortcut(int offset)
+    {
+        if (ShortcutList.SelectedItem is not ShortcutListItem row)
+        {
+            return;
+        }
+
+        var destination = ShortcutList.SelectedIndex + offset;
+        var result = _shortcutService.Move(row.Definition.Id, destination);
+        ShortcutUrlErrorText.Text = result.Succeeded ? "" : "无法移动";
+    }
+
+    private void DeleteShortcutButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ShortcutList.SelectedItem is not ShortcutListItem row)
+        {
+            return;
+        }
+
+        var result = _shortcutService.Delete(row.Definition.Id);
+        ShortcutUrlErrorText.Text = result.Succeeded ? "" : "删除失败";
+    }
+
+    private void OnShortcutsChanged(object? sender, EventArgs e)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(RefreshShortcutRows);
+            return;
+        }
+
+        RefreshShortcutRows();
+    }
+
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState == MouseButtonState.Pressed)
@@ -218,6 +396,17 @@ public partial class SettingsWindow : Window, ISettingsWindow
     private void OnSettingsWindowClosed(object? sender, EventArgs e)
     {
         _commands.SettingsChanged -= RefreshValues;
+        _shortcutService.Changed -= OnShortcutsChanged;
         Closed -= OnSettingsWindowClosed;
+    }
+
+    private sealed record ShortcutListItem(
+        ShortcutDefinition Definition,
+        string TypeLabel,
+        string ValidityLabel)
+    {
+        public string Name => Definition.Name;
+
+        public string Target => Definition.Target;
     }
 }
