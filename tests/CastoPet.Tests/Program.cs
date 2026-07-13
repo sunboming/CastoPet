@@ -78,6 +78,10 @@ var tests = new (string Name, Action Test)[]
     ("Radial wheel layout keeps generic two-ring geometry", RadialWheelLayoutKeepsGenericTwoRingGeometry),
     ("Wheel catalog preserves ordered action references", WheelCatalogPreservesOrderedActionReferences),
     ("Wheel catalog exposes disabled empty shortcut content", WheelCatalogExposesDisabledEmptyShortcutContent),
+    ("Wheel catalog service refreshes successful shortcut mutations", WheelCatalogServiceRefreshesSuccessfulShortcutMutations),
+    ("Wheel catalog service unsubscribes when disposed", WheelCatalogServiceUnsubscribesWhenDisposed),
+    ("Application composes one shared shortcut wheel graph", ApplicationComposesOneSharedShortcutWheelGraph),
+    ("Pet window follows live wheel catalog snapshots", PetWindowFollowsLiveWheelCatalogSnapshots),
     ("Radial wheel selector distinguishes all pointer regions", RadialWheelSelectorDistinguishesAllPointerRegions),
     ("Radial wheel controller honors category dwell", RadialWheelControllerHonorsCategoryDwell),
     ("Radial wheel controller resets and collapses state", RadialWheelControllerResetsAndCollapsesState),
@@ -1282,6 +1286,100 @@ static void WheelCatalogExposesDisabledEmptyShortcutContent()
     Assert.Equal(1, shortcutCategory.Items.Count, "An empty shortcut category should contain guidance.");
     Assert.Equal(WheelActionType.Disabled, shortcutCategory.Items[0].ActionType, "Empty guidance should not be actionable.");
     Assert.False(shortcutCategory.Items[0].IsEnabled, "Empty shortcut guidance should be disabled.");
+}
+
+static void WheelCatalogServiceRefreshesSuccessfulShortcutMutations()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var shortcuts = new ShortcutService(paths, new LoggingService(paths));
+    shortcuts.Load();
+    var expressions = new[]
+    {
+        new PetExpressionDefinition("happy", "Happy", "happy.png"),
+    };
+    using var catalogs = new WheelCatalogService(expressions, shortcuts);
+    var initial = catalogs.Current;
+    var changed = 0;
+    catalogs.Changed += (_, _) => changed++;
+
+    Assert.True(shortcuts.TryAdd(new ShortcutDefinition("a", "Alpha", ShortcutType.File, @"C:\A.txt", "", null, 0)).Added, "First shortcut should be added.");
+    var afterFirstAdd = catalogs.Current;
+    Assert.False(ReferenceEquals(initial, afterFirstAdd), "Add should replace the catalog snapshot immediately.");
+    Assert.Equal("a", afterFirstAdd.Categories[1].Items.Single().ActionReference, "Added shortcuts should appear without restarting.");
+
+    Assert.True(shortcuts.TryAdd(new ShortcutDefinition("b", "Beta", ShortcutType.File, @"C:\B.txt", "", null, 0)).Added, "Second shortcut should be added.");
+    var afterSecondAdd = catalogs.Current;
+    Assert.False(ReferenceEquals(afterFirstAdd, afterSecondAdd), "Each successful add should publish a new snapshot.");
+    Assert.Equal("a,b", string.Join(',', afterSecondAdd.Categories[1].Items.Select(item => item.ActionReference)), "Added shortcuts should preserve service order.");
+
+    Assert.True(shortcuts.Rename("b", "Renamed").Succeeded, "Rename should succeed.");
+    var afterRename = catalogs.Current;
+    Assert.False(ReferenceEquals(afterSecondAdd, afterRename), "Rename should replace the catalog snapshot immediately.");
+    Assert.Equal("Renamed", afterRename.Categories[1].Items[1].DisplayName, "Rename should update the wheel label immediately.");
+
+    Assert.True(shortcuts.Move("b", 0).Succeeded, "Reorder should succeed.");
+    var afterMove = catalogs.Current;
+    Assert.False(ReferenceEquals(afterRename, afterMove), "Reorder should replace the catalog snapshot immediately.");
+    Assert.Equal("b,a", string.Join(',', afterMove.Categories[1].Items.Select(item => item.ActionReference)), "Reorder should update wheel order immediately.");
+
+    Assert.True(shortcuts.Delete("a").Succeeded, "Delete should succeed.");
+
+    var shortcutItems = catalogs.Current.Categories.Single(category => category.Id == "shortcuts").Items;
+    Assert.False(ReferenceEquals(afterMove, catalogs.Current), "Delete should replace the catalog snapshot immediately.");
+    Assert.Equal(5, changed, "Every successful persisted mutation should publish one catalog change.");
+    Assert.Equal(1, shortcutItems.Count, "Deleted shortcuts should disappear from the current snapshot.");
+    Assert.Equal("b", shortcutItems[0].ActionReference, "Reordered shortcut identity should remain live.");
+    Assert.Equal("Renamed", shortcutItems[0].DisplayName, "Renamed shortcuts should update wheel labels.");
+}
+
+static void WheelCatalogServiceUnsubscribesWhenDisposed()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var shortcuts = new ShortcutService(paths, new LoggingService(paths));
+    shortcuts.Load();
+    var catalogs = new WheelCatalogService(
+        [new PetExpressionDefinition("happy", "Happy", "happy.png")],
+        shortcuts);
+    var snapshotAtDispose = catalogs.Current;
+    var changed = 0;
+    catalogs.Changed += (_, _) => changed++;
+
+    catalogs.Dispose();
+    Assert.True(shortcuts.TryAdd(new ShortcutDefinition("late", "Late", ShortcutType.File, @"C:\Late.txt", "", null, 0)).Added, "The shortcut service should remain independently usable.");
+
+    Assert.True(ReferenceEquals(snapshotAtDispose, catalogs.Current), "A disposed catalog service must stop replacing snapshots.");
+    Assert.Equal(0, changed, "A disposed catalog service must stop forwarding shortcut changes.");
+}
+
+static void ApplicationComposesOneSharedShortcutWheelGraph()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+
+    Assert.Equal(1, source.Split("new ShortcutService(_paths, _logger)", StringSplitOptions.None).Length - 1, "App startup should construct exactly one shortcut service from shared paths and logging.");
+    Assert.Equal(1, source.Split("_shortcutService.Load();", StringSplitOptions.None).Length - 1, "App startup should load the shared shortcut service exactly once.");
+    Assert.Contains(source, "new WheelCatalogService(skin.Expressions, _shortcutService)", "The live catalog should observe the shared shortcut service.");
+    Assert.Equal(1, source.Split("new ShortcutDropHandler(_shortcutService)", StringSplitOptions.None).Length - 1, "App startup should construct one shared drop handler.");
+    Assert.Equal(1, source.Split("new ShortcutLauncher(_logger)", StringSplitOptions.None).Length - 1, "App startup should construct one shared launcher.");
+    Assert.Contains(source, "new PetWindow(assets, _logger, _wheelCatalogService, _shortcutService, _shortcutDropHandler, _shortcutLauncher)", "The production window should receive the shared service graph.");
+    Assert.Contains(source, "_wheelCatalogService?.Dispose();", "Application shutdown should release the catalog subscription.");
+}
+
+static void PetWindowFollowsLiveWheelCatalogSnapshots()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(source, "WheelCatalogService wheelCatalogService", "PetWindow should receive the live catalog service instead of a frozen snapshot.");
+    Assert.Contains(source, "_wheelCatalogService.Changed += OnWheelCatalogChanged;", "PetWindow should observe live catalog changes.");
+    Assert.Contains(source, "Dispatcher.InvokeAsync(RefreshWheelCatalog)", "Catalog refresh should be marshalled to the window dispatcher.");
+    Assert.Contains(source, "_wheelCatalog = _wheelCatalogService.Current;", "A refresh should install the latest catalog snapshot.");
+    Assert.Contains(source, "_radialWheelController = new RadialWheelController(_wheelCatalog);", "A refresh should replace the controller bound to the old snapshot.");
+    Assert.Contains(source, "CloseRadialWheel(cancelController: true", "Refreshing should safely close an open wheel before replacing state.");
+    Assert.Contains(source, "BuildFirstRadialWheelRing();", "Refreshing should rebuild the category ring.");
+    Assert.Contains(source, "_wheelCatalogService.Changed -= OnWheelCatalogChanged;", "Window close should unsubscribe from catalog changes.");
 }
 
 static void RadialWheelSelectorDistinguishesAllPointerRegions()

@@ -1,7 +1,39 @@
 namespace CastoPet.Core;
 
-public static class WheelCatalogService
+public sealed class WheelCatalogService : IDisposable
 {
+    private readonly PetExpressionDefinition[] _expressions;
+    private readonly ShortcutService _shortcuts;
+    private readonly object _gate = new();
+    private WheelCatalog _current;
+    private bool _disposed;
+
+    public WheelCatalogService(
+        IEnumerable<PetExpressionDefinition> expressions,
+        ShortcutService shortcuts)
+    {
+        ArgumentNullException.ThrowIfNull(expressions);
+        ArgumentNullException.ThrowIfNull(shortcuts);
+
+        _expressions = expressions.ToArray();
+        _shortcuts = shortcuts;
+        _current = CreateCurrent();
+        _shortcuts.Changed += OnShortcutsChanged;
+    }
+
+    public event EventHandler? Changed;
+
+    public WheelCatalog Current
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _current;
+            }
+        }
+    }
+
     public static WheelCatalog Create(
         IEnumerable<PetExpressionDefinition> expressions,
         IEnumerable<WheelActionItem> shortcuts)
@@ -38,5 +70,46 @@ public static class WheelCatalogService
         ];
 
         return new WheelCatalog(categories);
+    }
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _shortcuts.Changed -= OnShortcutsChanged;
+        }
+    }
+
+    private void OnShortcutsChanged(object? sender, EventArgs e)
+    {
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _current = CreateCurrent();
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private WheelCatalog CreateCurrent()
+    {
+        var shortcutItems = _shortcuts.GetAll()
+            .Select(shortcut => new WheelActionItem(
+                shortcut.Id,
+                shortcut.Name,
+                WheelActionType.Shortcut,
+                shortcut.Id))
+            .ToArray();
+        return Create(_expressions, shortcutItems);
     }
 }

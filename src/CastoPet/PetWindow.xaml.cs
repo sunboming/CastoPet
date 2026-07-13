@@ -52,11 +52,12 @@ public partial class PetWindow : Window
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyList<ImageSource> _moveFrames;
     private readonly IReadOnlyDictionary<string, PetExpressionAsset> _expressionAssetsById;
-    private readonly WheelCatalog _wheelCatalog;
+    private readonly WheelCatalogService _wheelCatalogService;
+    private WheelCatalog _wheelCatalog;
     private readonly ShortcutService _shortcutService;
     private readonly ShortcutDropHandler _shortcutDrops;
     private readonly ShortcutLauncher _shortcutLauncher;
-    private readonly RadialWheelController _radialWheelController;
+    private RadialWheelController _radialWheelController;
     private readonly ImageSource? _inputReactiveBase;
     private readonly PetActionDefinition _idleAction;
     private readonly PetActionDefinition _moveAction;
@@ -130,7 +131,7 @@ public partial class PetWindow : Window
     }
 
     private sealed record LegacyWheelDependencies(
-        WheelCatalog Catalog,
+        WheelCatalogService CatalogService,
         ShortcutService Shortcuts,
         ShortcutDropHandler Drops,
         ShortcutLauncher Launcher);
@@ -147,7 +148,7 @@ public partial class PetWindow : Window
         : this(
             assets,
             logger,
-            dependencies.Catalog,
+            dependencies.CatalogService,
             dependencies.Shortcuts,
             dependencies.Drops,
             dependencies.Launcher)
@@ -157,14 +158,15 @@ public partial class PetWindow : Window
     public PetWindow(
         AssetService assets,
         LoggingService logger,
-        WheelCatalog wheelCatalog,
+        WheelCatalogService wheelCatalogService,
         ShortcutService shortcutService,
         ShortcutDropHandler shortcutDrops,
         ShortcutLauncher shortcutLauncher)
     {
         InitializeComponent();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _wheelCatalog = wheelCatalog ?? throw new ArgumentNullException(nameof(wheelCatalog));
+        _wheelCatalogService = wheelCatalogService ?? throw new ArgumentNullException(nameof(wheelCatalogService));
+        _wheelCatalog = _wheelCatalogService.Current;
         _shortcutService = shortcutService ?? throw new ArgumentNullException(nameof(shortcutService));
         _shortcutDrops = shortcutDrops ?? throw new ArgumentNullException(nameof(shortcutDrops));
         _shortcutLauncher = shortcutLauncher ?? throw new ArgumentNullException(nameof(shortcutLauncher));
@@ -233,6 +235,7 @@ public partial class PetWindow : Window
                 MessageBoxImage.Error);
         }
 
+        _wheelCatalogService.Changed += OnWheelCatalogChanged;
         BuildFirstRadialWheelRing();
 
         Loaded += (_, _) =>
@@ -250,6 +253,7 @@ public partial class PetWindow : Window
         };
         Closed += (_, _) =>
         {
+            _wheelCatalogService.Changed -= OnWheelCatalogChanged;
             StopInputReactiveMode();
             CloseRadialWheel(cancelController: true, restoreAnimation: false);
             _inputHookService.InputReceived -= OnInputReactiveInputReceived;
@@ -268,16 +272,9 @@ public partial class PetWindow : Window
     {
         var shortcutService = new ShortcutService(new AppPaths(), logger);
         shortcutService.Load();
-        var shortcutItems = shortcutService.GetAll()
-            .Select(shortcut => new WheelActionItem(
-                shortcut.Id,
-                shortcut.Name,
-                WheelActionType.Shortcut,
-                shortcut.Id))
-            .ToArray();
-        var catalog = WheelCatalogService.Create(assets.Skin.Expressions, shortcutItems);
+        var catalogService = new WheelCatalogService(assets.Skin.Expressions, shortcutService);
         return new LegacyWheelDependencies(
-            catalog,
+            catalogService,
             shortcutService,
             new ShortcutDropHandler(shortcutService),
             new ShortcutLauncher(logger));
@@ -1101,6 +1098,36 @@ public partial class PetWindow : Window
         CharacterScaleTransform.BeginAnimation(
             ScaleTransform.ScaleYProperty,
             new WpfAnimation.DoubleAnimation(scaleY, animationDuration) { EasingFunction = easing });
+    }
+
+    private void OnWheelCatalogChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            RefreshWheelCatalog();
+            return;
+        }
+
+        if (!Dispatcher.HasShutdownStarted)
+        {
+            _ = Dispatcher.InvokeAsync(RefreshWheelCatalog);
+        }
+    }
+
+    private void RefreshWheelCatalog()
+    {
+        if (_isRadialWheelOpen || _radialWheelController.IsOpen)
+        {
+            CloseRadialWheel(cancelController: true);
+        }
+
+        _wheelCatalog = _wheelCatalogService.Current;
+        _radialWheelController = new RadialWheelController(_wheelCatalog);
+        _secondRingContentKey = "closed";
+        SecondRingSurface.Children.Clear();
+        _secondRingVisuals.Clear();
+        SecondRingSurface.Visibility = Visibility.Collapsed;
+        BuildFirstRadialWheelRing();
     }
 
     private void BuildFirstRadialWheelRing()

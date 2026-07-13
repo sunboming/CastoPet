@@ -14,6 +14,10 @@ public partial class App : System.Windows.Application
     private PetWindow? _window;
     private SettingsWindowService? _settingsWindow;
     private UpdateCoordinator? _updates;
+    private ShortcutService? _shortcutService;
+    private WheelCatalogService? _wheelCatalogService;
+    private ShortcutDropHandler? _shortcutDropHandler;
+    private ShortcutLauncher? _shortcutLauncher;
     private int _crashRecorded;
 
     public App()
@@ -50,7 +54,12 @@ public partial class App : System.Windows.Application
         var skinSelectionService = new PetSkinSelectionService(_logger);
         var skin = skinSelectionService.LoadCurrentSkin(settings);
         var assets = new AssetService(_logger, skin);
-        _window = new PetWindow(assets, _logger);
+        _shortcutService = new ShortcutService(_paths, _logger);
+        _shortcutService.Load();
+        _wheelCatalogService = new WheelCatalogService(skin.Expressions, _shortcutService);
+        _shortcutDropHandler = new ShortcutDropHandler(_shortcutService);
+        _shortcutLauncher = new ShortcutLauncher(_logger);
+        _window = new PetWindow(assets, _logger, _wheelCatalogService, _shortcutService, _shortcutDropHandler, _shortcutLauncher);
         var commands = new MenuCommandService(
             _window,
             settings,
@@ -80,6 +89,7 @@ public partial class App : System.Windows.Application
         _logger.Info("CastoPet shutdown.");
         _tray?.Dispose();
         _settingsWindow?.Dispose();
+        _wheelCatalogService?.Dispose();
         _singleInstance?.Dispose();
         DispatcherUnhandledException -= OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException -= OnDomainUnhandledException;
