@@ -13,6 +13,9 @@
         SizeToContent="Manual">
     <Grid x:Name="RootGrid" Background="Transparent">
         <Image x:Name="CharacterImage"
+               AllowDrop="True"
+               DragOver="OnPetDragOver"
+               Drop="OnPetDrop"
                Stretch="Uniform"
                SnapsToDevicePixels="True"
                RenderOptions.BitmapScalingMode="HighQuality"
@@ -31,31 +34,35 @@
                 Visibility="Collapsed"
                 IsHitTestVisible="False" />
 
-        <Canvas x:Name="ExpressionWheelOverlay"
-                Visibility="Collapsed"
-                IsHitTestVisible="False">
-            <Canvas x:Name="ExpressionWheelSurface"
-                    Width="280"
-                    Height="280"
-                    RenderTransformOrigin="0.5,0.5">
+        <Popup x:Name="RadialWheelOverlay"
+               AllowsTransparency="True"
+               IsHitTestVisible="False"
+               Placement="AbsolutePoint"
+               StaysOpen="True">
+            <Canvas x:Name="RadialWheelSurface"
+                    Width="436"
+                    Height="436"
+                    Background="Transparent"
+                    RenderTransformOrigin="0.5,0.5"
+                    SnapsToDevicePixels="True">
                 <Canvas.RenderTransform>
-                    <ScaleTransform x:Name="ExpressionWheelScaleTransform" ScaleX="1" ScaleY="1" />
+                    <ScaleTransform x:Name="RadialWheelScaleTransform" ScaleX="1" ScaleY="1" />
                 </Canvas.RenderTransform>
-                <Ellipse Width="256"
-                         Height="256"
-                         Canvas.Left="12"
-                         Canvas.Top="12"
-                         Fill="#70322355"
-                         Stroke="#B8DDC8FF"
-                         StrokeThickness="1.5" />
-                <Ellipse Width="84"
-                         Height="84"
-                         Canvas.Left="98"
-                         Canvas.Top="98"
-                         Fill="#6630224D"
-                         Stroke="#80FFFFFF"
+                <Canvas x:Name="SecondRingSurface"
+                        Width="436"
+                        Height="436"
+                        Visibility="Collapsed" />
+                <Canvas x:Name="FirstRingSurface"
+                        Width="436"
+                        Height="436" />
+                <Ellipse Width="68"
+                         Height="68"
+                         Canvas.Left="184"
+                         Canvas.Top="184"
+                         Fill="#78352757"
+                         Stroke="#92F5EEFF"
                          StrokeThickness="1" />
             </Canvas>
-        </Canvas>
+        </Popup>
     </Grid>
 </Window>

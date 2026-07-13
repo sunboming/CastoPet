@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -7,6 +9,10 @@ using WpfControls = System.Windows.Controls;
 using WpfInput = System.Windows.Input;
 using WpfAnimation = System.Windows.Media.Animation;
 using WpfColor = System.Windows.Media.Color;
+using WpfDataFormats = System.Windows.DataFormats;
+using WpfDragDropEffects = System.Windows.DragDropEffects;
+using WpfDragEventArgs = System.Windows.DragEventArgs;
+using WpfDataObject = System.Windows.IDataObject;
 using WpfPoint = System.Windows.Point;
 using WpfShapes = System.Windows.Shapes;
 using WpfSize = System.Windows.Size;
@@ -20,6 +26,8 @@ public partial class PetWindow : Window
     private static readonly TimeSpan DefaultExpressionTransitionFrameInterval = TimeSpan.FromMilliseconds(55);
     private static readonly TimeSpan DefaultBlinkMinScheduleDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan DefaultBlinkMaxScheduleDelay = TimeSpan.FromSeconds(7);
+    private static readonly TimeSpan RadialWheelPointerProbeInterval = TimeSpan.FromMilliseconds(16);
+    private static readonly string[] UrlDropFormats = ["UniformResourceLocatorW", "UniformResourceLocator"];
     private const double DefaultMoveDistancePerFrame = 10;
     private const double DefaultMoveBaseSpeedPixelsPerSecond = 90;
     private const double DefaultMoveMinSpeedPixelsPerSecond = 80;
@@ -35,14 +43,20 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _blinkScheduleTimer;
     private readonly DispatcherTimer _blinkFrameTimer;
     private readonly DispatcherTimer _dragRestoreTimer;
-    private readonly DispatcherTimer _expressionWheelHoldTimer;
+    private readonly DispatcherTimer _radialWheelHoldTimer;
+    private readonly DispatcherTimer _radialWheelPointerProbeTimer;
     private readonly DispatcherTimer _temporaryExpressionTimer;
     private readonly DispatcherTimer _expressionTransitionFrameTimer;
     private readonly DispatcherTimer _activeMovementProbeTimer;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyList<ImageSource> _moveFrames;
-    private readonly IReadOnlyDictionary<ExpressionWheelItem, PetExpressionAsset> _expressionAssets;
+    private readonly IReadOnlyDictionary<string, PetExpressionAsset> _expressionAssetsById;
+    private readonly WheelCatalog _wheelCatalog;
+    private readonly ShortcutService _shortcutService;
+    private readonly ShortcutDropHandler _shortcutDrops;
+    private readonly ShortcutLauncher _shortcutLauncher;
+    private readonly RadialWheelController _radialWheelController;
     private readonly ImageSource? _inputReactiveBase;
     private readonly PetActionDefinition _idleAction;
     private readonly PetActionDefinition _moveAction;
@@ -53,27 +67,28 @@ public partial class PetWindow : Window
     private readonly WindowsInputHookService _inputHookService = new();
     private readonly DispatcherTimer _inputReactiveRenderTimer;
     private readonly WindowsCursorService _cursorService = new();
-    private readonly List<ExpressionWheelItem> _expressionWheelItems = new();
-    private readonly List<FrameworkElement> _expressionWheelItemVisuals = new();
-    private readonly List<WpfShapes.Path> _expressionWheelSectorVisuals = new();
-    private readonly List<WpfControls.TextBlock> _expressionWheelLabelVisuals = new();
-    private readonly List<WpfShapes.Line> _expressionWheelDividerVisuals = new();
+    private readonly List<RadialWheelItemVisual> _firstRingVisuals = new();
+    private readonly List<RadialWheelItemVisual> _secondRingVisuals = new();
     private readonly Random _blinkRandom = new();
     private readonly Random _movementRandom = new();
     private PetWindowSettingsSnapshot? _pendingSettings;
     private PetMovementTarget _activeMovementTarget;
     private DateTime _nextWanderDecisionUtc = DateTime.MinValue;
-    private WpfPoint _expressionWheelOrigin;
+    private WpfPoint _requestedRadialWheelOrigin;
+    private WpfPoint _radialWheelOrigin;
+    private WpfPoint _lastRadialWheelPointer;
     private bool _applySettingsOnSourceInitialized;
     private bool _isClickThrough;
     private bool _isDragging;
     private bool _isBlinking;
-    private bool _isExpressionWheelOpen;
+    private bool _isRadialWheelOpen;
+    private bool _hasRadialWheelPointer;
+    private bool _hasRadialWheelPointerEntered;
     private bool _activeMovementEnabled;
     private bool _pushCursorEnabled;
     private bool _inputReactiveModeEnabled;
     private bool _hasActiveMovementTarget;
-    private int? _selectedExpressionWheelIndex;
+    private string _secondRingContentKey = "closed";
     private PetExpressionAsset? _pendingExpressionAsset;
     private PetExpressionAsset? _activeExpressionAsset;
     private IReadOnlyList<ImageSource> _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
@@ -103,10 +118,57 @@ public partial class PetWindow : Window
         Out,
     }
 
+    private sealed class RadialWheelItemVisual(
+        WpfShapes.Path sector,
+        WpfControls.TextBlock label,
+        bool isEnabled)
+    {
+        public WpfShapes.Path Sector { get; } = sector;
+        public WpfControls.TextBlock Label { get; } = label;
+        public bool IsEnabled { get; } = isEnabled;
+        public bool IsSelected { get; set; }
+    }
+
+    private sealed record LegacyWheelDependencies(
+        WheelCatalog Catalog,
+        ShortcutService Shortcuts,
+        ShortcutDropHandler Drops,
+        ShortcutLauncher Launcher);
+
     public PetWindow(AssetService assets, LoggingService logger)
+        : this(assets, logger, CreateLegacyWheelDependencies(assets, logger))
+    {
+    }
+
+    private PetWindow(
+        AssetService assets,
+        LoggingService logger,
+        LegacyWheelDependencies dependencies)
+        : this(
+            assets,
+            logger,
+            dependencies.Catalog,
+            dependencies.Shortcuts,
+            dependencies.Drops,
+            dependencies.Launcher)
+    {
+    }
+
+    public PetWindow(
+        AssetService assets,
+        LoggingService logger,
+        WheelCatalog wheelCatalog,
+        ShortcutService shortcutService,
+        ShortcutDropHandler shortcutDrops,
+        ShortcutLauncher shortcutLauncher)
     {
         InitializeComponent();
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _wheelCatalog = wheelCatalog ?? throw new ArgumentNullException(nameof(wheelCatalog));
+        _shortcutService = shortcutService ?? throw new ArgumentNullException(nameof(shortcutService));
+        _shortcutDrops = shortcutDrops ?? throw new ArgumentNullException(nameof(shortcutDrops));
+        _shortcutLauncher = shortcutLauncher ?? throw new ArgumentNullException(nameof(shortcutLauncher));
+        _radialWheelController = new RadialWheelController(_wheelCatalog);
         _idleAction = assets.Skin.GetRequiredAction(PetActionKind.Idle);
         _moveAction = assets.Skin.GetRequiredAction(PetActionKind.Move);
         _blinkAction = assets.Skin.GetRequiredAction(PetActionKind.Blink);
@@ -124,8 +186,10 @@ public partial class PetWindow : Window
         _blinkFrameTimer.Tick += (_, _) => AdvanceBlinkFrame();
         _dragRestoreTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _dragRestoreTimer.Tick += (_, _) => RestoreAfterDrag();
-        _expressionWheelHoldTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.HoldDelay };
-        _expressionWheelHoldTimer.Tick += (_, _) => OpenExpressionWheel();
+        _radialWheelHoldTimer = new DispatcherTimer { Interval = WheelCatalog.HoldDelay };
+        _radialWheelHoldTimer.Tick += (_, _) => OpenRadialWheel();
+        _radialWheelPointerProbeTimer = new DispatcherTimer { Interval = RadialWheelPointerProbeInterval };
+        _radialWheelPointerProbeTimer.Tick += (_, _) => ProbeRadialWheelPointer();
         _temporaryExpressionTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.ExpressionDuration };
         _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
         _expressionTransitionFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_expressionTransitionInAction, DefaultExpressionTransitionFrameInterval) };
@@ -146,8 +210,9 @@ public partial class PetWindow : Window
             _inputReactiveBase = assets.TryLoadInputReactiveBase();
             _expressionTransitionInFrames = assets.LoadExpressionTransitionInFrames();
             _expressionTransitionOutFrames = assets.LoadExpressionTransitionOutFrames();
-            _expressionAssets = assets.LoadExpressionAssets();
-            BuildExpressionWheel(assets.Skin.Expressions);
+            _expressionAssetsById = assets.LoadExpressionAssets()
+                .Values
+                .ToDictionary(asset => asset.Definition.Id, StringComparer.OrdinalIgnoreCase);
             CharacterImage.Source = GetCurrentIdleFrame();
         }
         catch
@@ -160,13 +225,15 @@ public partial class PetWindow : Window
             _inputReactiveBase = null;
             _expressionTransitionInFrames = Array.Empty<ImageSource>();
             _expressionTransitionOutFrames = Array.Empty<ImageSource>();
-            _expressionAssets = new Dictionary<ExpressionWheelItem, PetExpressionAsset>();
+            _expressionAssetsById = new Dictionary<string, PetExpressionAsset>(StringComparer.OrdinalIgnoreCase);
             System.Windows.MessageBox.Show(
                 "CastoPet 无法加载内置角色图片 Castorice.png。",
                 "CastoPet",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+
+        BuildFirstRadialWheelRing();
 
         Loaded += (_, _) =>
         {
@@ -184,6 +251,7 @@ public partial class PetWindow : Window
         Closed += (_, _) =>
         {
             StopInputReactiveMode();
+            CloseRadialWheel(cancelController: true, restoreAnimation: false);
             _inputHookService.InputReceived -= OnInputReactiveInputReceived;
             _inputHookService.Dispose();
         };
@@ -191,6 +259,28 @@ public partial class PetWindow : Window
         MouseRightButtonDown += OnMouseRightButtonDown;
         MouseRightButtonUp += OnMouseRightButtonUp;
         MouseMove += OnMouseMove;
+        PreviewKeyDown += OnPreviewKeyDown;
+    }
+
+    private static LegacyWheelDependencies CreateLegacyWheelDependencies(
+        AssetService assets,
+        LoggingService logger)
+    {
+        var shortcutService = new ShortcutService(new AppPaths(), logger);
+        shortcutService.Load();
+        var shortcutItems = shortcutService.GetAll()
+            .Select(shortcut => new WheelActionItem(
+                shortcut.Id,
+                shortcut.Name,
+                WheelActionType.Shortcut,
+                shortcut.Id))
+            .ToArray();
+        var catalog = WheelCatalogService.Create(assets.Skin.Expressions, shortcutItems);
+        return new LegacyWheelDependencies(
+            catalog,
+            shortcutService,
+            new ShortcutDropHandler(shortcutService),
+            new ShortcutLauncher(logger));
     }
 
     public void ApplySettings(AppSettings settings)
@@ -287,7 +377,7 @@ public partial class PetWindow : Window
             && IsVisible
             && !_isDragging
             && !_dragRestoreTimer.IsEnabled
-            && !_isExpressionWheelOpen
+            && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _expressionTransitionMode == ExpressionTransitionMode.None;
     }
@@ -334,7 +424,7 @@ public partial class PetWindow : Window
 
         if (restoreIdle
             && !_isDragging
-            && !_isExpressionWheelOpen
+            && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _expressionTransitionMode == ExpressionTransitionMode.None)
         {
@@ -461,46 +551,80 @@ public partial class PetWindow : Window
 
     private void OnMouseRightButtonDown(object sender, WpfInput.MouseButtonEventArgs e)
     {
-        if (_isClickThrough || e.ButtonState != WpfInput.MouseButtonState.Pressed || _expressionWheelItems.Count == 0)
+        if (_isClickThrough || e.ButtonState != WpfInput.MouseButtonState.Pressed || _wheelCatalog.Categories.Count == 0)
         {
             return;
         }
 
-        _expressionWheelOrigin = e.GetPosition(RootGrid);
-        _selectedExpressionWheelIndex = null;
-        _expressionWheelHoldTimer.Stop();
-        _expressionWheelHoldTimer.Start();
+        if (_isRadialWheelOpen)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        _requestedRadialWheelOrigin = ToScreenPoint(e.GetPosition(RootGrid));
+        _radialWheelHoldTimer.Stop();
+        _radialWheelHoldTimer.Start();
     }
 
     private void OnMouseMove(object sender, WpfInput.MouseEventArgs e)
     {
-        if (!_isExpressionWheelOpen)
+        if (!_isRadialWheelOpen)
         {
             return;
         }
 
-        UpdateExpressionWheelSelection(e.GetPosition(RootGrid));
+        UpdateRadialWheelPointer(e.GetPosition(RootGrid), DateTimeOffset.UtcNow);
     }
 
     private void OnMouseRightButtonUp(object sender, WpfInput.MouseButtonEventArgs e)
     {
-        _expressionWheelHoldTimer.Stop();
+        _radialWheelHoldTimer.Stop();
 
-        if (!_isExpressionWheelOpen)
+        if (!_isRadialWheelOpen)
         {
             return;
         }
 
-        UpdateExpressionWheelSelection(e.GetPosition(RootGrid));
-        var selectedIndex = _selectedExpressionWheelIndex;
-        CloseExpressionWheel();
-        ReleaseMouseCapture();
+        UpdateRadialWheelPointer(e.GetPosition(RootGrid), DateTimeOffset.UtcNow);
         e.Handled = true;
-
-        if (selectedIndex is int index)
+        if (!_isRadialWheelOpen)
         {
-            ApplyTemporaryExpression(index);
+            return;
         }
+
+        var selection = RadialWheelSelector.GetSelection(
+            _lastRadialWheelPointer.X,
+            _lastRadialWheelPointer.Y,
+            _wheelCatalog.Categories.Count,
+            _radialWheelController.VisibleSecondLevelItems.Count);
+        var result = selection.Ring == RadialWheelRing.Second
+            ? _radialWheelController.Release()
+            : _radialWheelController.Cancel();
+
+        if (result.Kind == WheelReleaseKind.PageChanged)
+        {
+            RefreshRadialWheelVisuals(forceSecondRingRebuild: true);
+            return;
+        }
+
+        CloseRadialWheel(cancelController: false);
+        if (result.Kind == WheelReleaseKind.Execute && result.Action is not null)
+        {
+            ExecuteWheelAction(result.Action);
+        }
+    }
+
+    private void OnPreviewKeyDown(object sender, WpfInput.KeyEventArgs e)
+    {
+        if (!_isRadialWheelOpen || e.Key != WpfInput.Key.Escape)
+        {
+            return;
+        }
+
+        _radialWheelController.Cancel();
+        CloseRadialWheel(cancelController: false);
+        e.Handled = true;
     }
 
     private void BeginDrag()
@@ -552,7 +676,7 @@ public partial class PetWindow : Window
             && !_isClickThrough
             && !_isDragging
             && !_dragRestoreTimer.IsEnabled
-            && !_isExpressionWheelOpen
+            && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _expressionTransitionMode == ExpressionTransitionMode.None;
     }
@@ -979,190 +1103,193 @@ public partial class PetWindow : Window
             new WpfAnimation.DoubleAnimation(scaleY, animationDuration) { EasingFunction = easing });
     }
 
-    private void BuildExpressionWheel(IReadOnlyList<PetExpressionDefinition> expressions)
+    private void BuildFirstRadialWheelRing()
     {
-        foreach (var expression in expressions)
+        FirstRingSurface.Children.Clear();
+        _firstRingVisuals.Clear();
+        for (var index = 0; index < _wheelCatalog.Categories.Count; index++)
         {
-            var item = new ExpressionWheelItem(expression.Label, expression.ResourcePath);
-            if (!_expressionAssets.ContainsKey(item))
-            {
-                continue;
-            }
-
-            var visual = CreateExpressionWheelItemVisual(item);
-            _expressionWheelItems.Add(item);
-            _expressionWheelItemVisuals.Add(visual);
-            ExpressionWheelSurface.Children.Add(visual);
+            var category = _wheelCatalog.Categories[index];
+            _firstRingVisuals.Add(AddRadialWheelItem(
+                FirstRingSurface,
+                category.DisplayName,
+                index,
+                _wheelCatalog.Categories.Count,
+                WheelCatalog.InnerRadius,
+                WheelCatalog.FirstRingOuterRadius,
+                isEnabled: true,
+                isSecondRing: false));
         }
-
-        PositionExpressionWheelItems();
-        BuildExpressionWheelDividers();
     }
 
-    private FrameworkElement CreateExpressionWheelItemVisual(ExpressionWheelItem item)
+    private void BuildSecondRadialWheelRing()
     {
-        var itemIndex = _expressionWheelItems.Count;
-        var itemCount = _expressionAssets.Count;
+        SecondRingSurface.Children.Clear();
+        _secondRingVisuals.Clear();
+        var items = _radialWheelController.VisibleSecondLevelItems;
+        for (var index = 0; index < items.Count; index++)
+        {
+            var item = items[index];
+            _secondRingVisuals.Add(AddRadialWheelItem(
+                SecondRingSurface,
+                item.DisplayName,
+                index,
+                items.Count,
+                WheelCatalog.FirstRingOuterRadius,
+                WheelCatalog.SecondRingOuterRadius,
+                item.IsEnabled,
+                isSecondRing: true));
+        }
+
+        SecondRingSurface.Visibility = _radialWheelController.IsSecondLevelOpen
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private RadialWheelItemVisual AddRadialWheelItem(
+        WpfControls.Canvas surface,
+        string displayName,
+        int index,
+        int count,
+        double innerRadius,
+        double outerRadius,
+        bool isEnabled,
+        bool isSecondRing)
+    {
         var panel = new WpfControls.Canvas
         {
-            Width = ExpressionWheelSurface.Width,
-            Height = ExpressionWheelSurface.Height,
-            RenderTransformOrigin = new WpfPoint(0.5, 0.5),
-            RenderTransform = new ScaleTransform(1, 1),
-            Opacity = 1,
+            Width = RadialWheelSurface.Width,
+            Height = RadialWheelSurface.Height,
+            IsHitTestVisible = false,
+            Opacity = isEnabled ? 1 : 0.52,
         };
-
         var sector = new WpfShapes.Path
         {
-            Data = CreateExpressionWheelSectorGeometry(itemIndex, itemCount),
-            Fill = new SolidColorBrush(WpfColor.FromArgb(78, 67, 43, 111)),
-            Stroke = new SolidColorBrush(WpfColor.FromArgb(72, 234, 224, 255)),
-            StrokeThickness = 0.75,
+            Data = CreateRadialWheelSectorGeometry(index, count, innerRadius, outerRadius),
+            Fill = new SolidColorBrush(isSecondRing
+                ? WpfColor.FromArgb(102, 77, 50, 122)
+                : WpfColor.FromArgb(116, 61, 39, 101)),
+            Stroke = new SolidColorBrush(WpfColor.FromArgb(122, 236, 224, 255)),
+            StrokeThickness = 1,
         };
         panel.Children.Add(sector);
-        _expressionWheelSectorVisuals.Add(sector);
 
         var label = new WpfControls.TextBlock
         {
-            Text = item.Label,
-            Foreground = new SolidColorBrush(WpfColor.FromArgb(224, 255, 255, 255)),
-            FontSize = 12,
+            Text = displayName,
+            Foreground = new SolidColorBrush(WpfColor.FromArgb(232, 255, 255, 255)),
+            FontSize = isSecondRing ? 11.5 : 13,
             FontWeight = FontWeights.SemiBold,
             TextAlignment = TextAlignment.Center,
-            Width = 78,
-            Opacity = 0.78,
+            TextWrapping = TextWrapping.Wrap,
+            Width = isSecondRing ? 88 : 96,
+            MaxHeight = 40,
+            Opacity = isEnabled ? 0.84 : 0.6,
             RenderTransformOrigin = new WpfPoint(0.5, 0.5),
             RenderTransform = new ScaleTransform(1, 1),
             Effect = new System.Windows.Media.Effects.DropShadowEffect
             {
-                Color = WpfColor.FromArgb(160, 45, 28, 72),
+                Color = WpfColor.FromArgb(170, 40, 25, 68),
                 BlurRadius = 7,
                 ShadowDepth = 0,
-                Opacity = 0.75,
+                Opacity = 0.78,
             },
         };
+        var center = RadialWheelSurface.Width / 2;
+        var labelRadius = (innerRadius + outerRadius) / 2;
+        var labelAngle = count == 1
+            ? -Math.PI / 2
+            : -Math.PI / 2 + (index + 0.5) * Math.Tau / count;
+        var labelCenter = PointOnWheel(center, labelRadius, labelAngle);
+        WpfControls.Canvas.SetLeft(label, labelCenter.X - label.Width / 2);
+        WpfControls.Canvas.SetTop(label, labelCenter.Y - (isSecondRing ? 15 : 12));
         panel.Children.Add(label);
-        _expressionWheelLabelVisuals.Add(label);
-
-        return panel;
+        surface.Children.Add(panel);
+        return new RadialWheelItemVisual(sector, label, isEnabled);
     }
 
-    private void PositionExpressionWheelItems()
+    private Geometry CreateRadialWheelSectorGeometry(
+        int index,
+        int count,
+        double innerRadius,
+        double outerRadius)
     {
-        var center = ExpressionWheelSurface.Width / 2;
-        var radius = 96d;
-
-        for (var index = 0; index < _expressionWheelItemVisuals.Count; index++)
+        var center = RadialWheelSurface.Width / 2;
+        if (count == 1)
         {
-            WpfControls.Canvas.SetLeft(_expressionWheelItemVisuals[index], 0);
-            WpfControls.Canvas.SetTop(_expressionWheelItemVisuals[index], 0);
-
-            var angle = -Math.PI / 2 + index * 2 * Math.PI / _expressionWheelItemVisuals.Count;
-            var label = _expressionWheelLabelVisuals[index];
-            var x = center + Math.Cos(angle) * radius - label.Width / 2;
-            var y = center + Math.Sin(angle) * radius - 10;
-            WpfControls.Canvas.SetLeft(label, x);
-            WpfControls.Canvas.SetTop(label, y);
-        }
-    }
-
-    private void BuildExpressionWheelDividers()
-    {
-        var count = _expressionWheelItems.Count;
-        if (count == 0)
-        {
-            return;
+            return new CombinedGeometry(
+                GeometryCombineMode.Exclude,
+                new EllipseGeometry(new WpfPoint(center, center), outerRadius, outerRadius),
+                new EllipseGeometry(new WpfPoint(center, center), innerRadius, innerRadius));
         }
 
-        var center = ExpressionWheelSurface.Width / 2;
-        var innerRadius = ExpressionWheelCatalog.WheelInnerDiameter / 2;
-        var outerRadius = ExpressionWheelCatalog.WheelOuterDiameter / 2;
-        var halfStep = Math.PI / count;
-
-        for (var index = 0; index < count; index++)
-        {
-            var angle = -Math.PI / 2 - halfStep + index * 2 * Math.PI / count;
-            var inner = PointOnWheel(center, innerRadius, angle);
-            var outer = PointOnWheel(center, outerRadius, angle);
-            var divider = new WpfShapes.Line
-            {
-                X1 = inner.X,
-                Y1 = inner.Y,
-                X2 = outer.X,
-                Y2 = outer.Y,
-                Stroke = new SolidColorBrush(WpfColor.FromArgb(120, 233, 220, 255)),
-                StrokeThickness = 1,
-                SnapsToDevicePixels = true,
-            };
-            _expressionWheelDividerVisuals.Add(divider);
-            ExpressionWheelSurface.Children.Add(divider);
-        }
-    }
-
-    private Geometry CreateExpressionWheelSectorGeometry(int index, int count)
-    {
-        var center = ExpressionWheelSurface.Width / 2;
-        var outerRadius = ExpressionWheelCatalog.WheelOuterDiameter / 2;
-        var innerRadius = ExpressionWheelCatalog.WheelInnerDiameter / 2;
-        var step = 2 * Math.PI / count;
-        var gap = 0.012;
-        var startAngle = -Math.PI / 2 + index * step - step / 2 + gap;
-        var endAngle = -Math.PI / 2 + index * step + step / 2 - gap;
+        var step = Math.Tau / count;
+        const double gap = 0.012;
+        var startAngle = -Math.PI / 2 + index * step + gap;
+        var endAngle = -Math.PI / 2 + (index + 1) * step - gap;
         var outerStart = PointOnWheel(center, outerRadius, startAngle);
         var outerEnd = PointOnWheel(center, outerRadius, endAngle);
         var innerEnd = PointOnWheel(center, innerRadius, endAngle);
         var innerStart = PointOnWheel(center, innerRadius, startAngle);
-
+        var isLargeArc = endAngle - startAngle > Math.PI;
         var figure = new PathFigure
         {
             StartPoint = outerStart,
             IsClosed = true,
         };
-        figure.Segments.Add(new ArcSegment(outerEnd, new WpfSize(outerRadius, outerRadius), 0, false, SweepDirection.Clockwise, true));
+        figure.Segments.Add(new ArcSegment(outerEnd, new WpfSize(outerRadius, outerRadius), 0, isLargeArc, SweepDirection.Clockwise, true));
         figure.Segments.Add(new LineSegment(innerEnd, true));
-        figure.Segments.Add(new ArcSegment(innerStart, new WpfSize(innerRadius, innerRadius), 0, false, SweepDirection.Counterclockwise, true));
-
-        return new PathGeometry(new[] { figure });
+        figure.Segments.Add(new ArcSegment(innerStart, new WpfSize(innerRadius, innerRadius), 0, isLargeArc, SweepDirection.Counterclockwise, true));
+        return new PathGeometry([figure]);
     }
 
-    private static WpfPoint PointOnWheel(double center, double radius, double angle)
+    private static WpfPoint PointOnWheel(double center, double radius, double angle) =>
+        new(center + Math.Cos(angle) * radius, center + Math.Sin(angle) * radius);
+
+    private WpfPoint ToScreenPoint(WpfPoint localPoint)
     {
-        return new WpfPoint(center + Math.Cos(angle) * radius, center + Math.Sin(angle) * radius);
+        var devicePoint = RootGrid.PointToScreen(localPoint);
+        var source = PresentationSource.FromVisual(this);
+        return source?.CompositionTarget is null
+            ? devicePoint
+            : source.CompositionTarget.TransformFromDevice.Transform(devicePoint);
     }
 
-    private void PositionExpressionWheelOverlay(WpfPoint origin)
+    private void PositionRadialWheelOverlay(WpfPoint requestedOrigin)
     {
-        var maxLeft = Math.Max(0, RootGrid.ActualWidth - ExpressionWheelSurface.Width);
-        var maxTop = Math.Max(0, RootGrid.ActualHeight - ExpressionWheelSurface.Height);
-        var left = Math.Clamp(origin.X - ExpressionWheelSurface.Width / 2, 0, maxLeft);
-        var top = Math.Clamp(origin.Y - ExpressionWheelSurface.Height / 2, 0, maxTop);
-        WpfControls.Canvas.SetLeft(ExpressionWheelSurface, left);
-        WpfControls.Canvas.SetTop(ExpressionWheelSurface, top);
-        _expressionWheelOrigin = new WpfPoint(left + ExpressionWheelSurface.Width / 2, top + ExpressionWheelSurface.Height / 2);
+        var halfWidth = RadialWheelSurface.Width / 2;
+        var halfHeight = RadialWheelSurface.Height / 2;
+        var workArea = SystemParameters.WorkArea;
+        var centerX = ClampWheelCenter(requestedOrigin.X, workArea.Left + halfWidth, workArea.Right - halfWidth);
+        var centerY = ClampWheelCenter(requestedOrigin.Y, workArea.Top + halfHeight, workArea.Bottom - halfHeight);
+        _radialWheelOrigin = new WpfPoint(centerX, centerY);
+        RadialWheelOverlay.HorizontalOffset = centerX - halfWidth;
+        RadialWheelOverlay.VerticalOffset = centerY - halfHeight;
     }
 
-    private void AnimateExpressionWheelOpen()
-    {
-        ExpressionWheelOverlay.Opacity = 0;
-        ExpressionWheelScaleTransform.ScaleX = PetAnimationTimings.WheelOpenStartScale;
-        ExpressionWheelScaleTransform.ScaleY = PetAnimationTimings.WheelOpenStartScale;
+    private static double ClampWheelCenter(double value, double minimum, double maximum) =>
+        minimum <= maximum ? Math.Clamp(value, minimum, maximum) : (minimum + maximum) / 2;
 
+    private void AnimateRadialWheelOpen()
+    {
+        RadialWheelSurface.Opacity = 0;
+        RadialWheelScaleTransform.ScaleX = PetAnimationTimings.WheelOpenStartScale;
+        RadialWheelScaleTransform.ScaleY = PetAnimationTimings.WheelOpenStartScale;
         var duration = new Duration(PetAnimationTimings.WheelOpenDuration);
         var easing = new WpfAnimation.BackEase
         {
             Amplitude = 0.2,
             EasingMode = WpfAnimation.EasingMode.EaseOut,
         };
-
-        ExpressionWheelOverlay.BeginAnimation(UIElement.OpacityProperty, new WpfAnimation.DoubleAnimation(1, duration));
-        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
-        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+        RadialWheelSurface.BeginAnimation(UIElement.OpacityProperty, new WpfAnimation.DoubleAnimation(1, duration));
+        RadialWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
+        RadialWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
     }
 
-    private void OpenExpressionWheel()
+    private void OpenRadialWheel()
     {
-        _expressionWheelHoldTimer.Stop();
-        if (_expressionWheelItems.Count == 0 || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
+        _radialWheelHoldTimer.Stop();
+        if (_wheelCatalog.Categories.Count == 0 || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
         {
             return;
         }
@@ -1171,67 +1298,359 @@ public partial class PetWindow : Window
         StopInputReactiveMode(restoreIdle: false);
         StopIdleAnimation();
         StopBlinkAnimation();
-        _isExpressionWheelOpen = true;
-        UpdateActiveMovementTimer();
-        _selectedExpressionWheelIndex = null;
-        PositionExpressionWheelOverlay(_expressionWheelOrigin);
-        ExpressionWheelOverlay.Visibility = Visibility.Visible;
-        AnimateExpressionWheelOpen();
+        _isRadialWheelOpen = true;
+        _hasRadialWheelPointer = false;
+        _hasRadialWheelPointerEntered = false;
+        _radialWheelController.Open(DateTimeOffset.UtcNow);
+        _secondRingContentKey = "";
+        PositionRadialWheelOverlay(_requestedRadialWheelOrigin);
+        RadialWheelOverlay.IsOpen = true;
+        AnimateRadialWheelOpen();
         CaptureMouse();
-        UpdateExpressionWheelVisualSelection();
+        _radialWheelPointerProbeTimer.Start();
+        RefreshRadialWheelVisuals(forceSecondRingRebuild: true);
+        UpdateActiveMovementTimer();
     }
 
-    private void CloseExpressionWheel()
+    private void CloseRadialWheel(bool cancelController, bool restoreAnimation = true)
     {
-        _isExpressionWheelOpen = false;
-        _selectedExpressionWheelIndex = null;
-        ExpressionWheelOverlay.Visibility = Visibility.Collapsed;
-        ExpressionWheelOverlay.BeginAnimation(UIElement.OpacityProperty, null);
-        ExpressionWheelOverlay.Opacity = 1;
-        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        ExpressionWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        ExpressionWheelScaleTransform.ScaleX = 1;
-        ExpressionWheelScaleTransform.ScaleY = 1;
-        UpdateExpressionWheelVisualSelection();
+        _radialWheelHoldTimer.Stop();
+        _radialWheelPointerProbeTimer.Stop();
+        if (cancelController && _radialWheelController.IsOpen)
+        {
+            _radialWheelController.Cancel();
+        }
+
+        _isRadialWheelOpen = false;
+        _hasRadialWheelPointer = false;
+        _hasRadialWheelPointerEntered = false;
+        _secondRingContentKey = "closed";
+        SecondRingSurface.Visibility = Visibility.Collapsed;
+        RadialWheelOverlay.IsOpen = false;
+        RadialWheelSurface.BeginAnimation(UIElement.OpacityProperty, null);
+        RadialWheelSurface.Opacity = 1;
+        RadialWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        RadialWheelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        RadialWheelScaleTransform.ScaleX = 1;
+        RadialWheelScaleTransform.ScaleY = 1;
+        if (WpfInput.Mouse.Captured == this)
+        {
+            ReleaseMouseCapture();
+        }
+
+        UpdateRadialWheelSelectionVisuals(_firstRingVisuals, -1);
+        UpdateRadialWheelSelectionVisuals(_secondRingVisuals, -1);
+        if (!restoreAnimation)
+        {
+            return;
+        }
+
         UpdateInputReactiveMode();
         StartIdleAnimation();
         ScheduleNextBlink();
         UpdateActiveMovementTimer();
     }
 
-    private void UpdateExpressionWheelSelection(WpfPoint position)
+    private void ProbeRadialWheelPointer()
     {
-        _selectedExpressionWheelIndex = ExpressionWheelSelector.GetSelectedIndex(
-            position.X,
-            position.Y,
-            _expressionWheelOrigin.X,
-            _expressionWheelOrigin.Y,
-            _expressionWheelItems.Count);
-        UpdateExpressionWheelVisualSelection();
+        if (_isRadialWheelOpen && _hasRadialWheelPointer)
+        {
+            UpdateRadialWheelController(_lastRadialWheelPointer, DateTimeOffset.UtcNow);
+        }
     }
 
-    private void UpdateExpressionWheelVisualSelection()
+    private void UpdateRadialWheelPointer(WpfPoint localPosition, DateTimeOffset now)
     {
-        for (var index = 0; index < _expressionWheelItemVisuals.Count; index++)
+        var screenPosition = ToScreenPoint(localPosition);
+        _lastRadialWheelPointer = new WpfPoint(
+            screenPosition.X - _radialWheelOrigin.X,
+            screenPosition.Y - _radialWheelOrigin.Y);
+        _hasRadialWheelPointer = true;
+        UpdateRadialWheelController(_lastRadialWheelPointer, now);
+    }
+
+    private void UpdateRadialWheelController(WpfPoint pointer, DateTimeOffset now)
+    {
+        var pointerRegion = RadialWheelSelector.GetSelection(
+            pointer.X,
+            pointer.Y,
+            _wheelCatalog.Categories.Count,
+            _radialWheelController.VisibleSecondLevelItems.Count);
+        if (!_hasRadialWheelPointerEntered && pointerRegion.Ring == RadialWheelRing.Outside)
         {
-            var isSelected = _selectedExpressionWheelIndex == index;
-            var scale = isSelected ? ExpressionWheelCatalog.SelectedScale : 1;
-            _expressionWheelSectorVisuals[index].Fill = new SolidColorBrush(isSelected ? WpfColor.FromArgb(138, 113, 78, 174) : WpfColor.FromArgb(78, 67, 43, 111));
-            _expressionWheelSectorVisuals[index].Stroke = new SolidColorBrush(isSelected ? WpfColor.FromArgb(200, 246, 235, 255) : WpfColor.FromArgb(72, 234, 224, 255));
-            _expressionWheelSectorVisuals[index].StrokeThickness = isSelected ? 1.25 : 0.75;
-            _expressionWheelLabelVisuals[index].Opacity = isSelected ? 1 : 0.78;
-            _expressionWheelLabelVisuals[index].FontWeight = isSelected ? FontWeights.Bold : FontWeights.SemiBold;
-            _expressionWheelLabelVisuals[index].Foreground = new SolidColorBrush(isSelected ? WpfColor.FromArgb(255, 255, 255, 255) : WpfColor.FromArgb(224, 255, 255, 255));
-            if (_expressionWheelLabelVisuals[index].RenderTransform is not ScaleTransform labelScale)
+            return;
+        }
+
+        _hasRadialWheelPointerEntered = true;
+        _radialWheelController.UpdatePointer(pointer.X, pointer.Y, now);
+        if (!_radialWheelController.IsOpen)
+        {
+            CloseRadialWheel(cancelController: false);
+            return;
+        }
+
+        RefreshRadialWheelVisuals(forceSecondRingRebuild: false);
+    }
+
+    private void RefreshRadialWheelVisuals(bool forceSecondRingRebuild)
+    {
+        var contentKey = _radialWheelController.IsSecondLevelOpen
+            ? $"{_radialWheelController.SelectedCategoryIndex}:{_radialWheelController.CurrentPage}:{string.Join(',', _radialWheelController.VisibleSecondLevelItems.Select(item => item.Id))}"
+            : "closed";
+        if (forceSecondRingRebuild || !string.Equals(_secondRingContentKey, contentKey, StringComparison.Ordinal))
+        {
+            _secondRingContentKey = contentKey;
+            BuildSecondRadialWheelRing();
+        }
+
+        UpdateRadialWheelSelectionVisuals(_firstRingVisuals, _radialWheelController.SelectedCategoryIndex);
+        UpdateRadialWheelSelectionVisuals(_secondRingVisuals, _radialWheelController.SelectedSecondLevelIndex);
+    }
+
+    private static void UpdateRadialWheelSelectionVisuals(
+        IReadOnlyList<RadialWheelItemVisual> visuals,
+        int selectedIndex)
+    {
+        for (var index = 0; index < visuals.Count; index++)
+        {
+            var visual = visuals[index];
+            var isSelected = visual.IsEnabled && selectedIndex == index;
+            if (visual.IsSelected == isSelected)
             {
-                labelScale = new ScaleTransform(1, 1);
-                _expressionWheelLabelVisuals[index].RenderTransform = labelScale;
+                continue;
             }
 
+            visual.IsSelected = isSelected;
+            visual.Sector.Fill = new SolidColorBrush(isSelected
+                ? WpfColor.FromArgb(166, 123, 84, 184)
+                : WpfColor.FromArgb(visual.IsEnabled ? (byte)104 : (byte)72, 70, 45, 113));
+            visual.Sector.Stroke = new SolidColorBrush(isSelected
+                ? WpfColor.FromArgb(230, 250, 242, 255)
+                : WpfColor.FromArgb(122, 236, 224, 255));
+            visual.Sector.StrokeThickness = isSelected ? 1.6 : 1;
+            visual.Label.Opacity = isSelected ? 1 : visual.IsEnabled ? 0.84 : 0.6;
+            visual.Label.FontWeight = isSelected ? FontWeights.Bold : FontWeights.SemiBold;
+            if (visual.Label.RenderTransform is not ScaleTransform scaleTransform)
+            {
+                scaleTransform = new ScaleTransform(1, 1);
+                visual.Label.RenderTransform = scaleTransform;
+            }
+
+            var targetScale = isSelected ? WheelCatalog.SelectedScale : 1;
             var duration = new Duration(PetAnimationTimings.WheelSelectionDuration);
             var easing = new WpfAnimation.QuadraticEase { EasingMode = WpfAnimation.EasingMode.EaseOut };
-            labelScale.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(scale, duration) { EasingFunction = easing });
-            labelScale.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(scale, duration) { EasingFunction = easing });
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new WpfAnimation.DoubleAnimation(targetScale, duration) { EasingFunction = easing });
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(targetScale, duration) { EasingFunction = easing });
+        }
+    }
+
+    private void ExecuteWheelAction(WheelActionItem action)
+    {
+        switch (action.ActionType)
+        {
+            case WheelActionType.Expression:
+                ApplyTemporaryExpression(action.ActionReference);
+                break;
+            case WheelActionType.Shortcut:
+                LaunchShortcut(action.ActionReference);
+                break;
+        }
+    }
+
+    private void LaunchShortcut(string? shortcutId)
+    {
+        var shortcut = _shortcutService.GetAll()
+            .FirstOrDefault(candidate => string.Equals(candidate.Id, shortcutId, StringComparison.Ordinal));
+        if (shortcut is null)
+        {
+            TryLogInfo($"Shortcut wheel reference '{shortcutId ?? "<missing>"}' was not found.");
+            ApplyTemporaryExpression("confused");
+            return;
+        }
+
+        var result = _shortcutLauncher.Launch(shortcut);
+        if (!result.Succeeded)
+        {
+            ApplyTemporaryExpression("confused");
+        }
+    }
+
+    private void OnPetDragOver(object sender, WpfDragEventArgs e)
+    {
+        try
+        {
+            e.Effects = ContainsSupportedDropFormat(e.Data)
+                ? WpfDragDropEffects.Link
+                : WpfDragDropEffects.None;
+        }
+        catch (Exception ex)
+        {
+            e.Effects = WpfDragDropEffects.None;
+            TryLogError("Shortcut drag data could not be inspected.", ex);
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnPetDrop(object sender, WpfDragEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            var paths = ExtractDroppedPaths(e.Data);
+            var textValues = ExtractDroppedTextValues(e.Data);
+            var result = _shortcutDrops.AddDroppedItems(paths, textValues);
+            ShowShortcutDropFeedback(result);
+            e.Effects = WpfDragDropEffects.Link;
+        }
+        catch (Exception ex)
+        {
+            e.Effects = WpfDragDropEffects.None;
+            TryLogError("Shortcut drop could not be processed.", ex);
+            ApplyTemporaryExpression("confused");
+        }
+    }
+
+    private static bool ContainsSupportedDropFormat(WpfDataObject data)
+    {
+        if (data.GetDataPresent(WpfDataFormats.FileDrop, autoConvert: true) ||
+            data.GetDataPresent(WpfDataFormats.UnicodeText, autoConvert: true) ||
+            data.GetDataPresent(WpfDataFormats.Text, autoConvert: true) ||
+            data.GetDataPresent(WpfDataFormats.StringFormat, autoConvert: true))
+        {
+            return true;
+        }
+
+        return UrlDropFormats.Any(format => data.GetDataPresent(format, autoConvert: true));
+    }
+
+    private static IReadOnlyList<string> ExtractDroppedPaths(WpfDataObject data)
+    {
+        if (!data.GetDataPresent(WpfDataFormats.FileDrop, autoConvert: true))
+        {
+            return [];
+        }
+
+        return data.GetData(WpfDataFormats.FileDrop, autoConvert: true) is string[] paths
+            ? paths.Where(path => !string.IsNullOrWhiteSpace(path)).ToArray()
+            : [];
+    }
+
+    private static IReadOnlyList<string> ExtractDroppedTextValues(WpfDataObject data)
+    {
+        string[] formats =
+        [
+            WpfDataFormats.UnicodeText,
+            WpfDataFormats.Text,
+            WpfDataFormats.StringFormat,
+            .. UrlDropFormats,
+        ];
+        var values = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var format in formats)
+        {
+            if (!data.GetDataPresent(format, autoConvert: true))
+            {
+                continue;
+            }
+
+            var value = ReadDroppedText(data.GetData(format, autoConvert: true), format);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        return values.ToArray();
+    }
+
+    private static string? ReadDroppedText(object? value, string format)
+    {
+        if (value is string text)
+        {
+            return NormalizeDroppedText(text);
+        }
+
+        if (value is byte[] bytes)
+        {
+            var encoding = format.EndsWith('W') ? Encoding.Unicode : Encoding.UTF8;
+            return NormalizeDroppedText(encoding.GetString(bytes));
+        }
+
+        if (value is not Stream stream)
+        {
+            return null;
+        }
+
+        var originalPosition = stream.CanSeek ? stream.Position : (long?)null;
+        try
+        {
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+
+            var encoding = format.EndsWith('W') ? Encoding.Unicode : Encoding.UTF8;
+            using var reader = new StreamReader(
+                stream,
+                encoding,
+                detectEncodingFromByteOrderMarks: true,
+                bufferSize: 1024,
+                leaveOpen: true);
+            return NormalizeDroppedText(reader.ReadToEnd());
+        }
+        finally
+        {
+            if (originalPosition is long position)
+            {
+                stream.Position = position;
+            }
+        }
+    }
+
+    private static string? NormalizeDroppedText(string text)
+    {
+        var normalized = text.Trim('\0', ' ', '\t', '\r', '\n');
+        return normalized.Length == 0 ? null : normalized;
+    }
+
+    private void ShowShortcutDropFeedback(ShortcutDropResult result)
+    {
+        var nonAddedCount = result.DuplicateCount + result.UnsupportedCount + result.FailedCount;
+        var (outcome, expressionId) = result switch
+        {
+            { AddedCount: > 0 } when nonAddedCount == 0 => ("success", "happy"),
+            { DuplicateCount: > 0, AddedCount: 0, UnsupportedCount: 0, FailedCount: 0 } => ("duplicate", "proud"),
+            { AddedCount: > 0 } => ("partial", "surprised"),
+            { UnsupportedCount: > 0, AddedCount: 0, DuplicateCount: 0, FailedCount: 0 } => ("unsupported", "pouting"),
+            _ => ("failed", "confused"),
+        };
+        TryLogInfo(
+            $"Shortcut drop {outcome}: added={result.AddedCount}, duplicate={result.DuplicateCount}, " +
+            $"unsupported={result.UnsupportedCount}, failed={result.FailedCount}.");
+        ApplyTemporaryExpression(expressionId);
+    }
+
+    private void TryLogInfo(string message)
+    {
+        try
+        {
+            _logger.Info(message);
+        }
+        catch
+        {
+            // Feedback and launch failures must stay contained when logging is unavailable.
+        }
+    }
+
+    private void TryLogError(string message, Exception exception)
+    {
+        try
+        {
+            _logger.Error(message, exception);
+        }
+        catch
+        {
+            // Drop failures must not escape through a secondary logging failure.
         }
     }
 
@@ -1253,16 +1672,12 @@ public partial class PetWindow : Window
         CharacterScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new WpfAnimation.DoubleAnimation(1, duration) { EasingFunction = easing });
     }
 
-    private void ApplyTemporaryExpression(int index)
+    private void ApplyTemporaryExpression(string? expressionId)
     {
-        if (index < 0 || index >= _expressionWheelItems.Count)
+        if (string.IsNullOrWhiteSpace(expressionId) ||
+            !_expressionAssetsById.TryGetValue(expressionId, out var asset))
         {
-            return;
-        }
-
-        var item = _expressionWheelItems[index];
-        if (!_expressionAssets.TryGetValue(item, out var asset))
-        {
+            TryLogInfo($"Expression wheel reference '{expressionId ?? "<missing>"}' was not found.");
             return;
         }
 
@@ -1388,7 +1803,7 @@ public partial class PetWindow : Window
 
     private void ShowPendingExpression()
     {
-        if (_pendingExpressionAsset is null || _isDragging || _isExpressionWheelOpen)
+        if (_pendingExpressionAsset is null || _isDragging || _isRadialWheelOpen)
         {
             return;
         }
@@ -1411,7 +1826,7 @@ public partial class PetWindow : Window
 
     private void CompleteExpressionRestore()
     {
-        if (_isDragging || _isExpressionWheelOpen)
+        if (_isDragging || _isRadialWheelOpen)
         {
             return;
         }
@@ -1439,7 +1854,7 @@ public partial class PetWindow : Window
 
     private void StartIdleBreathing()
     {
-        if (_isDragging || _isExpressionWheelOpen)
+        if (_isDragging || _isRadialWheelOpen)
         {
             return;
         }
@@ -1525,7 +1940,7 @@ public partial class PetWindow : Window
             && InputReactiveModePolicy.AllowsPassiveAnimation(IsInputReactiveModeBlockingPassiveAnimation())
             && !_isDragging
             && !_hasActiveMovementTarget
-            && !_isExpressionWheelOpen
+            && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _expressionTransitionMode == ExpressionTransitionMode.None
             && _idleFrames.Count > 0;
@@ -1590,7 +2005,7 @@ public partial class PetWindow : Window
             && !_isDragging
             && !_isBlinking
             && !_hasActiveMovementTarget
-            && !_isExpressionWheelOpen
+            && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _expressionTransitionMode == ExpressionTransitionMode.None
             && _blinkFrames.Count > 0;

@@ -75,8 +75,7 @@ var tests = new (string Name, Action Test)[]
     ("Built-in expression transition actions define shared frames", BuiltInExpressionTransitionActionsDefineSharedFrames),
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
-    ("Expression wheel style is text only with dividers", ExpressionWheelStyleIsTextOnlyWithDividers),
-    ("Expression wheel selector maps pointer positions", ExpressionWheelSelectorMapsPointerPositions),
+    ("Radial wheel layout keeps generic two-ring geometry", RadialWheelLayoutKeepsGenericTwoRingGeometry),
     ("Wheel catalog preserves ordered action references", WheelCatalogPreservesOrderedActionReferences),
     ("Wheel catalog exposes disabled empty shortcut content", WheelCatalogExposesDisabledEmptyShortcutContent),
     ("Radial wheel selector distinguishes all pointer regions", RadialWheelSelectorDistinguishesAllPointerRegions),
@@ -102,6 +101,10 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut launcher rejects missing and malformed definitions", ShortcutLauncherRejectsMissingAndMalformedDefinitions),
     ("Shortcut launcher rejects tampered executable file definitions", ShortcutLauncherRejectsTamperedExecutableFileDefinitions),
     ("Shortcut launcher contains and logs start failures", ShortcutLauncherContainsAndLogsStartFailures),
+    ("Pet window defines two-level radial overlay and drop surface", PetWindowDefinesTwoLevelRadialOverlayAndDropSurface),
+    ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
+    ("Pet window extracts neutral shortcut drop data", PetWindowExtractsNeutralShortcutDropData),
+    ("Pet window retires expression-only wheel integration", PetWindowRetiresExpressionOnlyWheelIntegration),
     ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
     ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
     ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
@@ -1188,7 +1191,7 @@ static void ExpressionWheelDefinesEightItems()
     Assert.Equal("Confused", expressions[5].Label, "Sixth expression should be Confused.");
     Assert.Equal("Proud", expressions[6].Label, "Seventh expression should be Proud.");
     Assert.Equal("Crying", expressions[7].Label, "Eighth expression should be Crying.");
-    Assert.Equal(TimeSpan.FromMilliseconds(250), ExpressionWheelCatalog.HoldDelay, "Wheel hold delay should be short but deliberate.");
+    Assert.Equal(TimeSpan.FromMilliseconds(250), WheelCatalog.HoldDelay, "Wheel hold delay should be short but deliberate.");
     Assert.Equal(TimeSpan.FromSeconds(2), ExpressionWheelCatalog.ExpressionDuration, "Selected expression should be temporary.");
 }
 
@@ -1236,63 +1239,12 @@ static void ExpressionTransitionPlannerPrefersSpecificReversibleFrames()
     Assert.Equal(0, ExpressionTransitionPlanner.EnterFrames(Array.Empty<string>(), Array.Empty<string>()).Count, "Missing specific and fallback frames should return an empty sequence.");
 }
 
-static void ExpressionWheelStyleIsTextOnlyWithDividers()
+static void RadialWheelLayoutKeepsGenericTwoRingGeometry()
 {
-    Assert.False(ExpressionWheelCatalog.UsesPreviewImages, "Wheel items should use text labels instead of in-wheel expression previews.");
-    Assert.Equal(ExpressionWheelCatalog.ItemCount, ExpressionWheelCatalog.DividerCount, "Wheel should draw one divider per item boundary.");
-    Assert.Equal(280d, ExpressionWheelCatalog.WheelDiameter, "Wheel surface should keep the first-version compact size.");
-    Assert.Equal(256d, ExpressionWheelCatalog.WheelOuterDiameter, "Outer background should fit inside the wheel surface.");
-    Assert.Equal(84d, ExpressionWheelCatalog.WheelInnerDiameter, "Inner no-selection zone should remain visible.");
-    Assert.Equal(1.18d, ExpressionWheelCatalog.SelectedScale, "Selected wheel item should still scale up visibly.");
-}
-
-static void ExpressionWheelSelectorMapsPointerPositions()
-{
-    Assert.Equal(
-        null,
-        ExpressionWheelSelector.GetSelectedIndex(
-            pointerX: 0,
-            pointerY: 0,
-            originX: 0,
-            originY: 0,
-            itemCount: 8),
-        "Pointer inside the inner radius should not select an item.");
-    Assert.Equal(
-        null,
-        ExpressionWheelSelector.GetSelectedIndex(
-            pointerX: ExpressionWheelCatalog.OuterRadius + 20,
-            pointerY: 0,
-            originX: 0,
-            originY: 0,
-            itemCount: 8),
-        "Pointer outside the outer radius should not select an item.");
-    Assert.Equal(
-        0,
-        ExpressionWheelSelector.GetSelectedIndex(
-            pointerX: 0,
-            pointerY: -ExpressionWheelCatalog.InnerRadius - 10,
-            originX: 0,
-            originY: 0,
-            itemCount: 8),
-        "Pointer above the origin should select the top item.");
-    Assert.Equal(
-        2,
-        ExpressionWheelSelector.GetSelectedIndex(
-            pointerX: ExpressionWheelCatalog.InnerRadius + 10,
-            pointerY: 0,
-            originX: 0,
-            originY: 0,
-            itemCount: 8),
-        "Pointer right of the origin should select the right item.");
-    Assert.Equal(
-        4,
-        ExpressionWheelSelector.GetSelectedIndex(
-            pointerX: 0,
-            pointerY: ExpressionWheelCatalog.InnerRadius + 10,
-            originX: 0,
-            originY: 0,
-            itemCount: 8),
-        "Pointer below the origin should select the bottom item.");
+    Assert.Equal(8, WheelCatalog.MaxVisibleItemsPerRing, "Each radial ring should remain readable at no more than eight sectors.");
+    Assert.True(WheelCatalog.InnerRadius < WheelCatalog.FirstRingOuterRadius, "The first ring should surround the center cancel zone.");
+    Assert.True(WheelCatalog.FirstRingOuterRadius < WheelCatalog.SecondRingOuterRadius, "The second ring should surround the category ring.");
+    Assert.Equal(1.18d, WheelCatalog.SelectedScale, "Selected wheel text should still scale up visibly.");
 }
 
 static void WheelCatalogPreservesOrderedActionReferences()
@@ -1922,6 +1874,63 @@ static void ShortcutLauncherContainsAndLogsStartFailures()
     var log = File.ReadAllText(paths.LogFile);
     Assert.Contains(log, "simulated start failure", "The log should retain the process exception details.");
     Assert.Contains(log, filePath, "The log should identify the target that failed to launch.");
+}
+
+static void PetWindowDefinesTwoLevelRadialOverlayAndDropSurface()
+{
+    var workspace = FindWorkspaceRoot();
+    var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+
+    Assert.Contains(xaml, "x:Name=\"RadialWheelOverlay\"", "The wheel should expose a generic radial overlay.");
+    Assert.Contains(xaml, "x:Name=\"FirstRingSurface\"", "The overlay should expose a first-level category ring.");
+    Assert.Contains(xaml, "x:Name=\"SecondRingSurface\"", "The overlay should expose a second-level action ring.");
+    Assert.Contains(xaml, "AllowDrop=\"True\"", "The pet hit surface should accept shortcut drops.");
+    Assert.Contains(xaml, "DragOver=\"OnPetDragOver\"", "The pet should validate incoming drop data.");
+    Assert.Contains(xaml, "Drop=\"OnPetDrop\"", "The pet should register supported dropped shortcuts.");
+}
+
+static void PetWindowRoutesGenericRadialActions()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(source, "RadialWheelController", "PetWindow should delegate wheel state to the generic controller.");
+    Assert.Contains(source, "DateTimeOffset.UtcNow", "Category dwell should be driven by explicit timestamps.");
+    Assert.Contains(source, "WheelReleaseKind.PageChanged", "Page controls should keep the wheel open and refresh its page.");
+    Assert.Contains(source, "WheelActionType.Expression", "Expression actions should be dispatched by generic action type.");
+    Assert.Contains(source, "WheelActionType.Shortcut", "Shortcut actions should be dispatched by generic action type.");
+    Assert.Contains(source, "_expressionAssetsById.TryGetValue", "Expression actions should resolve assets by expression ID.");
+    Assert.Contains(source, "_shortcutLauncher.Launch", "Shortcut actions should use the injected launcher.");
+    Assert.Contains(source, "WpfInput.Key.Escape", "Escape should cancel an open radial wheel.");
+}
+
+static void PetWindowExtractsNeutralShortcutDropData()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(source, "DataFormats.FileDrop", "WPF file-drop data should be extracted into paths.");
+    Assert.Contains(source, "DataFormats.UnicodeText", "Unicode text drops should be extracted into neutral strings.");
+    Assert.Contains(source, "UniformResourceLocator", "Browser URL clipboard formats should be recognized.");
+    Assert.Contains(source, "_shortcutDrops.AddDroppedItems", "Only neutral path and text lists should cross into Core.");
+    Assert.Contains(source, "DragDropEffects.Link", "Drop feedback should communicate that source files remain untouched.");
+    Assert.False(source.Contains("File.Move(", StringComparison.Ordinal), "PetWindow must never move a dropped source file.");
+}
+
+static void PetWindowRetiresExpressionOnlyWheelIntegration()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    var selectorPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "ExpressionWheelSelector.cs");
+    var catalogSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "ExpressionWheelCatalog.cs"));
+
+    Assert.False(source.Contains("ExpressionWheelSelector", StringComparison.Ordinal), "PetWindow should not use the retired expression-only selector.");
+    Assert.False(source.Contains("ExpressionWheelItem", StringComparison.Ordinal), "PetWindow should resolve generic actions instead of expression-only wheel items.");
+    Assert.False(source.Contains("ExpressionWheelSurface", StringComparison.Ordinal), "PetWindow should render generic ring surfaces.");
+    Assert.False(File.Exists(selectorPath), "The obsolete expression-only selector should be deleted.");
+    Assert.False(catalogSource.Contains("WheelDiameter", StringComparison.Ordinal), "ExpressionWheelCatalog should no longer own generic layout constants.");
+    Assert.False(catalogSource.Contains("HoldDelay", StringComparison.Ordinal), "ExpressionWheelCatalog should retain only expression timing.");
+    Assert.Contains(catalogSource, "ExpressionDuration", "The existing two-second expression duration should remain stable.");
 }
 
 static void SettingCatalogDefinesEveryBooleanSettingOnce()
