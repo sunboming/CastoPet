@@ -108,6 +108,7 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut launcher rejects tampered executable file definitions", ShortcutLauncherRejectsTamperedExecutableFileDefinitions),
     ("Shortcut launcher contains and logs start failures", ShortcutLauncherContainsAndLogsStartFailures),
     ("Pet window defines two-level radial overlay and drop surface", PetWindowDefinesTwoLevelRadialOverlayAndDropSurface),
+    ("Pet window consumes centralized radial wheel styling", PetWindowConsumesCentralizedRadialWheelStyling),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
     ("Pet window extracts neutral shortcut drop data", PetWindowExtractsNeutralShortcutDropData),
     ("Pet window retires expression-only wheel integration", PetWindowRetiresExpressionOnlyWheelIntegration),
@@ -2040,6 +2041,20 @@ static void PetWindowDefinesTwoLevelRadialOverlayAndDropSurface()
     Assert.Contains(xaml, "AllowDrop=\"True\"", "The pet hit surface should accept shortcut drops.");
     Assert.Contains(xaml, "DragOver=\"OnPetDragOver\"", "The pet should validate incoming drop data.");
     Assert.Contains(xaml, "Drop=\"OnPetDrop\"", "The pet should register supported dropped shortcuts.");
+}
+
+static void PetWindowConsumesCentralizedRadialWheelStyling()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+
+    Assert.Contains(source, "RadialWheelStyle.GetNormalFill", "Initial and restored fills should use the shared style contract.");
+    Assert.Contains(source, "visual.Ring", "Selection refresh should restore the visual's original ring style.");
+    Assert.Contains(source, "RadialWheelStyle.SectorGapRadians", "Sector geometry should use the refined divider gap.");
+    Assert.Contains(source, "RadialWheelStyle.LabelShadowOpacity", "Label shadows should use the refined style.");
+    Assert.Contains(xaml, "Fill=\"#80352757\"", "The center should use the approved stronger fill.");
+    Assert.Contains(xaml, "Stroke=\"#96ECE0FF\"", "The center should use the softened outline.");
 }
 
 static void PetWindowRoutesGenericRadialActions()

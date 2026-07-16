@@ -59,9 +59,9 @@
                          Height="68"
                          Canvas.Left="184"
                          Canvas.Top="184"
-                         Fill="#78352757"
-                         Stroke="#92F5EEFF"
-                         StrokeThickness="1" />
+                         Fill="#80352757"
+                         Stroke="#96ECE0FF"
+                         StrokeThickness="0.9" />
             </Canvas>
         </Popup>
     </Grid>
