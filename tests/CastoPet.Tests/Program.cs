@@ -76,6 +76,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
     ("Radial wheel layout keeps generic two-ring geometry", RadialWheelLayoutKeepsGenericTwoRingGeometry),
+    ("Radial wheel style keeps readable ring hierarchy", RadialWheelStyleKeepsReadableRingHierarchy),
     ("Wheel catalog preserves ordered action references", WheelCatalogPreservesOrderedActionReferences),
     ("Wheel catalog exposes disabled empty shortcut content", WheelCatalogExposesDisabledEmptyShortcutContent),
     ("Wheel catalog service refreshes successful shortcut mutations", WheelCatalogServiceRefreshesSuccessfulShortcutMutations),
@@ -1253,6 +1254,23 @@ static void RadialWheelLayoutKeepsGenericTwoRingGeometry()
     Assert.True(WheelCatalog.InnerRadius < WheelCatalog.FirstRingOuterRadius, "The first ring should surround the center cancel zone.");
     Assert.True(WheelCatalog.FirstRingOuterRadius < WheelCatalog.SecondRingOuterRadius, "The second ring should surround the category ring.");
     Assert.Equal(1.18d, WheelCatalog.SelectedScale, "Selected wheel text should still scale up visibly.");
+}
+
+static void RadialWheelStyleKeepsReadableRingHierarchy()
+{
+    var first = RadialWheelStyle.GetNormalFill(RadialWheelRing.First, isEnabled: true);
+    var second = RadialWheelStyle.GetNormalFill(RadialWheelRing.Second, isEnabled: true);
+    var firstDisabled = RadialWheelStyle.GetNormalFill(RadialWheelRing.First, isEnabled: false);
+    var secondDisabled = RadialWheelStyle.GetNormalFill(RadialWheelRing.Second, isEnabled: false);
+
+    Assert.Equal((byte)140, first.Alpha, "First-ring fill should be readable over the desktop.");
+    Assert.Equal((byte)122, second.Alpha, "Second-ring fill should remain slightly lighter.");
+    Assert.Equal((byte)84, firstDisabled.Alpha, "Disabled first-ring fill should remain subdued.");
+    Assert.Equal((byte)72, secondDisabled.Alpha, "Disabled second-ring fill should remain subdued.");
+    Assert.False(first.Equals(second), "The two normal ring fills should remain visually distinct.");
+    Assert.True(RadialWheelStyle.SelectedFill.Alpha > first.Alpha, "Selection should be stronger than the first ring.");
+    Assert.True(RadialWheelStyle.SelectedFill.Alpha > second.Alpha, "Selection should be stronger than the second ring.");
+    Assert.Equal(0.016d, RadialWheelStyle.SectorGapRadians, "Sector dividers should use the refined gap.");
 }
 
 static void WheelCatalogPreservesOrderedActionReferences()
