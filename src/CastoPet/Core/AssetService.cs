@@ -6,9 +6,6 @@ namespace CastoPet.Core;
 
 public sealed class AssetService
 {
-    public const string DefaultCharacterPath = "Assets/Runtime/Castorice/Castorice.png";
-    public const string DraggingCharacterPath = "Assets/Runtime/Castorice/States/Castorice.Dragging.png";
-    public const string InputReactiveBasePath = "Assets/Runtime/Castorice/States/InputReactive/Castorice.InputReactive.Base.png";
     public const int CharacterDecodePixelWidth = 320;
 
     private readonly LoggingService _logger;

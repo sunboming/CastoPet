@@ -16,48 +16,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\Runtime\Castorice\Castorice.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Castorice.Happy.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Castorice.Sleepy.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Castorice.Surprised.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Castorice.Dragging.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.00.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.01.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.02.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.03.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.04.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.05.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.06.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Idle\Castorice.Idle.07.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.00.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.01.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.02.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.03.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.04.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.05.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.06.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Move\Castorice.Move.07.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Blink\Castorice.Blink.00.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Blink\Castorice.Blink.01.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Blink\Castorice.Blink.02.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\Petting\*.png" />
-    <Resource Include="Assets\Runtime\Castorice\States\InputReactive\Castorice.InputReactive.Base.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Happy.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Shy.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Sleepy.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Surprised.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Pouting.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Confused.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Proud.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Castorice.Expression.Crying.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\*\Transition\*.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.In.00.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.In.01.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.In.02.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.In.03.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.Out.00.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.Out.01.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.Out.02.png" />
-    <Resource Include="Assets\Runtime\Castorice\Expressions\Transition\Castorice.ExpressionTransition.Out.03.png" />
+    <Resource Include="Assets\Runtime\Castorice\**\*.png" />
+    <EmbeddedResource
+      Include="Assets\Runtime\Castorice\skin.json"
+      LogicalName="CastoPet.Assets.Runtime.Castorice.skin.json" />
   </ItemGroup>
 </Project>

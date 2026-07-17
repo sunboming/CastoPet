@@ -68,10 +68,13 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice defines optional petting action", BuiltInCastoriceDefinesOptionalPettingAction),
     ("Built-in petting frames are packaged and clean", BuiltInPettingFramesArePackagedAndClean),
     ("Built-in Castorice expressions are ordered skin definitions", BuiltInCastoriceExpressionsAreOrderedSkinDefinitions),
+    ("Built-in Castorice loads from embedded manifest", BuiltInCastoriceLoadsFromEmbeddedManifest),
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
     ("Pet skin manifest loads expression transition metadata", PetSkinManifestLoadsExpressionTransitionMetadata),
     ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
+    ("Pet skin manifest rejects duplicate actions", PetSkinManifestRejectsDuplicateActions),
+    ("Pet skin manifest rejects invalid action metadata", PetSkinManifestRejectsInvalidActionMetadata),
     ("Pet skin manifest writer emits loadable JSON", PetSkinManifestWriterEmitsLoadableJson),
     ("Pet skin manifest writer stores paths relative to resource root", PetSkinManifestWriterStoresPathsRelativeToResourceRoot),
     ("Pet skin manifest round trips optional petting action", PetSkinManifestRoundTripsOptionalPettingAction),
@@ -1099,7 +1102,7 @@ static void BuiltInPettingFramesArePackagedAndClean()
     Assert.True(idle.SequenceEqual(File.ReadAllBytes(frames[^1])), "Petting frame 07 should return exactly to the idle baseline.");
 
     var projectText = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
-    Assert.Contains(projectText, @"Assets\Runtime\Castorice\States\Petting\*.png", "Petting frames should be packaged as WPF resources.");
+    Assert.Contains(projectText, @"Assets\Runtime\Castorice\**\*.png", "Petting frames should be covered by the runtime WPF resource glob.");
 
     using var temp = TempDirectory.Create();
     var petting = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Petting) with
@@ -1130,6 +1133,29 @@ static void BuiltInCastoriceExpressionsAreOrderedSkinDefinitions()
     Assert.Equal(TimeSpan.FromMilliseconds(1000d / 15d), expressions[0].TransitionFrameInterval, "Expression transitions should play at 15 FPS.");
     Assert.Equal("crying", expressions[^1].Id, "Last expression id should be stable.");
     Assert.Equal("Crying", expressions[^1].Label, "Last expression label should be stable.");
+}
+
+static void BuiltInCastoriceLoadsFromEmbeddedManifest()
+{
+    const string resourceName = "CastoPet.Assets.Runtime.Castorice.skin.json";
+    var assembly = typeof(BuiltInPetSkins).Assembly;
+    Assert.True(
+        assembly.GetManifestResourceNames().Contains(resourceName, StringComparer.Ordinal),
+        "The built-in Castorice manifest should be embedded in the application assembly.");
+
+    using var stream = assembly.GetManifestResourceStream(resourceName)
+        ?? throw new InvalidOperationException("The built-in Castorice manifest stream is missing.");
+    using var reader = new StreamReader(stream);
+    var manifestSkin = PetSkinManifestLoader.LoadFromJson(reader.ReadToEnd());
+
+    Assert.Equal(BuiltInPetSkins.Castorice.Id, manifestSkin.Id, "The embedded manifest should define the built-in skin id.");
+    Assert.Equal(BuiltInPetSkins.Castorice.Actions.Count, manifestSkin.Actions.Count, "The embedded manifest should define every built-in action.");
+    Assert.Equal(BuiltInPetSkins.Castorice.Expressions.Count, manifestSkin.Expressions.Count, "The embedded manifest should define every built-in expression.");
+
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "BuiltInPetSkins.cs"));
+    Assert.False(source.Contains("new PetActionDefinition", StringComparison.Ordinal), "Built-in skin metadata should not be duplicated as action constructors.");
+    Assert.False(source.Contains("CreateFramePaths", StringComparison.Ordinal), "Built-in frame lists should come from the manifest.");
 }
 
 static void PetSkinManifestLoadsJsonResourcePaths()
@@ -1265,6 +1291,88 @@ static void PetSkinManifestRequiresCoreActions()
         """));
 
     Assert.Contains(ex.Message, "Move", "Manifest validation should identify missing move action.");
+}
+
+static void PetSkinManifestRejectsDuplicateActions()
+{
+    var duplicateId = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "duplicate-id",
+          "displayName": "Duplicate Id",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "shared", "kind": "idle", "frames": ["Idle.png"] },
+            { "id": "shared", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """));
+    Assert.Contains(duplicateId.Message, "Duplicate action id", "Manifest validation should identify duplicate action ids.");
+
+    var duplicateKind = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "duplicate-kind",
+          "displayName": "Duplicate Kind",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle-one", "kind": "idle", "frames": ["Idle-1.png"] },
+            { "id": "idle-two", "kind": "idle", "frames": ["Idle-2.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """));
+    Assert.Contains(duplicateKind.Message, "Duplicate action kind", "Manifest validation should identify duplicate action kinds.");
+}
+
+static void PetSkinManifestRejectsInvalidActionMetadata()
+{
+    var emptyFrames = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "empty-frames",
+          "displayName": "Empty Frames",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": [] },
+            { "id": "move", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """));
+    Assert.Contains(emptyFrames.Message, "must define at least one frame", "Manifest actions should not accept an empty frame list.");
+
+    var invalidMove = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "invalid-move",
+          "displayName": "Invalid Move",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": ["Idle.png"] },
+            { "id": "move", "kind": "move", "distancePerFrame": -1, "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """));
+    Assert.Contains(invalidMove.Message, "distancePerFrame", "Manifest actions should reject non-positive movement distance.");
+
+    var invalidSchedule = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "invalid-schedule",
+          "displayName": "Invalid Schedule",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": ["Idle.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "minScheduleDelayMs": 7000, "maxScheduleDelayMs": 3000, "frames": ["Blink.png"] }
+          ]
+        }
+        """));
+    Assert.Contains(invalidSchedule.Message, "schedule delay range", "Manifest actions should reject an inverted schedule range.");
 }
 
 static void PetSkinManifestWriterEmitsLoadableJson()
@@ -3154,7 +3262,7 @@ static void InputReactiveAssetPathUsesAppResource()
 {
     Assert.Equal(
         "Assets/Runtime/Castorice/States/InputReactive/Castorice.InputReactive.Base.png",
-        AssetService.InputReactiveBasePath,
+        BuiltInPetSkins.Castorice.InputReactiveBasePath,
         "Input reactive base should use an app resource path.");
 }
 
@@ -3166,8 +3274,8 @@ static void InputReactiveAssetIsPackaged()
 
     Assert.Contains(
         projectText,
-        @"Assets\Runtime\Castorice\States\InputReactive\Castorice.InputReactive.Base.png",
-        "Input reactive base should be packaged as a WPF resource.");
+        @"Assets\Runtime\Castorice\**\*.png",
+        "Input reactive base should be covered by the runtime WPF resource glob.");
 }
 
 static void PackagedCharacterAssetsAreDisplaySized()
@@ -3223,7 +3331,7 @@ static void PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints()
     }
 
     var projectText = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
-    Assert.Contains(projectText, @"Assets\Runtime\Castorice\Expressions\*\Transition\*.png", "Expression transition PNGs should be packaged with a WPF resource glob.");
+    Assert.Contains(projectText, @"Assets\Runtime\Castorice\**\*.png", "Expression transition PNGs should be covered by the runtime WPF resource glob.");
 }
 
 static IReadOnlyList<IdleFrameDiagnostic> ReadIdleFrameDiagnostics()

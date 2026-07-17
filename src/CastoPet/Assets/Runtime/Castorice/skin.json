@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 2,
+  "id": "castorice",
+  "displayName": "Castorice",
+  "resourceRoot": "Assets/Runtime/Castorice",
+  "defaultCharacter": "Castorice.png",
+  "draggingCharacter": "States/Castorice.Dragging.png",
+  "inputReactiveBase": "States/InputReactive/Castorice.InputReactive.Base.png",
+  "actions": [
+    {
+      "id": "idle",
+      "kind": "idle",
+      "frameIntervalMs": 125,
+      "frames": [
+        "States/Idle/Castorice.Idle.00.png",
+        "States/Idle/Castorice.Idle.01.png",
+        "States/Idle/Castorice.Idle.02.png",
+        "States/Idle/Castorice.Idle.03.png",
+        "States/Idle/Castorice.Idle.04.png",
+        "States/Idle/Castorice.Idle.05.png",
+        "States/Idle/Castorice.Idle.06.png",
+        "States/Idle/Castorice.Idle.07.png"
+      ]
+    },
+    {
+      "id": "move",
+      "kind": "move",
+      "distancePerFrame": 10,
+      "baseSpeedPixelsPerSecond": 90,
+      "minSpeedPixelsPerSecond": 80,
+      "maxSpeedPixelsPerSecond": 105,
+      "frames": [
+        "States/Move/Castorice.Move.00.png",
+        "States/Move/Castorice.Move.01.png",
+        "States/Move/Castorice.Move.02.png",
+        "States/Move/Castorice.Move.03.png",
+        "States/Move/Castorice.Move.04.png",
+        "States/Move/Castorice.Move.05.png",
+        "States/Move/Castorice.Move.06.png",
+        "States/Move/Castorice.Move.07.png"
+      ]
+    },
+    {
+      "id": "blink",
+      "kind": "blink",
+      "frameIntervalMs": 90,
+      "minScheduleDelayMs": 3000,
+      "maxScheduleDelayMs": 7000,
+      "frames": [
+        "States/Blink/Castorice.Blink.00.png",
+        "States/Blink/Castorice.Blink.01.png",
+        "States/Blink/Castorice.Blink.02.png"
+      ]
+    },
+    {
+      "id": "petting",
+      "kind": "petting",
+      "frameIntervalMs": 80,
+      "frames": [
+        "States/Petting/Castorice.Petting.00.png",
+        "States/Petting/Castorice.Petting.01.png",
+        "States/Petting/Castorice.Petting.02.png",
+        "States/Petting/Castorice.Petting.03.png",
+        "States/Petting/Castorice.Petting.04.png",
+        "States/Petting/Castorice.Petting.05.png",
+        "States/Petting/Castorice.Petting.06.png",
+        "States/Petting/Castorice.Petting.07.png"
+      ]
+    },
+    {
+      "id": "expression-transition-in",
+      "kind": "expression-transition-in",
+      "frameIntervalMs": 55,
+      "frames": [
+        "Expressions/Transition/Castorice.ExpressionTransition.In.00.png",
+        "Expressions/Transition/Castorice.ExpressionTransition.In.01.png",
+        "Expressions/Transition/Castorice.ExpressionTransition.In.02.png",
+        "Expressions/Transition/Castorice.ExpressionTransition.In.03.png"
+      ]
+    },
+    {
+      "id": "expression-transition-out",
+      "kind": "expression-transition-out",
+      "frameIntervalMs": 55,
+      "frames": [
+        "Expressions/Transition/Castorice.ExpressionTransition.Out.00.png",
+        "Expressions/Transition/Castorice.ExpressionTransition.Out.01.png",
+        "Expressions/Transition/Castorice.ExpressionTransition.Out.02.png",
+        "Expressions/Transition/Castorice.ExpressionTransition.Out.03.png"
+      ]
+    }
+  ],
+  "expressions": {
+    "Happy": {
+      "image": "Expressions/Castorice.Expression.Happy.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Happy/Transition/Castorice.Expression.Happy.Transition.00.png",
+        "Expressions/Happy/Transition/Castorice.Expression.Happy.Transition.01.png",
+        "Expressions/Happy/Transition/Castorice.Expression.Happy.Transition.02.png",
+        "Expressions/Happy/Transition/Castorice.Expression.Happy.Transition.03.png",
+        "Expressions/Happy/Transition/Castorice.Expression.Happy.Transition.04.png",
+        "Expressions/Happy/Transition/Castorice.Expression.Happy.Transition.05.png"
+      ]
+    },
+    "Shy": {
+      "image": "Expressions/Castorice.Expression.Shy.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Shy/Transition/Castorice.Expression.Shy.Transition.00.png",
+        "Expressions/Shy/Transition/Castorice.Expression.Shy.Transition.01.png",
+        "Expressions/Shy/Transition/Castorice.Expression.Shy.Transition.02.png",
+        "Expressions/Shy/Transition/Castorice.Expression.Shy.Transition.03.png",
+        "Expressions/Shy/Transition/Castorice.Expression.Shy.Transition.04.png",
+        "Expressions/Shy/Transition/Castorice.Expression.Shy.Transition.05.png"
+      ]
+    },
+    "Sleepy": {
+      "image": "Expressions/Castorice.Expression.Sleepy.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Sleepy/Transition/Castorice.Expression.Sleepy.Transition.00.png",
+        "Expressions/Sleepy/Transition/Castorice.Expression.Sleepy.Transition.01.png",
+        "Expressions/Sleepy/Transition/Castorice.Expression.Sleepy.Transition.02.png",
+        "Expressions/Sleepy/Transition/Castorice.Expression.Sleepy.Transition.03.png",
+        "Expressions/Sleepy/Transition/Castorice.Expression.Sleepy.Transition.04.png",
+        "Expressions/Sleepy/Transition/Castorice.Expression.Sleepy.Transition.05.png"
+      ]
+    },
+    "Surprised": {
+      "image": "Expressions/Castorice.Expression.Surprised.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Surprised/Transition/Castorice.Expression.Surprised.Transition.00.png",
+        "Expressions/Surprised/Transition/Castorice.Expression.Surprised.Transition.01.png",
+        "Expressions/Surprised/Transition/Castorice.Expression.Surprised.Transition.02.png",
+        "Expressions/Surprised/Transition/Castorice.Expression.Surprised.Transition.03.png",
+        "Expressions/Surprised/Transition/Castorice.Expression.Surprised.Transition.04.png",
+        "Expressions/Surprised/Transition/Castorice.Expression.Surprised.Transition.05.png"
+      ]
+    },
+    "Pouting": {
+      "image": "Expressions/Castorice.Expression.Pouting.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Pouting/Transition/Castorice.Expression.Pouting.Transition.00.png",
+        "Expressions/Pouting/Transition/Castorice.Expression.Pouting.Transition.01.png",
+        "Expressions/Pouting/Transition/Castorice.Expression.Pouting.Transition.02.png",
+        "Expressions/Pouting/Transition/Castorice.Expression.Pouting.Transition.03.png",
+        "Expressions/Pouting/Transition/Castorice.Expression.Pouting.Transition.04.png",
+        "Expressions/Pouting/Transition/Castorice.Expression.Pouting.Transition.05.png"
+      ]
+    },
+    "Confused": {
+      "image": "Expressions/Castorice.Expression.Confused.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Confused/Transition/Castorice.Expression.Confused.Transition.00.png",
+        "Expressions/Confused/Transition/Castorice.Expression.Confused.Transition.01.png",
+        "Expressions/Confused/Transition/Castorice.Expression.Confused.Transition.02.png",
+        "Expressions/Confused/Transition/Castorice.Expression.Confused.Transition.03.png",
+        "Expressions/Confused/Transition/Castorice.Expression.Confused.Transition.04.png",
+        "Expressions/Confused/Transition/Castorice.Expression.Confused.Transition.05.png"
+      ]
+    },
+    "Proud": {
+      "image": "Expressions/Castorice.Expression.Proud.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Proud/Transition/Castorice.Expression.Proud.Transition.00.png",
+        "Expressions/Proud/Transition/Castorice.Expression.Proud.Transition.01.png",
+        "Expressions/Proud/Transition/Castorice.Expression.Proud.Transition.02.png",
+        "Expressions/Proud/Transition/Castorice.Expression.Proud.Transition.03.png",
+        "Expressions/Proud/Transition/Castorice.Expression.Proud.Transition.04.png",
+        "Expressions/Proud/Transition/Castorice.Expression.Proud.Transition.05.png"
+      ]
+    },
+    "Crying": {
+      "image": "Expressions/Castorice.Expression.Crying.png",
+      "transitionFrameIntervalMs": 66.66666666666667,
+      "transitionFrames": [
+        "Expressions/Crying/Transition/Castorice.Expression.Crying.Transition.00.png",
+        "Expressions/Crying/Transition/Castorice.Expression.Crying.Transition.01.png",
+        "Expressions/Crying/Transition/Castorice.Expression.Crying.Transition.02.png",
+        "Expressions/Crying/Transition/Castorice.Expression.Crying.Transition.03.png",
+        "Expressions/Crying/Transition/Castorice.Expression.Crying.Transition.04.png",
+        "Expressions/Crying/Transition/Castorice.Expression.Crying.Transition.05.png"
+      ]
+    }
+  }
+}

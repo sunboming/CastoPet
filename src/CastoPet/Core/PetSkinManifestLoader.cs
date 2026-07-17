@@ -34,6 +34,7 @@ public static class PetSkinManifestLoader
             .Select(action => BuildAction(action, resolver))
             .ToArray();
 
+        ValidateActions(actions);
         RequireAction(actions, PetActionKind.Idle);
         RequireAction(actions, PetActionKind.Move);
         RequireAction(actions, PetActionKind.Blink);
@@ -46,6 +47,8 @@ public static class PetSkinManifestLoader
                 expressions.Add(BuildExpression(item.Key, item.Value, resolver));
             }
         }
+
+        ValidateExpressions(expressions);
 
         return new PetSkinDefinition(
             Id: RequiredText(manifest.Id, "id"),
@@ -105,23 +108,32 @@ public static class PetSkinManifestLoader
 
         var manifest = value.Deserialize<ExpressionManifest>(JsonOptions)
             ?? throw new InvalidDataException($"Expression {label} is invalid.");
+        ValidatePositive(
+            manifest.TransitionFrameIntervalMs,
+            $"expression {label} transitionFrameIntervalMs");
         return new PetExpressionDefinition(
             Id: ToExpressionId(label),
             Label: label,
             ResourcePath: resolver.Resolve(RequiredText(manifest.Image, $"expression.{label}.image")),
-            TransitionFramePaths: manifest.TransitionFrames?.Select(resolver.Resolve).ToArray(),
+            TransitionFramePaths: manifest.TransitionFrames?
+                .Select((path, index) => resolver.Resolve(RequiredText(
+                    path,
+                    $"expression.{label}.transitionFrames[{index}]")))
+                .ToArray(),
             TransitionFrameInterval: MillisecondsToTimeSpan(manifest.TransitionFrameIntervalMs));
     }
 
     private static PetActionDefinition BuildAction(ActionManifest manifest, PathResolver resolver)
     {
-        var kind = ParseActionKind(RequiredText(manifest.Kind, "action.kind"));
-        var frames = (manifest.Frames ?? [])
-            .Select(resolver.Resolve)
+        var id = RequiredText(manifest.Id, "action.id");
+        var kind = ParseActionKind(RequiredText(manifest.Kind, $"action {id}.kind"));
+        ValidateActionMetadata(manifest, id);
+        var frames = manifest.Frames!
+            .Select((path, index) => resolver.Resolve(RequiredText(path, $"action {id}.frames[{index}]")))
             .ToArray();
 
         return new PetActionDefinition(
-            Id: RequiredText(manifest.Id, "action.id"),
+            Id: id,
             Kind: kind,
             FramePaths: frames,
             FrameInterval: MillisecondsToTimeSpan(manifest.FrameIntervalMs),
@@ -131,6 +143,83 @@ public static class PetSkinManifestLoader
             BaseSpeedPixelsPerSecond: manifest.BaseSpeedPixelsPerSecond,
             MinSpeedPixelsPerSecond: manifest.MinSpeedPixelsPerSecond,
             MaxSpeedPixelsPerSecond: manifest.MaxSpeedPixelsPerSecond);
+    }
+
+    private static void ValidateActionMetadata(ActionManifest manifest, string id)
+    {
+        if (manifest.Frames is null || manifest.Frames.Count == 0)
+        {
+            throw new InvalidDataException($"Action {id} must define at least one frame.");
+        }
+
+        ValidatePositive(manifest.FrameIntervalMs, $"action {id} frameIntervalMs");
+        ValidatePositive(manifest.DistancePerFrame, $"action {id} distancePerFrame");
+        ValidatePositive(manifest.MinScheduleDelayMs, $"action {id} minScheduleDelayMs");
+        ValidatePositive(manifest.MaxScheduleDelayMs, $"action {id} maxScheduleDelayMs");
+        ValidatePositive(manifest.BaseSpeedPixelsPerSecond, $"action {id} baseSpeedPixelsPerSecond");
+        ValidatePositive(manifest.MinSpeedPixelsPerSecond, $"action {id} minSpeedPixelsPerSecond");
+        ValidatePositive(manifest.MaxSpeedPixelsPerSecond, $"action {id} maxSpeedPixelsPerSecond");
+
+        if (manifest.MinScheduleDelayMs is double minDelay
+            && manifest.MaxScheduleDelayMs is double maxDelay
+            && minDelay > maxDelay)
+        {
+            throw new InvalidDataException($"Action {id} has an invalid schedule delay range.");
+        }
+
+        if (manifest.MinSpeedPixelsPerSecond is double minSpeed
+            && manifest.MaxSpeedPixelsPerSecond is double maxSpeed
+            && minSpeed > maxSpeed)
+        {
+            throw new InvalidDataException($"Action {id} has an invalid speed range.");
+        }
+
+        if (manifest.BaseSpeedPixelsPerSecond is double baseSpeed)
+        {
+            if (manifest.MinSpeedPixelsPerSecond is double minimum && baseSpeed < minimum
+                || manifest.MaxSpeedPixelsPerSecond is double maximum && baseSpeed > maximum)
+            {
+                throw new InvalidDataException($"Action {id} base speed must be within its speed range.");
+            }
+        }
+    }
+
+    private static void ValidateActions(IReadOnlyList<PetActionDefinition> actions)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var kinds = new HashSet<PetActionKind>();
+        foreach (var action in actions)
+        {
+            if (!ids.Add(action.Id))
+            {
+                throw new InvalidDataException($"Duplicate action id {action.Id}.");
+            }
+
+            if (!kinds.Add(action.Kind))
+            {
+                throw new InvalidDataException($"Duplicate action kind {action.Kind}.");
+            }
+        }
+    }
+
+    private static void ValidateExpressions(IReadOnlyList<PetExpressionDefinition> expressions)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var expression in expressions)
+        {
+            if (!ids.Add(expression.Id))
+            {
+                throw new InvalidDataException($"Duplicate expression id {expression.Id}.");
+            }
+        }
+    }
+
+    private static void ValidatePositive(double? value, string name)
+    {
+        if (value is double number && (!double.IsFinite(number) || number <= 0))
+        {
+            throw new InvalidDataException($"Manifest {name} must be greater than zero.");
+        }
     }
 
     private static PetActionKind ParseActionKind(string value)
