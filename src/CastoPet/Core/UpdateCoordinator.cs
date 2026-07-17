@@ -9,6 +9,7 @@ public sealed class UpdateCoordinator
     private readonly Func<AppSettings, bool> _saveSettings;
     private readonly Func<DateOnly> _todayProvider;
     private readonly TimeSpan _timeout;
+    private readonly LoggingService? _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public UpdateCoordinator(
@@ -16,13 +17,15 @@ public sealed class UpdateCoordinator
         AppSettings settings,
         Func<AppSettings, bool> saveSettings,
         Func<DateOnly>? todayProvider = null,
-        TimeSpan? timeout = null)
+        TimeSpan? timeout = null,
+        LoggingService? logger = null)
     {
         _updateService = updateService;
         _settings = settings;
         _saveSettings = saveSettings;
         _todayProvider = todayProvider ?? (() => DateOnly.FromDateTime(DateTime.Now));
         _timeout = timeout ?? DefaultTimeout;
+        _logger = logger;
     }
 
     public string CurrentVersion => _updateService.CurrentVersion;
@@ -54,7 +57,10 @@ public sealed class UpdateCoordinator
             if (!manual)
             {
                 _settings.LastAutomaticUpdateCheckDate = UpdateCheckPolicy.FormatDate(today);
-                _saveSettings(_settings);
+                if (!_saveSettings(_settings))
+                {
+                    TryLogError("Automatic update attempt date could not be persisted.");
+                }
             }
 
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -64,8 +70,19 @@ public sealed class UpdateCoordinator
                 ? Result(UpdateCheckStatus.Current)
                 : new UpdateCheckResult(UpdateCheckStatus.Available, _updateService.CurrentVersion, update);
         }
-        catch (Exception)
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
+            TryLogError($"{GetCheckLabel(manual)} update check timed out.", ex);
+            return Result(UpdateCheckStatus.Failed);
+        }
+        catch (OperationCanceledException)
+        {
+            TryLogInfo($"{GetCheckLabel(manual)} update check was canceled.");
+            return Result(UpdateCheckStatus.Failed);
+        }
+        catch (Exception ex)
+        {
+            TryLogError($"{GetCheckLabel(manual)} update check failed.", ex);
             return Result(UpdateCheckStatus.Failed);
         }
         finally
@@ -89,8 +106,14 @@ public sealed class UpdateCoordinator
             await _updateService.DownloadUpdatesAsync(update, progress, cancellationToken);
             return true;
         }
-        catch
+        catch (OperationCanceledException)
         {
+            TryLogInfo("Update download was canceled.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            TryLogError("Update download failed.", ex);
             return false;
         }
         finally
@@ -107,5 +130,29 @@ public sealed class UpdateCoordinator
     private UpdateCheckResult Result(UpdateCheckStatus status)
     {
         return new UpdateCheckResult(status, _updateService.CurrentVersion);
+    }
+
+    private static string GetCheckLabel(bool manual) => manual ? "Manual" : "Automatic";
+
+    private void TryLogInfo(string message)
+    {
+        try
+        {
+            _logger?.Info(message);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private void TryLogError(string message, Exception? exception = null)
+    {
+        try
+        {
+            _logger?.Error(message, exception);
+        }
+        catch (Exception)
+        {
+        }
     }
 }

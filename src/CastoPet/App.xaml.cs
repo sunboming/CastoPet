@@ -9,6 +9,7 @@ public partial class App : System.Windows.Application
     private readonly AppPaths _paths;
     private readonly CrashReportService _crashReports;
     private readonly LoggingService _logger;
+    private readonly CancellationTokenSource _applicationLifetime = new();
     private SingleInstanceService? _singleInstance;
     private TrayService? _tray;
     private PetWindow? _window;
@@ -69,7 +70,7 @@ public partial class App : System.Windows.Application
             executablePath);
 
         var updateService = new VelopackUpdateService();
-        _updates = new UpdateCoordinator(updateService, settings, settingsService.Save);
+        _updates = new UpdateCoordinator(updateService, settings, settingsService.Save, logger: _logger);
         _settingsWindow = new SettingsWindowService(
             () => new SettingsWindow(commands, _crashReports, _updates, _shortcutService, _shortcutDropHandler, _shortcutLauncher));
         commands.SettingsRequested += _settingsWindow.ShowOrActivate;
@@ -81,11 +82,12 @@ public partial class App : System.Windows.Application
         _window.Show();
         _window.ApplySettings(settings);
         ShowPendingCrashNotification(settings, settingsService);
-        _ = CheckForUpdatesAfterStartupAsync();
+        _ = CheckForUpdatesAfterStartupAsync(_applicationLifetime.Token);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _applicationLifetime.Cancel();
         _logger.Info("CastoPet shutdown.");
         _tray?.Dispose();
         _settingsWindow?.Dispose();
@@ -148,47 +150,57 @@ public partial class App : System.Windows.Application
         return _crashReports.TryWriteReport(exception, out _);
     }
 
-    private async Task CheckForUpdatesAfterStartupAsync()
+    private async Task CheckForUpdatesAfterStartupAsync(CancellationToken cancellationToken)
     {
-        await Task.Delay(TimeSpan.FromSeconds(10));
-        if (_updates is null)
+        try
         {
-            return;
-        }
-
-        var result = await _updates.CheckAsync(manual: false);
-        if (result.Status != UpdateCheckStatus.Available || result.AvailableUpdate is null)
-        {
-            return;
-        }
-
-        var notes = string.IsNullOrWhiteSpace(result.AvailableUpdate.ReleaseNotes)
-            ? "此版本没有发布说明。"
-            : result.AvailableUpdate.ReleaseNotes;
-        if (notes.Length > 600)
-        {
-            notes = notes[..600] + "...";
-        }
-
-        var choice = System.Windows.MessageBox.Show(
-            $"CastoPet {result.AvailableUpdate.Version} 已可用。\n\n{notes}\n\n是否立即更新？",
-            "CastoPet 更新",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Information);
-        if (choice == MessageBoxResult.Yes)
-        {
-            var downloaded = await _updates.DownloadUpdatesAsync(result.AvailableUpdate);
-            if (!downloaded)
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+            if (_updates is null)
             {
-                System.Windows.MessageBox.Show(
-                    "更新下载失败，当前版本不会受到影响。你可以稍后在设置中重试。",
-                    "CastoPet 更新",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
                 return;
             }
 
-            _updates.ApplyUpdatesAndRestart(result.AvailableUpdate);
+            var result = await _updates.CheckAsync(manual: false, cancellationToken);
+            if (result.Status != UpdateCheckStatus.Available || result.AvailableUpdate is null)
+            {
+                return;
+            }
+
+            var notes = string.IsNullOrWhiteSpace(result.AvailableUpdate.ReleaseNotes)
+                ? "此版本没有发布说明。"
+                : result.AvailableUpdate.ReleaseNotes;
+            if (notes.Length > 600)
+            {
+                notes = notes[..600] + "...";
+            }
+
+            var choice = System.Windows.MessageBox.Show(
+                $"CastoPet {result.AvailableUpdate.Version} 已可用。\n\n{notes}\n\n是否立即更新？",
+                "CastoPet 更新",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+            if (choice == MessageBoxResult.Yes)
+            {
+                var downloaded = await _updates.DownloadUpdatesAsync(result.AvailableUpdate, cancellationToken: cancellationToken);
+                if (!downloaded)
+                {
+                    System.Windows.MessageBox.Show(
+                        "更新下载失败，当前版本不会受到影响。你可以稍后在设置中重试。",
+                        "CastoPet 更新",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                _updates.ApplyUpdatesAndRestart(result.AvailableUpdate);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Automatic update workflow failed.", ex);
         }
     }
 }

@@ -30,13 +30,16 @@ var tests = new (string Name, Action Test)[]
     ("Crash reports keep a bounded log tail", CrashReportsKeepABoundedLogTail),
     ("Crash report service writes and acknowledges reports", CrashReportServiceWritesAndAcknowledgesReports),
     ("Crash report service contains file system failures", CrashReportServiceContainsFileSystemFailures),
+    ("Crash report service prunes old reports", CrashReportServicePrunesOldReports),
     ("Application registers all unhandled exception sources", ApplicationRegistersAllUnhandledExceptionSources),
+    ("Application cancels automatic update work on exit", ApplicationCancelsAutomaticUpdateWorkOnExit),
     ("Crash notification is local only", CrashNotificationIsLocalOnly),
     ("Update policy checks at most once per local day", UpdatePolicyChecksAtMostOncePerLocalDay),
     ("Manual update checks bypass the daily gate", ManualUpdateChecksBypassTheDailyGate),
     ("Update coordinator skips development builds", UpdateCoordinatorSkipsDevelopmentBuilds),
     ("Update coordinator records automatic attempts before network", UpdateCoordinatorRecordsAutomaticAttemptsBeforeNetwork),
     ("Update coordinator maps network failures", UpdateCoordinatorMapsNetworkFailures),
+    ("Update coordinator logs network failures", UpdateCoordinatorLogsNetworkFailures),
     ("Update coordinator rejects concurrent checks", UpdateCoordinatorRejectsConcurrentChecks),
     ("Project pins semantic version and Velopack", ProjectPinsSemanticVersionAndVelopack),
     ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
@@ -47,6 +50,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window settings snapshot copies input reactive mode", PetWindowSettingsSnapshotCopiesInputReactiveMode),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
     ("Logging writes a dated log file", LoggingWritesDatedLogFile),
+    ("Logging rotates bounded archive files", LoggingRotatesBoundedArchiveFiles),
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
     ("Startup value name is CastoPet", StartupValueNameIsCastoPet),
     ("Startup registration matches current executable path", StartupRegistrationMatchesCurrentExecutablePath),
@@ -577,6 +581,29 @@ static void CrashReportServiceContainsFileSystemFailures()
     Assert.True(report is null, "Failed writes should not return report metadata.");
 }
 
+static void CrashReportServicePrunesOldReports()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var timestamp = new DateTimeOffset(2026, 7, 17, 8, 0, 0, TimeSpan.Zero);
+    var nextReport = -1;
+    var service = new CrashReportService(
+        paths,
+        new LoggingService(paths),
+        maxReports: 3,
+        nowProvider: () => timestamp.AddMilliseconds(Interlocked.Increment(ref nextReport)));
+
+    for (var index = 0; index < 5; index++)
+    {
+        Assert.True(service.TryWriteReport(new Exception($"failure-{index}"), out _), "Crash report write should succeed.");
+    }
+
+    var reports = Directory.EnumerateFiles(paths.CrashesDirectory, "crash-*.txt").Order().ToArray();
+    Assert.Equal(3, reports.Length, "Crash retention should keep only the configured number of reports.");
+    Assert.False(File.ReadAllText(reports[0]).Contains("failure-0", StringComparison.Ordinal), "The oldest report should be pruned first.");
+    Assert.Contains(File.ReadAllText(reports[^1]), "failure-4", "The newest report should remain available.");
+}
+
 static void ApplicationRegistersAllUnhandledExceptionSources()
 {
     var workspace = FindWorkspaceRoot();
@@ -585,6 +612,16 @@ static void ApplicationRegistersAllUnhandledExceptionSources()
     Assert.Contains(appSource, "DispatcherUnhandledException", "WPF dispatcher exceptions should be recorded.");
     Assert.Contains(appSource, "AppDomain.CurrentDomain.UnhandledException", "Non-UI fatal exceptions should be recorded.");
     Assert.Contains(appSource, "TaskScheduler.UnobservedTaskException", "Unobserved task exceptions should be recorded.");
+}
+
+static void ApplicationCancelsAutomaticUpdateWorkOnExit()
+{
+    var workspace = FindWorkspaceRoot();
+    var appSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+
+    Assert.Contains(appSource, "_applicationLifetime.Cancel()", "Application exit should cancel pending background work.");
+    Assert.Contains(appSource, "Task.Delay(TimeSpan.FromSeconds(10), cancellationToken)", "Startup update delay should observe application cancellation.");
+    Assert.Contains(appSource, "CheckAsync(manual: false, cancellationToken)", "Automatic update checks should observe application cancellation.");
 }
 
 static void CrashNotificationIsLocalOnly()
@@ -656,6 +693,27 @@ static void UpdateCoordinatorMapsNetworkFailures()
     var result = coordinator.CheckAsync(manual: true).GetAwaiter().GetResult();
 
     Assert.Equal(UpdateCheckStatus.Failed, result.Status, "Network errors should map to a retryable failed status.");
+}
+
+static void UpdateCoordinatorLogsNetworkFailures()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var service = new FakeUpdateService { Exception = new HttpRequestException("offline-for-test") };
+    var coordinator = new UpdateCoordinator(
+        service,
+        AppSettings.Default,
+        _ => true,
+        () => new DateOnly(2026, 7, 17),
+        logger: logger);
+
+    var result = coordinator.CheckAsync(manual: true).GetAwaiter().GetResult();
+
+    Assert.Equal(UpdateCheckStatus.Failed, result.Status, "A logged network error should remain retryable.");
+    var log = File.ReadAllText(paths.LogFile);
+    Assert.Contains(log, "Manual update check failed", "Update logs should identify the failed operation.");
+    Assert.Contains(log, "offline-for-test", "Update logs should retain the underlying exception details.");
 }
 
 static void UpdateCoordinatorRejectsConcurrentChecks()
@@ -789,6 +847,24 @@ static void LoggingWritesDatedLogFile()
     Assert.True(File.Exists(paths.LogFile), "Log file should exist.");
     var text = File.ReadAllText(paths.LogFile);
     Assert.Contains(text, "hello", "Log file should include message.");
+}
+
+static void LoggingRotatesBoundedArchiveFiles()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths, maxLogFileBytes: 180, maxArchiveFiles: 2);
+
+    for (var index = 0; index < 8; index++)
+    {
+        logger.Info($"entry-{index}-{new string('x', 150)}");
+    }
+
+    var logName = System.IO.Path.GetFileName(paths.LogFile);
+    var files = Directory.EnumerateFiles(paths.LogsDirectory, $"{logName}*").ToArray();
+    Assert.True(files.Length <= 3, "Logging should keep the current file and at most two archives.");
+    Assert.True(File.Exists(paths.LogFile + ".1"), "Rotation should create the newest archive.");
+    Assert.Contains(File.ReadAllText(paths.LogFile), "entry-7", "The current log should contain the newest entry.");
 }
 
 static void BottomRightPlacementUsesWorkAreaMargin()

@@ -10,13 +10,24 @@ public sealed record CrashReportInfo(string Id, string Path, DateTimeOffset Crea
 
 public sealed class CrashReportService
 {
+    public const int DefaultMaxReports = 20;
+
     private readonly AppPaths _paths;
     private readonly LoggingService _logger;
+    private readonly int _maxReports;
+    private readonly Func<DateTimeOffset> _nowProvider;
 
-    public CrashReportService(AppPaths paths, LoggingService logger)
+    public CrashReportService(
+        AppPaths paths,
+        LoggingService logger,
+        int maxReports = DefaultMaxReports,
+        Func<DateTimeOffset>? nowProvider = null)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxReports, 1);
         _paths = paths;
         _logger = logger;
+        _maxReports = maxReports;
+        _nowProvider = nowProvider ?? (() => DateTimeOffset.UtcNow);
     }
 
     public bool TryWriteReport(Exception exception, out CrashReportInfo? report)
@@ -27,7 +38,7 @@ public sealed class CrashReportService
         try
         {
             Directory.CreateDirectory(_paths.CrashesDirectory);
-            var now = DateTimeOffset.UtcNow;
+            var now = _nowProvider();
             var id = $"crash-{now:yyyyMMdd-HHmmssfff}-{Guid.NewGuid():N}";
             var finalPath = System.IO.Path.Combine(_paths.CrashesDirectory, $"{id}.txt");
             temporaryPath = finalPath + ".tmp";
@@ -37,6 +48,7 @@ public sealed class CrashReportService
             File.WriteAllText(temporaryPath, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             File.Move(temporaryPath, finalPath);
             report = new CrashReportInfo(id, finalPath, now);
+            TryPruneOldReports();
             return true;
         }
         catch (Exception writeException)
@@ -135,6 +147,25 @@ public sealed class CrashReportService
         catch
         {
             // Crash handling must never throw a secondary exception.
+        }
+    }
+
+    private void TryPruneOldReports()
+    {
+        try
+        {
+            var oldReports = Directory
+                .EnumerateFiles(_paths.CrashesDirectory, "crash-*.txt", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(System.IO.Path.GetFileName, StringComparer.Ordinal)
+                .Skip(_maxReports);
+            foreach (var path in oldReports)
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception exception)
+        {
+            TryLogFailure(exception);
         }
     }
 
