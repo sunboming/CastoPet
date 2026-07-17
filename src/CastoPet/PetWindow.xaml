@@ -39,13 +39,20 @@
                IsHitTestVisible="False"
                Placement="AbsolutePoint"
                StaysOpen="True">
-            <Grid Width="44" Height="44">
-                <Ellipse Stroke="#604B2C6E"
-                         StrokeThickness="2" />
+            <Grid Width="58" Height="58">
+                <Ellipse Margin="2"
+                         Stroke="#809F65D8"
+                         StrokeThickness="3" />
+                <Ellipse Fill="#C044175F"
+                         Stroke="#D6C29AE8"
+                         StrokeThickness="1.5" />
+                <Ellipse Margin="7"
+                         Stroke="#B8754B9B"
+                         StrokeThickness="4" />
                 <Path x:Name="RadialWheelHoldArc"
                       Fill="Transparent"
-                      Stroke="#F0EED7FF"
-                      StrokeThickness="2.5"
+                      Stroke="#FFF7E5FF"
+                      StrokeThickness="5"
                       StrokeStartLineCap="Round"
                       StrokeEndLineCap="Round" />
             </Grid>

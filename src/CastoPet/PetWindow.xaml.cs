@@ -37,8 +37,8 @@ public partial class PetWindow : Window
     private const double DefaultMoveMaxSpeedPixelsPerSecond = 105;
     private const double MinimumLeftDragThreshold = 6;
     private const double RightWheelDragThreshold = 14;
-    private const double HoldIndicatorSize = 44;
-    private const double HoldIndicatorRadius = 18;
+    private const double HoldIndicatorSize = 58;
+    private const double HoldIndicatorRadius = 22;
 
     private readonly LoggingService _logger;
     private readonly PetRuntimeState _runtimeState = new();
@@ -52,7 +52,6 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _blinkFrameTimer;
     private readonly DispatcherTimer _pettingFrameTimer;
     private readonly DispatcherTimer _dragRestoreTimer;
-    private readonly DispatcherTimer _radialWheelHoldTimer;
     private readonly DispatcherTimer _radialWheelPointerProbeTimer;
     private readonly DispatcherTimer _temporaryExpressionTimer;
     private readonly DispatcherTimer _expressionTransitionFrameTimer;
@@ -124,6 +123,7 @@ public partial class PetWindow : Window
     private double? _expectedCursorY;
     private int _moveFrameIndex;
     private bool _activeMovementRenderingSubscribed;
+    private bool _radialWheelHoldRenderingSubscribed;
     private WpfControls.ContextMenu? _petContextMenu;
 
     private enum ExpressionTransitionMode
@@ -209,8 +209,6 @@ public partial class PetWindow : Window
         _pettingFrameTimer.Tick += (_, _) => AdvancePettingFrame();
         _dragRestoreTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _dragRestoreTimer.Tick += (_, _) => RestoreAfterDrag();
-        _radialWheelHoldTimer = new DispatcherTimer { Interval = RadialWheelPointerProbeInterval };
-        _radialWheelHoldTimer.Tick += (_, _) => UpdateRadialWheelHoldGesture();
         _radialWheelPointerProbeTimer = new DispatcherTimer { Interval = RadialWheelPointerProbeInterval };
         _radialWheelPointerProbeTimer.Tick += (_, _) => ProbeRadialWheelPointer();
         _temporaryExpressionTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.ExpressionDuration };
@@ -649,10 +647,10 @@ public partial class PetWindow : Window
 
         _requestedRadialWheelOrigin = ToScreenPoint(position);
         CaptureMouse();
-        _radialWheelHoldTimer.Stop();
+        StopRadialWheelHoldRendering();
         if (_wheelCatalog.Categories.Count > 0)
         {
-            _radialWheelHoldTimer.Start();
+            StartRadialWheelHoldRendering();
         }
         e.Handled = true;
     }
@@ -706,7 +704,7 @@ public partial class PetWindow : Window
 
     private void OnMouseRightButtonUp(object sender, WpfInput.MouseButtonEventArgs e)
     {
-        _radialWheelHoldTimer.Stop();
+        StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
 
         if (!_isRadialWheelOpen)
@@ -1633,6 +1631,33 @@ public partial class PetWindow : Window
         UpdateRadialWheelHoldFeedback(_pointerGestures.GetRightHoldProgress(now, RadialWheelHoldRevealDelay));
     }
 
+    private void StartRadialWheelHoldRendering()
+    {
+        if (_radialWheelHoldRenderingSubscribed)
+        {
+            return;
+        }
+
+        CompositionTarget.Rendering += OnRadialWheelHoldRendering;
+        _radialWheelHoldRenderingSubscribed = true;
+    }
+
+    private void StopRadialWheelHoldRendering()
+    {
+        if (!_radialWheelHoldRenderingSubscribed)
+        {
+            return;
+        }
+
+        CompositionTarget.Rendering -= OnRadialWheelHoldRendering;
+        _radialWheelHoldRenderingSubscribed = false;
+    }
+
+    private void OnRadialWheelHoldRendering(object? sender, EventArgs e)
+    {
+        UpdateRadialWheelHoldGesture();
+    }
+
     private void UpdateRadialWheelHoldFeedback(double progress)
     {
         if (progress <= 0)
@@ -1676,7 +1701,7 @@ public partial class PetWindow : Window
 
     private void CancelPendingPointerGesture(bool releaseCapture = true)
     {
-        _radialWheelHoldTimer.Stop();
+        StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
         _pointerGestures.Cancel();
         if (releaseCapture)
@@ -1726,7 +1751,7 @@ public partial class PetWindow : Window
 
     private void OpenRadialWheel()
     {
-        _radialWheelHoldTimer.Stop();
+        StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
         if (_wheelCatalog.Categories.Count == 0 || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
         {
@@ -1755,7 +1780,7 @@ public partial class PetWindow : Window
 
     private void CloseRadialWheel(bool cancelController, bool restoreAnimation = true)
     {
-        _radialWheelHoldTimer.Stop();
+        StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
         _radialWheelPointerProbeTimer.Stop();
         _pointerGestures.Cancel();

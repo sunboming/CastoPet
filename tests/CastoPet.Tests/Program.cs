@@ -2344,6 +2344,9 @@ static void PetWindowDefinesHoldFeedbackAndPettingPlayback()
     Assert.Contains(xaml, "RadialWheelHoldOverlay", "Right hold should have a dedicated non-interactive progress overlay.");
     Assert.Contains(xaml, "RadialWheelHoldArc", "Hold feedback should expose an updateable circular arc.");
     Assert.Contains(source, "GetRightHoldProgress", "Hold feedback should use classifier timing.");
+    Assert.Contains(source, "CompositionTarget.Rendering += OnRadialWheelHoldRendering", "Hold feedback should update on display composition frames.");
+    Assert.Contains(source, "CompositionTarget.Rendering -= OnRadialWheelHoldRendering", "Hold feedback should release its composition-frame subscription.");
+    Assert.False(xaml.Contains("DropShadowEffect", StringComparison.Ordinal), "The changing hold arc should not invalidate a real-time blur effect every frame.");
     Assert.Contains(source, "LoadPettingFrames", "PetWindow should load optional skin petting frames.");
     Assert.Contains(source, "AdvancePettingFrame", "Petting should play as a one-shot frame sequence.");
     Assert.Contains(source, "_isPetting", "Passive runtime modes should be able to gate on petting playback.");
