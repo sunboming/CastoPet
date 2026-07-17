@@ -2,6 +2,9 @@ namespace CastoPet.Core;
 
 public sealed class AppSettings
 {
+    public const int CurrentSchemaVersion = 1;
+
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public bool Topmost { get; set; } = true;
     public bool ClickThrough { get; set; }
     public bool ShowInTaskbar { get; set; }
@@ -20,6 +23,7 @@ public sealed class AppSettings
     {
         return new AppSettings
         {
+            SchemaVersion = SchemaVersion,
             Topmost = Topmost,
             ClickThrough = ClickThrough,
             ShowInTaskbar = ShowInTaskbar,
@@ -32,5 +36,21 @@ public sealed class AppSettings
             LastAcknowledgedCrashId = LastAcknowledgedCrashId,
             LastAutomaticUpdateCheckDate = LastAutomaticUpdateCheckDate,
         };
+    }
+
+    public void CopyFrom(AppSettings source)
+    {
+        SchemaVersion = source.SchemaVersion;
+        Topmost = source.Topmost;
+        ClickThrough = source.ClickThrough;
+        ShowInTaskbar = source.ShowInTaskbar;
+        StartWithWindows = source.StartWithWindows;
+        ActiveMovement = source.ActiveMovement;
+        PushCursor = source.PushCursor;
+        InputReactiveMode = source.InputReactiveMode;
+        ThemeMode = source.ThemeMode;
+        SkinManifestPath = source.SkinManifestPath;
+        LastAcknowledgedCrashId = source.LastAcknowledgedCrashId;
+        LastAutomaticUpdateCheckDate = source.LastAutomaticUpdateCheckDate;
     }
 }

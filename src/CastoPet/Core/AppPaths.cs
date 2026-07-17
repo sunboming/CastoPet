@@ -13,6 +13,8 @@ public sealed class AppPaths
         CrashesDirectory = Path.Combine(DataDirectory, "Crashes");
         ShortcutsDirectory = Path.Combine(DataDirectory, "Shortcuts");
         SettingsFile = Path.Combine(DataDirectory, "settings.json");
+        SettingsBackupFile = SettingsFile + ".bak";
+        SettingsTemporaryFile = SettingsFile + ".tmp";
         ShortcutsFile = Path.Combine(ShortcutsDirectory, "shortcuts.json");
         LogFile = Path.Combine(LogsDirectory, $"{DateTime.Now:yyyy-MM-dd}.log");
     }
@@ -22,6 +24,8 @@ public sealed class AppPaths
     public string CrashesDirectory { get; }
     public string ShortcutsDirectory { get; }
     public string SettingsFile { get; }
+    public string SettingsBackupFile { get; }
+    public string SettingsTemporaryFile { get; }
     public string ShortcutsFile { get; }
     public string LogFile { get; }
 }

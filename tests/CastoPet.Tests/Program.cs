@@ -14,6 +14,10 @@ var tests = new (string Name, Action Test)[]
     ("Settings round trip includes input reactive mode", SettingsRoundTripIncludesInputReactiveMode),
     ("Settings round trip includes skin manifest path", SettingsRoundTripIncludesSkinManifestPath),
     ("Settings round trip includes theme mode", SettingsRoundTripIncludesThemeMode),
+    ("Settings save is atomic and versioned", SettingsSaveIsAtomicAndVersioned),
+    ("Settings load restores the last valid backup", SettingsLoadRestoresTheLastValidBackup),
+    ("Settings load migrates legacy schema", SettingsLoadMigratesLegacySchema),
+    ("Settings transaction rolls back failed persistence", SettingsTransactionRollsBackFailedPersistence),
     ("App paths include local crash reports", AppPathsIncludeLocalCrashReports),
     ("Settings round trip includes crash and update state", SettingsRoundTripIncludesCrashAndUpdateState),
     ("Settings clone includes crash and update state", SettingsCloneIncludesCrashAndUpdateState),
@@ -336,6 +340,80 @@ static void SettingsRoundTripIncludesThemeMode()
     var loaded = service.Load();
 
     Assert.Equal(AppThemeMode.Dark, loaded.ThemeMode, "Theme mode should round trip.");
+}
+
+static void SettingsSaveIsAtomicAndVersioned()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new SettingsService(paths, new LoggingService(paths));
+
+    Assert.True(service.Save(new AppSettings { Topmost = true }), "Initial settings save should succeed.");
+    Assert.True(service.Save(new AppSettings { Topmost = false }), "Replacement settings save should succeed.");
+
+    Assert.True(File.Exists(paths.SettingsFile), "Atomic save should leave the current settings file.");
+    Assert.True(File.Exists(paths.SettingsBackupFile), "Atomic replacement should retain the previous valid settings file.");
+    Assert.False(File.Exists(paths.SettingsTemporaryFile), "Atomic save should not leave a temporary file behind.");
+
+    using var current = System.Text.Json.JsonDocument.Parse(File.ReadAllText(paths.SettingsFile));
+    using var backup = System.Text.Json.JsonDocument.Parse(File.ReadAllText(paths.SettingsBackupFile));
+    Assert.Equal(AppSettings.CurrentSchemaVersion, current.RootElement.GetProperty("SchemaVersion").GetInt32(), "Saved settings should declare the current schema.");
+    Assert.False(current.RootElement.GetProperty("Topmost").GetBoolean(), "Current settings should contain the replacement value.");
+    Assert.True(backup.RootElement.GetProperty("Topmost").GetBoolean(), "Backup settings should contain the previous valid value.");
+}
+
+static void SettingsLoadRestoresTheLastValidBackup()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new SettingsService(paths, new LoggingService(paths));
+    service.Save(new AppSettings { ClickThrough = false });
+    service.Save(new AppSettings { ClickThrough = true });
+    File.WriteAllText(paths.SettingsFile, "{broken json");
+
+    var loaded = service.Load();
+
+    Assert.False(loaded.ClickThrough, "A damaged current file should recover the previous valid settings.");
+    Assert.True(Directory.EnumerateFiles(paths.DataDirectory, "settings.invalid-*.json").Any(), "The damaged file should be preserved for diagnosis.");
+    Assert.Equal(AppSettings.CurrentSchemaVersion, loaded.SchemaVersion, "Recovered settings should use the current schema.");
+    Assert.False(new SettingsService(paths, new LoggingService(paths)).Load().ClickThrough, "The recovered backup should replace the damaged current file.");
+}
+
+static void SettingsLoadMigratesLegacySchema()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    Directory.CreateDirectory(paths.DataDirectory);
+    File.WriteAllText(paths.SettingsFile, """
+        {
+          "Topmost": false,
+          "ThemeMode": 2
+        }
+        """);
+
+    var loaded = new SettingsService(paths, new LoggingService(paths)).Load();
+
+    Assert.Equal(AppSettings.CurrentSchemaVersion, loaded.SchemaVersion, "A legacy file without schemaVersion should migrate in memory.");
+    Assert.False(loaded.Topmost, "Legacy values should survive migration.");
+    Assert.Equal(AppThemeMode.Dark, loaded.ThemeMode, "Legacy theme values should survive migration.");
+}
+
+static void SettingsTransactionRollsBackFailedPersistence()
+{
+    var settings = new AppSettings { Topmost = true, ThemeMode = AppThemeMode.Light };
+
+    var saved = SettingsTransaction.TryApply(
+        settings,
+        candidate =>
+        {
+            candidate.Topmost = false;
+            candidate.ThemeMode = AppThemeMode.Dark;
+        },
+        _ => false);
+
+    Assert.False(saved, "A failed save should report failure.");
+    Assert.True(settings.Topmost, "A failed save should restore the original boolean value.");
+    Assert.Equal(AppThemeMode.Light, settings.ThemeMode, "A failed save should restore the original theme.");
 }
 
 static void AppPathsIncludeLocalCrashReports()

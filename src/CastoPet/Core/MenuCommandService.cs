@@ -45,38 +45,32 @@ public sealed class MenuCommandService
 
     public void ToggleTopmost()
     {
-        Settings.Topmost = !Settings.Topmost;
-        ApplyAndSave("Always on top setting changed.");
+        ApplyAndSave(settings => settings.Topmost = !settings.Topmost, "Always on top setting changed.");
     }
 
     public void ToggleClickThrough()
     {
-        Settings.ClickThrough = !Settings.ClickThrough;
-        ApplyAndSave("Mouse click-through setting changed.");
+        ApplyAndSave(settings => settings.ClickThrough = !settings.ClickThrough, "Mouse click-through setting changed.");
     }
 
     public void ToggleActiveMovement()
     {
-        Settings.ActiveMovement = !Settings.ActiveMovement;
-        ApplyAndSave("Active movement setting changed.");
+        ApplyAndSave(settings => settings.ActiveMovement = !settings.ActiveMovement, "Active movement setting changed.");
     }
 
     public void TogglePushCursor()
     {
-        Settings.PushCursor = !Settings.PushCursor;
-        ApplyAndSave("Push cursor setting changed.");
+        ApplyAndSave(settings => settings.PushCursor = !settings.PushCursor, "Push cursor setting changed.");
     }
 
     public void ToggleInputReactiveMode()
     {
-        Settings.InputReactiveMode = !Settings.InputReactiveMode;
-        ApplyAndSave("Input reactive mode setting changed.");
+        ApplyAndSave(settings => settings.InputReactiveMode = !settings.InputReactiveMode, "Input reactive mode setting changed.");
     }
 
     public void ToggleShowInTaskbar()
     {
-        Settings.ShowInTaskbar = !Settings.ShowInTaskbar;
-        ApplyAndSave("Taskbar visibility setting changed.");
+        ApplyAndSave(settings => settings.ShowInTaskbar = !settings.ShowInTaskbar, "Taskbar visibility setting changed.");
     }
 
     public void ToggleStartWithWindows()
@@ -92,8 +86,10 @@ public sealed class MenuCommandService
             return;
         }
 
-        Settings.StartWithWindows = target;
-        ApplyAndSave("Start with Windows setting changed.");
+        if (!ApplyAndSave(settings => settings.StartWithWindows = target, "Start with Windows setting changed."))
+        {
+            _startupService.SetEnabled(!target, _executablePath);
+        }
     }
 
     public void SetThemeMode(AppThemeMode mode)
@@ -103,10 +99,7 @@ public sealed class MenuCommandService
             return;
         }
 
-        Settings.ThemeMode = mode;
-        _settingsService.Save(Settings);
-        _logger.Info($"Settings theme changed to {mode}.");
-        SettingsChanged?.Invoke();
+        ApplyAndSave(settings => settings.ThemeMode = mode, $"Settings theme changed to {mode}.", applyToPet: false);
     }
 
     public void Exit()
@@ -115,11 +108,29 @@ public sealed class MenuCommandService
         Wpf.Application.Current.Shutdown();
     }
 
-    private void ApplyAndSave(string logMessage)
+    private bool ApplyAndSave(
+        Action<AppSettings> mutation,
+        string logMessage,
+        bool applyToPet = true)
     {
-        _window.ApplySettings(Settings);
-        _settingsService.Save(Settings);
+        if (!SettingsTransaction.TryApply(Settings, mutation, _settingsService.Save))
+        {
+            SettingsChanged?.Invoke();
+            Wpf.MessageBox.Show(
+                "CastoPet 无法保存设置，修改已撤销。",
+                "CastoPet",
+                Wpf.MessageBoxButton.OK,
+                Wpf.MessageBoxImage.Warning);
+            return false;
+        }
+
+        if (applyToPet)
+        {
+            _window.ApplySettings(Settings);
+        }
+
         _logger.Info(logMessage);
         SettingsChanged?.Invoke();
+        return true;
     }
 }
