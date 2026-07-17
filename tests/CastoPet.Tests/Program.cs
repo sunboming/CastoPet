@@ -158,6 +158,9 @@ var tests = new (string Name, Action Test)[]
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
     ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
     ("Movement planner detects mouse approach rest position", MovementPlannerDetectsMouseApproachRestPosition),
+    ("Movement controller advances logical positions", MovementControllerAdvancesLogicalPositions),
+    ("Movement controller schedules bounded wander targets", MovementControllerSchedulesBoundedWanderTargets),
+    ("Movement controller advances frames by distance", MovementControllerAdvancesFramesByDistance),
     ("Cursor nudge planner nudges nearby cursor", CursorNudgePlannerNudgesNearbyCursor),
     ("Cursor nudge planner ignores distant cursor", CursorNudgePlannerIgnoresDistantCursor),
     ("Cursor nudge planner clamps to work area", CursorNudgePlannerClampsToWorkArea),
@@ -2853,6 +2856,59 @@ static void MovementPlannerDetectsMouseApproachRestPosition()
             mouseY: 150,
             bounds),
         "Pet should still move when away from the mouse approach target.");
+}
+
+static void MovementControllerAdvancesLogicalPositions()
+{
+    var controller = new PetMovementController(CreateTestMoveAction(), new Random(7));
+    controller.BeginRendering(left: 0, top: 0);
+    controller.SetTarget(new PetMovementTarget(100, 0));
+
+    var initial = controller.Advance(TimeSpan.Zero, currentLeft: 0, currentTop: 0);
+    var moved = controller.Advance(TimeSpan.FromSeconds(1), currentLeft: 0, currentTop: 0);
+
+    Assert.True(initial is null, "The first rendering sample should establish timing without moving.");
+    Assert.True(moved is not null, "A later rendering sample should advance toward the target.");
+    Assert.Equal(90d, moved!.Value.NextLeft, "The configured base speed should determine logical movement.");
+    Assert.Equal(0d, moved.Value.NextTop, "Horizontal movement should preserve the vertical coordinate.");
+    Assert.Equal(90d, moved.Value.Distance, "Movement output should report the traveled distance.");
+}
+
+static void MovementControllerSchedulesBoundedWanderTargets()
+{
+    var controller = new PetMovementController(CreateTestMoveAction(), new Random(11));
+    var bounds = new PetMovementBounds(0, 0, 500, 400);
+    var now = new DateTime(2026, 7, 17, 12, 0, 0, DateTimeKind.Utc);
+
+    Assert.True(controller.TryChooseWanderTarget(now, 450, 350, 100, 100, bounds), "A due controller should choose a wander target.");
+    Assert.True(controller.Target.Left >= 0 && controller.Target.Left <= 400, "Wander target should keep the pet inside horizontal bounds.");
+    Assert.True(controller.Target.Top >= 0 && controller.Target.Top <= 300, "Wander target should keep the pet inside vertical bounds.");
+
+    controller.CompleteTarget(now);
+    Assert.False(controller.IsWanderDue(now), "Completing a target should schedule a rest interval.");
+    Assert.True(controller.IsWanderDue(now.AddSeconds(3)), "The next wander should become due after the maximum rest interval.");
+}
+
+static void MovementControllerAdvancesFramesByDistance()
+{
+    var controller = new PetMovementController(CreateTestMoveAction(), new Random(3));
+
+    Assert.Equal(new PetMoveFrameAdvance(2, true), controller.AdvanceMoveFrame(distance: 25, frameCount: 8), "Twenty-five pixels should cross two ten-pixel frames.");
+    Assert.Equal(new PetMoveFrameAdvance(3, true), controller.AdvanceMoveFrame(distance: 5, frameCount: 8), "The carried distance should advance the next frame.");
+    controller.ResetMoveFrames();
+    Assert.Equal(0, controller.MoveFrameIndex, "Reset should restore movement frame zero.");
+}
+
+static PetActionDefinition CreateTestMoveAction()
+{
+    return new PetActionDefinition(
+        Id: "test-move",
+        Kind: PetActionKind.Move,
+        FramePaths: Array.Empty<string>(),
+        DistancePerFrame: 10,
+        BaseSpeedPixelsPerSecond: 90,
+        MinSpeedPixelsPerSecond: 80,
+        MaxSpeedPixelsPerSecond: 105);
 }
 
 static void CursorNudgePlannerNudgesNearbyCursor()

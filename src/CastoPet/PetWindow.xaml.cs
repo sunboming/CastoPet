@@ -31,10 +31,6 @@ public partial class PetWindow : Window
     private static readonly TimeSpan RadialWheelHoldRevealDelay = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan PettingFallbackDuration = TimeSpan.FromMilliseconds(240);
     private static readonly string[] UrlDropFormats = ["UniformResourceLocatorW", "UniformResourceLocator"];
-    private const double DefaultMoveDistancePerFrame = 10;
-    private const double DefaultMoveBaseSpeedPixelsPerSecond = 90;
-    private const double DefaultMoveMinSpeedPixelsPerSecond = 80;
-    private const double DefaultMoveMaxSpeedPixelsPerSecond = 105;
     private const double MinimumLeftDragThreshold = 6;
     private const double RightWheelDragThreshold = 14;
     private const double HoldIndicatorSize = 58;
@@ -43,6 +39,7 @@ public partial class PetWindow : Window
     private readonly LoggingService _logger;
     private readonly PetRuntimeState _runtimeState = new();
     private readonly PetAnimationController _animationController = new();
+    private readonly PetMovementController _movementController;
     private readonly ImageSource _defaultCharacter;
     private readonly ImageSource _draggingCharacter;
     private readonly IReadOnlyList<ImageSource> _idleFrames;
@@ -82,10 +79,7 @@ public partial class PetWindow : Window
     private readonly List<RadialWheelItemVisual> _firstRingVisuals = new();
     private readonly List<RadialWheelItemVisual> _secondRingVisuals = new();
     private readonly Random _blinkRandom = new();
-    private readonly Random _movementRandom = new();
     private PetWindowSettingsSnapshot? _pendingSettings;
-    private PetMovementTarget _activeMovementTarget;
-    private DateTime _nextWanderDecisionUtc = DateTime.MinValue;
     private WpfPoint _requestedRadialWheelOrigin;
     private WpfPoint _radialWheelOrigin;
     private WpfPoint _lastRadialWheelPointer;
@@ -98,24 +92,17 @@ public partial class PetWindow : Window
     private bool _activeMovementEnabled;
     private bool _pushCursorEnabled;
     private bool _inputReactiveModeEnabled;
-    private bool _hasActiveMovementTarget;
     private string _secondRingContentKey = "closed";
     private PetExpressionAsset? _pendingExpressionAsset;
     private PetExpressionAsset? _activeExpressionAsset;
     private IReadOnlyList<ImageSource> _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
     private bool _activeExpressionUsesSpecificTransition;
-    private TimeSpan? _lastActiveMovementRenderTime;
     private TimeSpan? _lastManualCursorMovementTime;
     private TimeSpan? _cursorPushStartedAt;
     private int _activeMovementVisualDirection;
     private bool _dragMovementVisualApplied;
-    private double _lastMovementDeltaX;
-    private double _logicalLeft;
-    private double _logicalTop;
-    private double _moveFrameDistanceAccumulator;
     private double? _expectedCursorX;
     private double? _expectedCursorY;
-    private int _moveFrameIndex;
     private bool _activeMovementRenderingSubscribed;
     private bool _radialWheelHoldRenderingSubscribed;
     private WpfControls.ContextMenu? _petContextMenu;
@@ -176,6 +163,7 @@ public partial class PetWindow : Window
         _radialWheelController = new RadialWheelController(_wheelCatalog);
         _idleAction = assets.Skin.GetRequiredAction(PetActionKind.Idle);
         _moveAction = assets.Skin.GetRequiredAction(PetActionKind.Move);
+        _movementController = new PetMovementController(_moveAction);
         _blinkAction = assets.Skin.GetRequiredAction(PetActionKind.Blink);
         _pettingAction = assets.Skin.TryGetAction(PetActionKind.Petting, out var pettingAction)
             ? pettingAction
@@ -419,7 +407,7 @@ public partial class PetWindow : Window
             PassiveAnimationAllowed: InputReactiveModePolicy.AllowsPassiveAnimation(
                 IsInputReactiveModeBlockingPassiveAnimation()),
             IsDragging: _isDragging,
-            HasActiveMovementTarget: _hasActiveMovementTarget,
+            HasActiveMovementTarget: _movementController.HasTarget,
             IsRadialWheelOpen: _isRadialWheelOpen,
             HasTemporaryExpression: _temporaryExpressionTimer.IsEnabled);
     }
@@ -434,7 +422,7 @@ public partial class PetWindow : Window
 
         StopActiveMovementProbe();
         StopActiveMovementRendering();
-        _hasActiveMovementTarget = false;
+        _movementController.CancelTarget();
         StopIdleAnimation();
         StopBlinkAnimation();
         ResetMoveFrameState();
@@ -791,7 +779,7 @@ public partial class PetWindow : Window
         CancelTemporaryExpression();
         StopInputReactiveMode(restoreIdle: false);
         StopActiveMovementRendering();
-        _hasActiveMovementTarget = false;
+        _movementController.CancelTarget();
         _isDragging = true;
         _dragRestoreTimer.Stop();
         StopIdleAnimation();
@@ -835,7 +823,7 @@ public partial class PetWindow : Window
         StopInputReactiveMode(restoreIdle: false);
         StopActiveMovementProbe();
         StopActiveMovementRendering();
-        _hasActiveMovementTarget = false;
+        _movementController.CancelTarget();
         _dragRestoreTimer.Stop();
         StopIdleAnimation();
         StopBlinkAnimation();
@@ -964,7 +952,7 @@ public partial class PetWindow : Window
 
         StopActiveMovementProbe();
         StopActiveMovementRendering();
-        _hasActiveMovementTarget = false;
+        _movementController.CancelTarget();
         ResetMoveFrameState();
         ResetActiveMovementVisual();
     }
@@ -1015,7 +1003,7 @@ public partial class PetWindow : Window
             return;
         }
 
-        if (DateTime.UtcNow >= _nextWanderDecisionUtc)
+        if (_movementController.IsWanderDue(DateTime.UtcNow))
         {
             StartActiveMovementRendering();
         }
@@ -1028,9 +1016,7 @@ public partial class PetWindow : Window
             return;
         }
 
-        _logicalLeft = Left;
-        _logicalTop = Top;
-        _lastActiveMovementRenderTime = null;
+        _movementController.BeginRendering(Left, Top);
         CompositionTarget.Rendering += OnActiveMovementRendering;
         _activeMovementRenderingSubscribed = true;
     }
@@ -1044,7 +1030,7 @@ public partial class PetWindow : Window
 
         CompositionTarget.Rendering -= OnActiveMovementRendering;
         _activeMovementRenderingSubscribed = false;
-        _lastActiveMovementRenderTime = null;
+        _movementController.StopRendering();
         _expectedCursorX = null;
         _expectedCursorY = null;
         _cursorPushStartedAt = null;
@@ -1068,18 +1054,9 @@ public partial class PetWindow : Window
             return;
         }
 
-        if (_lastActiveMovementRenderTime is null)
+        if (!_movementController.HasRenderingTime)
         {
-            _lastActiveMovementRenderTime = renderingTime;
-            _logicalLeft = Left;
-            _logicalTop = Top;
-            return;
-        }
-
-        var elapsed = renderingTime - _lastActiveMovementRenderTime.Value;
-        _lastActiveMovementRenderTime = renderingTime;
-        if (elapsed <= TimeSpan.Zero)
-        {
+            _movementController.Advance(renderingTime, Left, Top);
             return;
         }
 
@@ -1103,10 +1080,9 @@ public partial class PetWindow : Window
                 bounds);
             if (PetMovementPlanner.IsClose(Left, Top, mouseApproachTarget))
             {
-                if (_hasActiveMovementTarget)
+                if (_movementController.HasTarget)
                 {
-                    _hasActiveMovementTarget = false;
-                    _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+                    _movementController.CompleteTarget(DateTime.UtcNow);
                     ResetMoveFrameState();
                     ResetActiveMovementVisual();
                     ScheduleNextBlink();
@@ -1116,31 +1092,30 @@ public partial class PetWindow : Window
                 return;
             }
 
-            if (!_hasActiveMovementTarget)
+            if (!_movementController.HasTarget)
             {
                 StopIdleAnimation();
                 StopBlinkAnimation();
             }
 
-            _activeMovementTarget = mouseApproachTarget;
-            _hasActiveMovementTarget = true;
+            _movementController.SetTarget(mouseApproachTarget);
         }
-        else if (!_hasActiveMovementTarget || PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
+        else if (!_movementController.HasTarget ||
+            PetMovementPlanner.IsClose(Left, Top, _movementController.Target))
         {
             ChooseWanderTarget(width, height, bounds);
         }
 
-        if (!_hasActiveMovementTarget)
+        if (!_movementController.HasTarget)
         {
             ResetActiveMovementVisual();
             StopActiveMovementRendering();
             return;
         }
 
-        if (PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
+        if (PetMovementPlanner.IsClose(Left, Top, _movementController.Target))
         {
-            _hasActiveMovementTarget = false;
-            _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+            _movementController.CompleteTarget(DateTime.UtcNow);
             ResetMoveFrameState();
             ResetActiveMovementVisual();
             ScheduleNextBlink();
@@ -1148,35 +1123,22 @@ public partial class PetWindow : Window
             return;
         }
 
-        var dx = _activeMovementTarget.Left - _logicalLeft;
-        var dy = _activeMovementTarget.Top - _logicalTop;
-        var distance = Math.Sqrt(dx * dx + dy * dy);
-        var step = CalculateMoveStep(_moveAction, elapsed, distance);
-        if (step <= 0 || distance <= 0.001)
+        var movement = _movementController.Advance(renderingTime, Left, Top);
+        if (movement is null)
         {
             return;
         }
 
-        var ratio = step / distance;
-        var nextLeft = _logicalLeft + dx * ratio;
-        var nextTop = _logicalTop + dy * ratio;
-        var movementDeltaX = nextLeft - _logicalLeft;
-        var movementDeltaY = nextTop - _logicalTop;
-
-        _lastMovementDeltaX = movementDeltaX;
-        _logicalLeft = nextLeft;
-        _logicalTop = nextTop;
-        Left = Math.Round(_logicalLeft);
-        Top = Math.Round(_logicalTop);
+        Left = Math.Round(movement.Value.NextLeft);
+        Top = Math.Round(movement.Value.NextTop);
         _runtimeState.SetRuntimePosition(Left, Top);
-        AdvanceMoveFrame(step);
+        AdvanceMoveFrame(movement.Value.Distance);
         ApplyActiveMovementVisual();
-        TryPushCursor(renderingTime, movementDeltaX, movementDeltaY);
+        TryPushCursor(renderingTime, movement.Value.DeltaX, movement.Value.DeltaY);
 
-        if (PetMovementPlanner.IsClose(Left, Top, _activeMovementTarget))
+        if (PetMovementPlanner.IsClose(Left, Top, _movementController.Target))
         {
-            _hasActiveMovementTarget = false;
-            _nextWanderDecisionUtc = DateTime.UtcNow.AddMilliseconds(_movementRandom.Next(1200, 2600));
+            _movementController.CompleteTarget(DateTime.UtcNow);
             ResetMoveFrameState();
             ScheduleNextBlink();
             StopActiveMovementRendering();
@@ -1272,20 +1234,19 @@ public partial class PetWindow : Window
 
     private void ChooseWanderTarget(double width, double height, PetMovementBounds bounds)
     {
-        if (DateTime.UtcNow < _nextWanderDecisionUtc)
+        if (!_movementController.TryChooseWanderTarget(
+            DateTime.UtcNow,
+            Left,
+            Top,
+            width,
+            height,
+            bounds))
         {
             return;
         }
 
         StopIdleAnimation();
         StopBlinkAnimation();
-
-        const double range = 160;
-        var targetLeft = Left + _movementRandom.NextDouble() * range * 2 - range;
-        var targetTop = Top + _movementRandom.NextDouble() * range * 2 - range;
-
-        _activeMovementTarget = PetMovementPlanner.ClampTarget(targetLeft, targetTop, width, height, bounds);
-        _hasActiveMovementTarget = true;
     }
 
     private void AdvanceMoveFrame(double distance)
@@ -1295,20 +1256,16 @@ public partial class PetWindow : Window
             return;
         }
 
-        _moveFrameDistanceAccumulator += distance;
-        var distancePerFrame = _moveAction.DistancePerFrame ?? DefaultMoveDistancePerFrame;
-        while (_moveFrameDistanceAccumulator >= distancePerFrame)
+        var frame = _movementController.AdvanceMoveFrame(distance, _moveFrames.Count);
+        if (frame.Changed)
         {
-            _moveFrameDistanceAccumulator -= distancePerFrame;
-            _moveFrameIndex = (_moveFrameIndex + 1) % _moveFrames.Count;
-            CharacterImage.Source = _moveFrames[_moveFrameIndex];
+            CharacterImage.Source = _moveFrames[frame.FrameIndex];
         }
     }
 
     private void ResetMoveFrameState()
     {
-        _moveFrameDistanceAccumulator = 0;
-        _moveFrameIndex = 0;
+        _movementController.ResetMoveFrames();
 
         if (!_isDragging && !_temporaryExpressionTimer.IsEnabled &&
             _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None)
@@ -1320,7 +1277,7 @@ public partial class PetWindow : Window
 
     private void ApplyActiveMovementVisual()
     {
-        var direction = _lastMovementDeltaX < 0 ? -1 : 1;
+        var direction = _movementController.LastDeltaX < 0 ? -1 : 1;
         if (_activeMovementVisualDirection == direction)
         {
             return;
@@ -2433,23 +2390,6 @@ public partial class PetWindow : Window
     private static TimeSpan GetActionFrameInterval(PetActionDefinition? action, TimeSpan fallback)
     {
         return action?.FrameInterval ?? fallback;
-    }
-
-    private static double CalculateMoveStep(PetActionDefinition action, TimeSpan elapsed, double distanceToTarget)
-    {
-        if (elapsed <= TimeSpan.Zero || distanceToTarget <= 0)
-        {
-            return 0;
-        }
-
-        var baseSpeed = action.BaseSpeedPixelsPerSecond ?? DefaultMoveBaseSpeedPixelsPerSecond;
-        var minSpeed = action.MinSpeedPixelsPerSecond ?? DefaultMoveMinSpeedPixelsPerSecond;
-        var maxSpeed = action.MaxSpeedPixelsPerSecond ?? DefaultMoveMaxSpeedPixelsPerSecond;
-        var speed = distanceToTarget > 240 ? maxSpeed
-            : distanceToTarget < 80 ? minSpeed
-            : baseSpeed;
-
-        return Math.Min(distanceToTarget, speed * elapsed.TotalSeconds);
     }
 
     private void BeginBlink()
