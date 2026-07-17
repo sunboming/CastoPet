@@ -1264,10 +1264,10 @@ static void RadialWheelStyleKeepsReadableRingHierarchy()
     var firstDisabled = RadialWheelStyle.GetNormalFill(RadialWheelRing.First, isEnabled: false);
     var secondDisabled = RadialWheelStyle.GetNormalFill(RadialWheelRing.Second, isEnabled: false);
 
-    Assert.Equal((byte)140, first.Alpha, "First-ring fill should be readable over the desktop.");
-    Assert.Equal((byte)122, second.Alpha, "Second-ring fill should remain slightly lighter.");
-    Assert.Equal((byte)84, firstDisabled.Alpha, "Disabled first-ring fill should remain subdued.");
-    Assert.Equal((byte)72, secondDisabled.Alpha, "Disabled second-ring fill should remain subdued.");
+    Assert.Equal((byte)180, first.Alpha, "First-ring fill should be readable over the desktop.");
+    Assert.Equal((byte)166, second.Alpha, "Second-ring fill should remain slightly lighter.");
+    Assert.Equal((byte)110, firstDisabled.Alpha, "Disabled first-ring fill should remain subdued.");
+    Assert.Equal((byte)96, secondDisabled.Alpha, "Disabled second-ring fill should remain subdued.");
     Assert.False(first.Equals(second), "The two normal ring fills should remain visually distinct.");
     Assert.True(RadialWheelStyle.SelectedFill.Alpha > first.Alpha, "Selection should be stronger than the first ring.");
     Assert.True(RadialWheelStyle.SelectedFill.Alpha > second.Alpha, "Selection should be stronger than the second ring.");
@@ -2053,8 +2053,8 @@ static void PetWindowConsumesCentralizedRadialWheelStyling()
     Assert.Contains(source, "visual.Ring", "Selection refresh should restore the visual's original ring style.");
     Assert.Contains(source, "RadialWheelStyle.SectorGapRadians", "Sector geometry should use the refined divider gap.");
     Assert.Contains(source, "RadialWheelStyle.LabelShadowOpacity", "Label shadows should use the refined style.");
-    Assert.Contains(xaml, "Fill=\"#80352757\"", "The center should use the approved stronger fill.");
-    Assert.Contains(xaml, "Stroke=\"#96ECE0FF\"", "The center should use the softened outline.");
+    Assert.Contains(xaml, "Color=\"#C08A5EB4\"", "The center should use the vivid lavender highlight.");
+    Assert.Contains(xaml, "Color=\"#B0F8E8FF\"", "The center should use the luminous glass edge highlight.");
 }
 
 static void PetWindowRoutesGenericRadialActions()

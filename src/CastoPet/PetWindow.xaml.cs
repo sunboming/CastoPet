@@ -1194,8 +1194,8 @@ public partial class PetWindow : Window
         var sector = new WpfShapes.Path
         {
             Data = CreateRadialWheelSectorGeometry(index, count, innerRadius, outerRadius),
-            Fill = new SolidColorBrush(ToWpfColor(RadialWheelStyle.GetNormalFill(ring, isEnabled))),
-            Stroke = new SolidColorBrush(ToWpfColor(RadialWheelStyle.NormalStroke)),
+            Fill = CreateRadialWheelFillBrush(RadialWheelStyle.GetNormalFill(ring, isEnabled), isSelected: false),
+            Stroke = CreateRadialWheelStrokeBrush(RadialWheelStyle.NormalStroke),
             StrokeThickness = RadialWheelStyle.NormalStrokeThickness,
         };
         panel.Children.Add(sector);
@@ -1203,14 +1203,14 @@ public partial class PetWindow : Window
         var label = new WpfControls.TextBlock
         {
             Text = displayName,
-            Foreground = new SolidColorBrush(WpfColor.FromArgb(232, 255, 255, 255)),
+            Foreground = new SolidColorBrush(WpfColor.FromArgb(242, 247, 244, 250)),
             FontSize = isSecondRing ? 11.5 : 13,
-            FontWeight = FontWeights.SemiBold,
+            FontWeight = FontWeights.Medium,
             TextAlignment = TextAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
             Width = isSecondRing ? 88 : 96,
             MaxHeight = 40,
-            Opacity = isEnabled ? 0.84 : 0.6,
+            Opacity = isEnabled ? 0.9 : 0.58,
             RenderTransformOrigin = new WpfPoint(0.5, 0.5),
             RenderTransform = new ScaleTransform(1, 1),
             Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -1274,6 +1274,55 @@ public partial class PetWindow : Window
 
     private static WpfColor ToWpfColor(RadialWheelColor color) =>
         WpfColor.FromArgb(color.Alpha, color.Red, color.Green, color.Blue);
+
+    private static WpfColor ShiftRadialWheelColor(
+        RadialWheelColor color,
+        int redDelta,
+        int greenDelta,
+        int blueDelta,
+        int alphaDelta = 0) =>
+        WpfColor.FromArgb(
+            (byte)Math.Clamp(color.Alpha + alphaDelta, 0, 255),
+            (byte)Math.Clamp(color.Red + redDelta, 0, 255),
+            (byte)Math.Clamp(color.Green + greenDelta, 0, 255),
+            (byte)Math.Clamp(color.Blue + blueDelta, 0, 255));
+
+    private static LinearGradientBrush CreateRadialWheelFillBrush(
+        RadialWheelColor color,
+        bool isSelected)
+    {
+        var highlightBoost = isSelected ? 12 : 0;
+        return new LinearGradientBrush
+        {
+            StartPoint = new WpfPoint(0, 0),
+            EndPoint = new WpfPoint(1, 1),
+            GradientStops =
+            {
+                new GradientStop(ShiftRadialWheelColor(
+                    color,
+                    38 + highlightBoost,
+                    25 + highlightBoost,
+                    54 + highlightBoost,
+                    12), 0),
+                new GradientStop(ShiftRadialWheelColor(color, 24, -2, 28, 6), 0.32),
+                new GradientStop(ToWpfColor(color), 0.64),
+                new GradientStop(ShiftRadialWheelColor(color, -18, -16, 12, -4), 1),
+            },
+        };
+    }
+
+    private static LinearGradientBrush CreateRadialWheelStrokeBrush(RadialWheelColor color) =>
+        new()
+        {
+            StartPoint = new WpfPoint(0, 0),
+            EndPoint = new WpfPoint(1, 1),
+            GradientStops =
+            {
+                new GradientStop(ToWpfColor(color), 0),
+                new GradientStop(ShiftRadialWheelColor(color, 12, -4, 18, -20), 0.48),
+                new GradientStop(ShiftRadialWheelColor(color, -20, -12, 5, -45), 1),
+            },
+        };
 
     private WpfPoint ToScreenPoint(WpfPoint localPoint)
     {
@@ -1453,14 +1502,23 @@ public partial class PetWindow : Window
             var fill = isSelected
                 ? RadialWheelStyle.SelectedFill
                 : RadialWheelStyle.GetNormalFill(visual.Ring, visual.IsEnabled);
-            visual.Sector.Fill = new SolidColorBrush(ToWpfColor(fill));
-            visual.Sector.Stroke = new SolidColorBrush(ToWpfColor(
-                isSelected ? RadialWheelStyle.SelectedStroke : RadialWheelStyle.NormalStroke));
+            visual.Sector.Fill = CreateRadialWheelFillBrush(fill, isSelected);
+            visual.Sector.Stroke = CreateRadialWheelStrokeBrush(
+                isSelected ? RadialWheelStyle.SelectedStroke : RadialWheelStyle.NormalStroke);
             visual.Sector.StrokeThickness = isSelected
                 ? RadialWheelStyle.SelectedStrokeThickness
                 : RadialWheelStyle.NormalStrokeThickness;
-            visual.Label.Opacity = isSelected ? 1 : visual.IsEnabled ? 0.84 : 0.6;
-            visual.Label.FontWeight = isSelected ? FontWeights.Bold : FontWeights.SemiBold;
+            visual.Sector.Effect = isSelected
+                ? new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = ToWpfColor(RadialWheelStyle.SelectedGlow),
+                    BlurRadius = RadialWheelStyle.SelectedGlowBlurRadius,
+                    ShadowDepth = 0,
+                    Opacity = RadialWheelStyle.SelectedGlowOpacity,
+                }
+                : null;
+            visual.Label.Opacity = isSelected ? 1 : visual.IsEnabled ? 0.9 : 0.58;
+            visual.Label.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Medium;
             if (visual.Label.RenderTransform is not ScaleTransform scaleTransform)
             {
                 scaleTransform = new ScaleTransform(1, 1);

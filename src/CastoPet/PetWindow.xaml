@@ -59,9 +59,23 @@
                          Height="68"
                          Canvas.Left="184"
                          Canvas.Top="184"
-                         Fill="#80352757"
-                         Stroke="#96ECE0FF"
-                         StrokeThickness="0.9" />
+                         StrokeThickness="0.9">
+                    <Ellipse.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#C08A5EB4" Offset="0" />
+                            <GradientStop Color="#B8663A91" Offset="0.42" />
+                            <GradientStop Color="#B0442A72" Offset="0.72" />
+                            <GradientStop Color="#A62C1B52" Offset="1" />
+                        </LinearGradientBrush>
+                    </Ellipse.Fill>
+                    <Ellipse.Stroke>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#B0F8E8FF" Offset="0" />
+                            <GradientStop Color="#88E5BDF5" Offset="0.48" />
+                            <GradientStop Color="#70B99BD6" Offset="1" />
+                        </LinearGradientBrush>
+                    </Ellipse.Stroke>
+                </Ellipse>
             </Canvas>
         </Popup>
     </Grid>
