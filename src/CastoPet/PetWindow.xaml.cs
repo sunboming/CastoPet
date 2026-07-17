@@ -59,11 +59,10 @@ public partial class PetWindow : Window
     private readonly IReadOnlyList<ImageSource> _moveFrames;
     private readonly IReadOnlyDictionary<string, PetExpressionAsset> _expressionAssetsById;
     private readonly WheelCatalogService _wheelCatalogService;
-    private WheelCatalog _wheelCatalog;
+    private readonly PetInteractionCoordinator _interactions;
     private readonly ShortcutService _shortcutService;
     private readonly ShortcutDropHandler _shortcutDrops;
     private readonly ShortcutLauncher _shortcutLauncher;
-    private RadialWheelController _radialWheelController;
     private readonly ImageSource? _inputReactiveBase;
     private readonly PetActionDefinition _idleAction;
     private readonly PetActionDefinition _moveAction;
@@ -74,7 +73,6 @@ public partial class PetWindow : Window
     private readonly InputReactiveState _inputReactiveState = new();
     private readonly WindowsInputHookService _inputHookService = new();
     private readonly DispatcherTimer _inputReactiveRenderTimer;
-    private readonly PetPointerGestureClassifier _pointerGestures;
     private readonly WindowsCursorService _cursorService = new();
     private readonly List<RadialWheelItemVisual> _firstRingVisuals = new();
     private readonly List<RadialWheelItemVisual> _secondRingVisuals = new();
@@ -86,7 +84,6 @@ public partial class PetWindow : Window
     private bool _applySettingsOnSourceInitialized;
     private bool _isClickThrough;
     private bool _isDragging;
-    private bool _isRadialWheelOpen;
     private bool _hasRadialWheelPointer;
     private bool _hasRadialWheelPointerEntered;
     private bool _activeMovementEnabled;
@@ -156,11 +153,9 @@ public partial class PetWindow : Window
         InitializeComponent();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _wheelCatalogService = wheelCatalogService ?? throw new ArgumentNullException(nameof(wheelCatalogService));
-        _wheelCatalog = _wheelCatalogService.Current;
         _shortcutService = shortcutService ?? throw new ArgumentNullException(nameof(shortcutService));
         _shortcutDrops = shortcutDrops ?? throw new ArgumentNullException(nameof(shortcutDrops));
         _shortcutLauncher = shortcutLauncher ?? throw new ArgumentNullException(nameof(shortcutLauncher));
-        _radialWheelController = new RadialWheelController(_wheelCatalog);
         _idleAction = assets.Skin.GetRequiredAction(PetActionKind.Idle);
         _moveAction = assets.Skin.GetRequiredAction(PetActionKind.Move);
         _movementController = new PetMovementController(_moveAction);
@@ -195,11 +190,13 @@ public partial class PetWindow : Window
         _inputReactiveRenderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _inputReactiveRenderTimer.Tick += (_, _) => RenderInputReactiveHighlights();
         _inputHookService.InputReceived += OnInputReactiveInputReceived;
-        _pointerGestures = new PetPointerGestureClassifier(
-            Math.Max(MinimumLeftDragThreshold, SystemParameters.MinimumHorizontalDragDistance),
-            Math.Max(MinimumLeftDragThreshold, SystemParameters.MinimumVerticalDragDistance),
-            RightWheelDragThreshold,
-            WheelCatalog.HoldDelay);
+        _interactions = new PetInteractionCoordinator(
+            _wheelCatalogService.Current,
+            new PetPointerGestureClassifier(
+                Math.Max(MinimumLeftDragThreshold, SystemParameters.MinimumHorizontalDragDistance),
+                Math.Max(MinimumLeftDragThreshold, SystemParameters.MinimumVerticalDragDistance),
+                RightWheelDragThreshold,
+                WheelCatalog.HoldDelay));
 
         try
         {
@@ -391,7 +388,7 @@ public partial class PetWindow : Window
             && !_isDragging
             && !_animationController.IsPetting
             && !_dragRestoreTimer.IsEnabled
-            && !_isRadialWheelOpen
+            && !_interactions.IsRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None;
     }
@@ -408,7 +405,7 @@ public partial class PetWindow : Window
                 IsInputReactiveModeBlockingPassiveAnimation()),
             IsDragging: _isDragging,
             HasActiveMovementTarget: _movementController.HasTarget,
-            IsRadialWheelOpen: _isRadialWheelOpen,
+            IsRadialWheelOpen: _interactions.IsRadialWheelOpen,
             HasTemporaryExpression: _temporaryExpressionTimer.IsEnabled);
     }
 
@@ -450,7 +447,7 @@ public partial class PetWindow : Window
         if (restoreIdle
             && !_isDragging
             && !_animationController.IsPetting
-            && !_isRadialWheelOpen
+            && !_interactions.IsRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None)
         {
@@ -560,8 +557,8 @@ public partial class PetWindow : Window
         }
 
         var position = e.GetPosition(RootGrid);
-        _pointerGestures.Press(PetPointerButton.Left, position.X, position.Y, DateTimeOffset.UtcNow);
-        if (_pointerGestures.State != PetPointerGestureState.LeftPending)
+        _interactions.PressPointer(PetPointerButton.Left, position.X, position.Y, DateTimeOffset.UtcNow);
+        if (_interactions.PointerState != PetPointerGestureState.LeftPending)
         {
             CancelPendingPointerGesture();
             e.Handled = true;
@@ -575,7 +572,7 @@ public partial class PetWindow : Window
     private void OnMouseLeftButtonUp(object sender, WpfInput.MouseButtonEventArgs e)
     {
         var position = e.GetPosition(RootGrid);
-        var intent = _pointerGestures.Release(
+        var intent = _interactions.ReleasePointer(
             PetPointerButton.Left,
             position.X,
             position.Y,
@@ -605,7 +602,7 @@ public partial class PetWindow : Window
         finally
         {
             EndDrag();
-            _pointerGestures.Cancel();
+            _interactions.CancelPointerGesture();
         }
     }
 
@@ -616,15 +613,15 @@ public partial class PetWindow : Window
             return;
         }
 
-        if (_isRadialWheelOpen)
+        if (_interactions.IsRadialWheelOpen)
         {
             e.Handled = true;
             return;
         }
 
         var position = e.GetPosition(RootGrid);
-        _pointerGestures.Press(PetPointerButton.Right, position.X, position.Y, DateTimeOffset.UtcNow);
-        if (_pointerGestures.State != PetPointerGestureState.RightPending)
+        _interactions.PressPointer(PetPointerButton.Right, position.X, position.Y, DateTimeOffset.UtcNow);
+        if (_interactions.PointerState != PetPointerGestureState.RightPending)
         {
             CancelPendingPointerGesture();
             e.Handled = true;
@@ -634,7 +631,7 @@ public partial class PetWindow : Window
         _requestedRadialWheelOrigin = ToScreenPoint(position);
         CaptureMouse();
         StopRadialWheelHoldRendering();
-        if (_wheelCatalog.Categories.Count > 0)
+        if (_interactions.HasWheelCategories)
         {
             StartRadialWheelHoldRendering();
         }
@@ -644,13 +641,13 @@ public partial class PetWindow : Window
     private void OnMouseMove(object sender, WpfInput.MouseEventArgs e)
     {
         var position = e.GetPosition(RootGrid);
-        if (_isRadialWheelOpen)
+        if (_interactions.IsRadialWheelOpen)
         {
             UpdateRadialWheelPointer(position, DateTimeOffset.UtcNow);
             return;
         }
 
-        if (_pointerGestures.State == PetPointerGestureState.LeftPending)
+        if (_interactions.PointerState == PetPointerGestureState.LeftPending)
         {
             if (e.LeftButton != WpfInput.MouseButtonState.Pressed)
             {
@@ -658,7 +655,7 @@ public partial class PetWindow : Window
                 return;
             }
 
-            if (_pointerGestures.Move(position.X, position.Y, DateTimeOffset.UtcNow) == PetPointerIntent.Drag)
+            if (_interactions.MovePointer(position.X, position.Y, DateTimeOffset.UtcNow) == PetPointerIntent.Drag)
             {
                 BeginDragFromGesture();
             }
@@ -666,7 +663,7 @@ public partial class PetWindow : Window
             return;
         }
 
-        if (_pointerGestures.State != PetPointerGestureState.RightPending)
+        if (_interactions.PointerState != PetPointerGestureState.RightPending)
         {
             return;
         }
@@ -677,12 +674,12 @@ public partial class PetWindow : Window
             return;
         }
 
-        if (_wheelCatalog.Categories.Count == 0)
+        if (!_interactions.HasWheelCategories)
         {
             return;
         }
 
-        if (_pointerGestures.Move(position.X, position.Y, DateTimeOffset.UtcNow) == PetPointerIntent.RadialWheel)
+        if (_interactions.MovePointer(position.X, position.Y, DateTimeOffset.UtcNow) == PetPointerIntent.RadialWheel)
         {
             OpenRadialWheel();
         }
@@ -693,10 +690,10 @@ public partial class PetWindow : Window
         StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
 
-        if (!_isRadialWheelOpen)
+        if (!_interactions.IsRadialWheelOpen)
         {
             var position = e.GetPosition(RootGrid);
-            var intent = _pointerGestures.Release(
+            var intent = _interactions.ReleasePointer(
                 PetPointerButton.Right,
                 position.X,
                 position.Y,
@@ -713,7 +710,7 @@ public partial class PetWindow : Window
 
         UpdateRadialWheelPointer(e.GetPosition(RootGrid), DateTimeOffset.UtcNow);
         e.Handled = true;
-        if (!_isRadialWheelOpen)
+        if (!_interactions.IsRadialWheelOpen)
         {
             return;
         }
@@ -721,12 +718,12 @@ public partial class PetWindow : Window
         var selection = RadialWheelSelector.GetSelection(
             _lastRadialWheelPointer.X,
             _lastRadialWheelPointer.Y,
-            _wheelCatalog.Categories.Count,
-            _radialWheelController.VisibleSecondLevelItems.Count);
+            _interactions.Catalog.Categories.Count,
+            _interactions.RadialWheel.VisibleSecondLevelItems.Count);
         var result = selection.Ring == RadialWheelRing.Second
-            ? _radialWheelController.Release()
-            : _radialWheelController.Cancel();
-        _pointerGestures.Release(
+            ? _interactions.RadialWheel.Release()
+            : _interactions.RadialWheel.Cancel();
+        _interactions.ReleasePointer(
             PetPointerButton.Right,
             e.GetPosition(RootGrid).X,
             e.GetPosition(RootGrid).Y,
@@ -747,7 +744,7 @@ public partial class PetWindow : Window
 
     private void OnLostMouseCapture(object sender, WpfInput.MouseEventArgs e)
     {
-        if (_pointerGestures.State is PetPointerGestureState.LeftPending or PetPointerGestureState.RightPending)
+        if (_interactions.PointerState is PetPointerGestureState.LeftPending or PetPointerGestureState.RightPending)
         {
             CancelPendingPointerGesture(releaseCapture: false);
         }
@@ -755,7 +752,7 @@ public partial class PetWindow : Window
 
     private void OnWindowDeactivated(object? sender, EventArgs e)
     {
-        if (!_isRadialWheelOpen)
+        if (!_interactions.IsRadialWheelOpen)
         {
             CancelPendingPointerGesture();
         }
@@ -763,12 +760,12 @@ public partial class PetWindow : Window
 
     private void OnPreviewKeyDown(object sender, WpfInput.KeyEventArgs e)
     {
-        if (!_isRadialWheelOpen || e.Key != WpfInput.Key.Escape)
+        if (!_interactions.IsRadialWheelOpen || e.Key != WpfInput.Key.Escape)
         {
             return;
         }
 
-        _radialWheelController.Cancel();
+        _interactions.RadialWheel.Cancel();
         CloseRadialWheel(cancelController: false);
         e.Handled = true;
     }
@@ -937,7 +934,7 @@ public partial class PetWindow : Window
             && !_isDragging
             && !_animationController.IsPetting
             && !_dragRestoreTimer.IsEnabled
-            && !_isRadialWheelOpen
+            && !_interactions.IsRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
             && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None;
     }
@@ -1351,13 +1348,12 @@ public partial class PetWindow : Window
 
     private void RefreshWheelCatalog()
     {
-        if (_isRadialWheelOpen || _radialWheelController.IsOpen)
+        if (_interactions.IsRadialWheelOpen || _interactions.RadialWheel.IsOpen)
         {
             CloseRadialWheel(cancelController: true);
         }
 
-        _wheelCatalog = _wheelCatalogService.Current;
-        _radialWheelController = new RadialWheelController(_wheelCatalog);
+        _interactions.UpdateCatalog(_wheelCatalogService.Current);
         _secondRingContentKey = "closed";
         SecondRingSurface.Children.Clear();
         _secondRingVisuals.Clear();
@@ -1369,14 +1365,14 @@ public partial class PetWindow : Window
     {
         FirstRingSurface.Children.Clear();
         _firstRingVisuals.Clear();
-        for (var index = 0; index < _wheelCatalog.Categories.Count; index++)
+        for (var index = 0; index < _interactions.Catalog.Categories.Count; index++)
         {
-            var category = _wheelCatalog.Categories[index];
+            var category = _interactions.Catalog.Categories[index];
             _firstRingVisuals.Add(AddRadialWheelItem(
                 FirstRingSurface,
                 category.DisplayName,
                 index,
-                _wheelCatalog.Categories.Count,
+                _interactions.Catalog.Categories.Count,
                 WheelCatalog.InnerRadius,
                 WheelCatalog.FirstRingOuterRadius,
                 isEnabled: true,
@@ -1388,7 +1384,7 @@ public partial class PetWindow : Window
     {
         SecondRingSurface.Children.Clear();
         _secondRingVisuals.Clear();
-        var items = _radialWheelController.VisibleSecondLevelItems;
+        var items = _interactions.RadialWheel.VisibleSecondLevelItems;
         for (var index = 0; index < items.Count; index++)
         {
             var item = items[index];
@@ -1403,7 +1399,7 @@ public partial class PetWindow : Window
                 isSecondRing: true));
         }
 
-        SecondRingSurface.Visibility = _radialWheelController.IsSecondLevelOpen
+        SecondRingSurface.Visibility = _interactions.RadialWheel.IsSecondLevelOpen
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
@@ -1570,7 +1566,7 @@ public partial class PetWindow : Window
 
     private void UpdateRadialWheelHoldGesture()
     {
-        if (_pointerGestures.State != PetPointerGestureState.RightPending
+        if (_interactions.PointerState != PetPointerGestureState.RightPending
             || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
         {
             CancelPendingPointerGesture();
@@ -1578,13 +1574,13 @@ public partial class PetWindow : Window
         }
 
         var now = DateTimeOffset.UtcNow;
-        if (_pointerGestures.UpdateHold(now) == PetPointerIntent.RadialWheel)
+        if (_interactions.UpdateHold(now) == PetPointerIntent.RadialWheel)
         {
             OpenRadialWheel();
             return;
         }
 
-        UpdateRadialWheelHoldFeedback(_pointerGestures.GetRightHoldProgress(now, RadialWheelHoldRevealDelay));
+        UpdateRadialWheelHoldFeedback(_interactions.GetRightHoldProgress(now, RadialWheelHoldRevealDelay));
     }
 
     private void StartRadialWheelHoldRendering()
@@ -1659,7 +1655,7 @@ public partial class PetWindow : Window
     {
         StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
-        _pointerGestures.Cancel();
+        _interactions.CancelPointerGesture();
         if (releaseCapture)
         {
             ReleasePendingMouseCapture();
@@ -1668,7 +1664,7 @@ public partial class PetWindow : Window
 
     private void ReleasePendingMouseCapture()
     {
-        if (WpfInput.Mouse.Captured == this && !_isRadialWheelOpen && !_isDragging)
+        if (WpfInput.Mouse.Captured == this && !_interactions.IsRadialWheelOpen && !_isDragging)
         {
             ReleaseMouseCapture();
         }
@@ -1709,7 +1705,7 @@ public partial class PetWindow : Window
     {
         StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
-        if (_wheelCatalog.Categories.Count == 0 || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
+        if (!_interactions.HasWheelCategories || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
         {
             CancelPendingPointerGesture();
             return;
@@ -1720,10 +1716,12 @@ public partial class PetWindow : Window
         StopInputReactiveMode(restoreIdle: false);
         StopIdleAnimation();
         StopBlinkAnimation();
-        _isRadialWheelOpen = true;
+        if (!_interactions.TryOpenRadialWheel(DateTimeOffset.UtcNow))
+        {
+            return;
+        }
         _hasRadialWheelPointer = false;
         _hasRadialWheelPointerEntered = false;
-        _radialWheelController.Open(DateTimeOffset.UtcNow);
         _secondRingContentKey = "";
         PositionRadialWheelOverlay(_requestedRadialWheelOrigin);
         RadialWheelOverlay.IsOpen = true;
@@ -1739,13 +1737,7 @@ public partial class PetWindow : Window
         StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
         _radialWheelPointerProbeTimer.Stop();
-        _pointerGestures.Cancel();
-        if (cancelController && _radialWheelController.IsOpen)
-        {
-            _radialWheelController.Cancel();
-        }
-
-        _isRadialWheelOpen = false;
+        _interactions.CloseRadialWheel(cancelController);
         _hasRadialWheelPointer = false;
         _hasRadialWheelPointerEntered = false;
         _secondRingContentKey = "closed";
@@ -1777,7 +1769,7 @@ public partial class PetWindow : Window
 
     private void ProbeRadialWheelPointer()
     {
-        if (_isRadialWheelOpen && _hasRadialWheelPointer)
+        if (_interactions.IsRadialWheelOpen && _hasRadialWheelPointer)
         {
             UpdateRadialWheelController(_lastRadialWheelPointer, DateTimeOffset.UtcNow);
         }
@@ -1798,16 +1790,16 @@ public partial class PetWindow : Window
         var pointerRegion = RadialWheelSelector.GetSelection(
             pointer.X,
             pointer.Y,
-            _wheelCatalog.Categories.Count,
-            _radialWheelController.VisibleSecondLevelItems.Count);
+            _interactions.Catalog.Categories.Count,
+            _interactions.RadialWheel.VisibleSecondLevelItems.Count);
         if (!_hasRadialWheelPointerEntered && pointerRegion.Ring == RadialWheelRing.Outside)
         {
             return;
         }
 
         _hasRadialWheelPointerEntered = true;
-        _radialWheelController.UpdatePointer(pointer.X, pointer.Y, now);
-        if (!_radialWheelController.IsOpen)
+        _interactions.RadialWheel.UpdatePointer(pointer.X, pointer.Y, now);
+        if (!_interactions.RadialWheel.IsOpen)
         {
             CloseRadialWheel(cancelController: false);
             return;
@@ -1818,8 +1810,8 @@ public partial class PetWindow : Window
 
     private void RefreshRadialWheelVisuals(bool forceSecondRingRebuild)
     {
-        var contentKey = _radialWheelController.IsSecondLevelOpen
-            ? $"{_radialWheelController.SelectedCategoryIndex}:{_radialWheelController.CurrentPage}:{string.Join(',', _radialWheelController.VisibleSecondLevelItems.Select(item => item.Id))}"
+        var contentKey = _interactions.RadialWheel.IsSecondLevelOpen
+            ? $"{_interactions.RadialWheel.SelectedCategoryIndex}:{_interactions.RadialWheel.CurrentPage}:{string.Join(',', _interactions.RadialWheel.VisibleSecondLevelItems.Select(item => item.Id))}"
             : "closed";
         if (forceSecondRingRebuild || !string.Equals(_secondRingContentKey, contentKey, StringComparison.Ordinal))
         {
@@ -1827,8 +1819,8 @@ public partial class PetWindow : Window
             BuildSecondRadialWheelRing();
         }
 
-        UpdateRadialWheelSelectionVisuals(_firstRingVisuals, _radialWheelController.SelectedCategoryIndex);
-        UpdateRadialWheelSelectionVisuals(_secondRingVisuals, _radialWheelController.SelectedSecondLevelIndex);
+        UpdateRadialWheelSelectionVisuals(_firstRingVisuals, _interactions.RadialWheel.SelectedCategoryIndex);
+        UpdateRadialWheelSelectionVisuals(_secondRingVisuals, _interactions.RadialWheel.SelectedSecondLevelIndex);
     }
 
     private static void UpdateRadialWheelSelectionVisuals(
@@ -2235,7 +2227,7 @@ public partial class PetWindow : Window
 
     private void ShowPendingExpression()
     {
-        if (_pendingExpressionAsset is null || _isDragging || _isRadialWheelOpen)
+        if (_pendingExpressionAsset is null || _isDragging || _interactions.IsRadialWheelOpen)
         {
             return;
         }
@@ -2258,7 +2250,7 @@ public partial class PetWindow : Window
 
     private void CompleteExpressionRestore()
     {
-        if (_isDragging || _isRadialWheelOpen)
+        if (_isDragging || _interactions.IsRadialWheelOpen)
         {
             return;
         }
@@ -2285,7 +2277,7 @@ public partial class PetWindow : Window
 
     private void StartIdleBreathing()
     {
-        if (_isDragging || _isRadialWheelOpen)
+        if (_isDragging || _interactions.IsRadialWheelOpen)
         {
             return;
         }

@@ -99,6 +99,8 @@ var tests = new (string Name, Action Test)[]
     ("Pointer gestures classify left click and drag", PointerGesturesClassifyLeftClickAndDrag),
     ("Pointer gestures classify right click movement and hold", PointerGesturesClassifyRightClickMovementAndHold),
     ("Pointer gestures cancel conflicts and commit once", PointerGesturesCancelConflictsAndCommitOnce),
+    ("Interaction coordinator preserves short-click intent", InteractionCoordinatorPreservesShortClickIntent),
+    ("Interaction coordinator owns wheel lifecycle", InteractionCoordinatorOwnsWheelLifecycle),
     ("Wheel catalog preserves ordered action references", WheelCatalogPreservesOrderedActionReferences),
     ("Wheel catalog exposes disabled empty shortcut content", WheelCatalogExposesDisabledEmptyShortcutContent),
     ("Wheel catalog service refreshes successful shortcut mutations", WheelCatalogServiceRefreshesSuccessfulShortcutMutations),
@@ -1680,6 +1682,40 @@ static void PointerGesturesCancelConflictsAndCommitOnce()
     Assert.Equal(PetPointerGestureState.Idle, classifier.State, "Cancellation should clear committed state.");
 }
 
+static void InteractionCoordinatorPreservesShortClickIntent()
+{
+    var coordinator = new PetInteractionCoordinator(
+        CreateWheelCatalog(1),
+        new PetPointerGestureClassifier(6, 6, 14, WheelCatalog.HoldDelay));
+    var now = DateTimeOffset.UtcNow;
+
+    coordinator.PressPointer(PetPointerButton.Right, 40, 40, now);
+    var intent = coordinator.ReleasePointer(PetPointerButton.Right, 40, 40, now.AddMilliseconds(100));
+
+    Assert.Equal(PetPointerIntent.ContextMenu, intent, "A right short click should remain a traditional menu gesture.");
+    Assert.Equal(PetPointerGestureState.Idle, coordinator.PointerState, "Released short clicks should return to idle.");
+}
+
+static void InteractionCoordinatorOwnsWheelLifecycle()
+{
+    var coordinator = new PetInteractionCoordinator(
+        CreateWheelCatalog(1),
+        new PetPointerGestureClassifier(6, 6, 14, WheelCatalog.HoldDelay));
+    var now = DateTimeOffset.UtcNow;
+    coordinator.PressPointer(PetPointerButton.Right, 0, 0, now);
+
+    var intent = coordinator.MovePointer(20, 0, now.AddMilliseconds(20));
+    Assert.Equal(PetPointerIntent.RadialWheel, intent, "A radial movement should commit the wheel intent.");
+    Assert.True(coordinator.TryOpenRadialWheel(now.AddMilliseconds(20)), "A non-empty catalog should open the wheel.");
+    Assert.True(coordinator.IsRadialWheelOpen, "Coordinator should own the visible wheel state.");
+    Assert.True(coordinator.RadialWheel.IsOpen, "Coordinator should open the selection controller at the same time.");
+
+    coordinator.UpdateCatalog(new WheelCatalog(Array.Empty<WheelCategory>()));
+    Assert.False(coordinator.IsRadialWheelOpen, "Replacing the catalog should close the visible wheel.");
+    Assert.False(coordinator.RadialWheel.IsOpen, "Replacing the catalog should close the selection controller.");
+    Assert.Equal(PetPointerGestureState.Idle, coordinator.PointerState, "Replacing the catalog should cancel pending pointer state.");
+}
+
 static void WheelCatalogPreservesOrderedActionReferences()
 {
     var expressions = new[]
@@ -1804,8 +1840,7 @@ static void PetWindowFollowsLiveWheelCatalogSnapshots()
     Assert.Contains(source, "WheelCatalogService wheelCatalogService", "PetWindow should receive the live catalog service instead of a frozen snapshot.");
     Assert.Contains(source, "_wheelCatalogService.Changed += OnWheelCatalogChanged;", "PetWindow should observe live catalog changes.");
     Assert.Contains(source, "Dispatcher.InvokeAsync(RefreshWheelCatalog)", "Catalog refresh should be marshalled to the window dispatcher.");
-    Assert.Contains(source, "_wheelCatalog = _wheelCatalogService.Current;", "A refresh should install the latest catalog snapshot.");
-    Assert.Contains(source, "_radialWheelController = new RadialWheelController(_wheelCatalog);", "A refresh should replace the controller bound to the old snapshot.");
+    Assert.Contains(source, "_interactions.UpdateCatalog(_wheelCatalogService.Current);", "A refresh should install the latest catalog snapshot through the interaction coordinator.");
     Assert.Contains(source, "CloseRadialWheel(cancelController: true", "Refreshing should safely close an open wheel before replacing state.");
     Assert.Contains(source, "BuildFirstRadialWheelRing();", "Refreshing should rebuild the category ring.");
     Assert.Contains(source, "_wheelCatalogService.Changed -= OnWheelCatalogChanged;", "Window close should unsubscribe from catalog changes.");
