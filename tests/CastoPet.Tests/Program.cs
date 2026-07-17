@@ -51,6 +51,7 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
     ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
     ("Built-in Castorice defines optional petting action", BuiltInCastoriceDefinesOptionalPettingAction),
+    ("Built-in petting frames are packaged and clean", BuiltInPettingFramesArePackagedAndClean),
     ("Built-in Castorice expressions are ordered skin definitions", BuiltInCastoriceExpressionsAreOrderedSkinDefinitions),
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
     ("Pet skin manifest loads expression transition metadata", PetSkinManifestLoadsExpressionTransitionMetadata),
@@ -115,6 +116,8 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut launcher contains and logs start failures", ShortcutLauncherContainsAndLogsStartFailures),
     ("Pet window defines two-level radial overlay and drop surface", PetWindowDefinesTwoLevelRadialOverlayAndDropSurface),
     ("Pet window consumes centralized radial wheel styling", PetWindowConsumesCentralizedRadialWheelStyling),
+    ("Pet window routes classified pointer gestures", PetWindowRoutesClassifiedPointerGestures),
+    ("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
     ("Pet window extracts neutral shortcut drop data", PetWindowExtractsNeutralShortcutDropData),
     ("Pet window retires expression-only wheel integration", PetWindowRetiresExpressionOnlyWheelIntegration),
@@ -821,6 +824,62 @@ static void BuiltInCastoriceDefinesOptionalPettingAction()
     Assert.Equal("Assets/Runtime/Castorice/States/Petting/Castorice.Petting.07.png", petting.FramePaths[^1], "Petting should end on frame seven.");
 }
 
+static void BuiltInPettingFramesArePackagedAndClean()
+{
+    var workspace = FindWorkspaceRoot();
+    var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+    var runtimeRoot = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "Petting");
+    var frames = Enumerable.Range(0, 8)
+        .Select(index => System.IO.Path.Combine(runtimeRoot, $"Castorice.Petting.{index:00}.png"))
+        .ToArray();
+
+    Assert.True(frames.All(File.Exists), "Built-in petting should include eight consecutive runtime PNGs.");
+    foreach (var frame in frames)
+    {
+        using var bitmap = new Bitmap(frame);
+        Assert.Equal(320, bitmap.Width, $"{System.IO.Path.GetFileName(frame)} should be 320 pixels wide.");
+        Assert.Equal(320, bitmap.Height, $"{System.IO.Path.GetFileName(frame)} should be 320 pixels high.");
+        Assert.True(bitmap.GetPixel(0, 0).A == 0, $"{System.IO.Path.GetFileName(frame)} should keep a transparent background.");
+
+        var greenFringePixels = 0;
+        for (var y = 0; y < bitmap.Height; y += 2)
+        {
+            for (var x = 0; x < bitmap.Width; x += 2)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                if (pixel.A > 8 && pixel.G > pixel.R + 40 && pixel.G > pixel.B + 40)
+                {
+                    greenFringePixels++;
+                }
+            }
+        }
+
+        Assert.True(greenFringePixels <= 2, $"{System.IO.Path.GetFileName(frame)} should not contain a visible cluster of green-key fringe pixels.");
+    }
+
+    var idle = File.ReadAllBytes(System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "Idle", "Castorice.Idle.00.png"));
+    Assert.True(idle.SequenceEqual(File.ReadAllBytes(frames[0])), "Petting frame 00 should use the idle baseline.");
+    Assert.True(idle.SequenceEqual(File.ReadAllBytes(frames[^1])), "Petting frame 07 should return exactly to the idle baseline.");
+
+    var projectText = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
+    Assert.Contains(projectText, @"Assets\Runtime\Castorice\States\Petting\*.png", "Petting frames should be packaged as WPF resources.");
+
+    using var temp = TempDirectory.Create();
+    var petting = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Petting) with
+    {
+        FramePaths = frames,
+    };
+    var skin = BuiltInPetSkins.Castorice with
+    {
+        Actions = BuiltInPetSkins.Castorice.Actions
+            .Where(action => action.Kind != PetActionKind.Petting)
+            .Append(petting)
+            .ToArray(),
+    };
+    var service = new AssetService(new LoggingService(new AppPaths(temp.Path)), skin);
+    Assert.Equal(8, service.LoadPettingFrames().Count, "AssetService should load the complete built-in petting sequence.");
+}
+
 static void BuiltInCastoriceExpressionsAreOrderedSkinDefinitions()
 {
     var expressions = BuiltInPetSkins.Castorice.Expressions;
@@ -1260,7 +1319,7 @@ static void ExpressionWheelDefinesEightItems()
     Assert.Equal("Confused", expressions[5].Label, "Sixth expression should be Confused.");
     Assert.Equal("Proud", expressions[6].Label, "Seventh expression should be Proud.");
     Assert.Equal("Crying", expressions[7].Label, "Eighth expression should be Crying.");
-    Assert.Equal(TimeSpan.FromMilliseconds(250), WheelCatalog.HoldDelay, "Wheel hold delay should be short but deliberate.");
+    Assert.Equal(TimeSpan.FromMilliseconds(400), WheelCatalog.HoldDelay, "Wheel hold delay should leave room to distinguish a short click.");
     Assert.Equal(TimeSpan.FromSeconds(2), ExpressionWheelCatalog.ExpressionDuration, "Selected expression should be temporary.");
 }
 
@@ -2165,6 +2224,34 @@ static void PetWindowConsumesCentralizedRadialWheelStyling()
     Assert.Contains(source, "RadialWheelStyle.LabelShadowOpacity", "Label shadows should use the refined style.");
     Assert.Contains(xaml, "Color=\"#C08A5EB4\"", "The center should use the vivid lavender highlight.");
     Assert.Contains(xaml, "Color=\"#B0F8E8FF\"", "The center should use the luminous glass edge highlight.");
+}
+
+static void PetWindowRoutesClassifiedPointerGestures()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(source, "PetPointerGestureClassifier", "PetWindow should delegate ambiguity to the tested gesture classifier.");
+    Assert.Contains(source, "SystemParameters.MinimumHorizontalDragDistance", "Left drag should respect the Windows drag threshold.");
+    Assert.Contains(source, "PetPointerIntent.Petting", "Left release should route to petting.");
+    Assert.Contains(source, "PetPointerIntent.ContextMenu", "Right release should route to the manual context menu.");
+    Assert.Contains(source, "ShowPetContextMenu", "The pet context menu should open only after classification.");
+    Assert.Contains(source, "CaptureMouse()", "Pending gestures should retain pointer events outside the pet bounds.");
+    Assert.False(source.Contains("        ContextMenu = menu;", StringComparison.Ordinal), "Automatic WPF context-menu opening should be disabled.");
+}
+
+static void PetWindowDefinesHoldFeedbackAndPettingPlayback()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+
+    Assert.Contains(xaml, "RadialWheelHoldOverlay", "Right hold should have a dedicated non-interactive progress overlay.");
+    Assert.Contains(xaml, "RadialWheelHoldArc", "Hold feedback should expose an updateable circular arc.");
+    Assert.Contains(source, "GetRightHoldProgress", "Hold feedback should use classifier timing.");
+    Assert.Contains(source, "LoadPettingFrames", "PetWindow should load optional skin petting frames.");
+    Assert.Contains(source, "AdvancePettingFrame", "Petting should play as a one-shot frame sequence.");
+    Assert.Contains(source, "_isPetting", "Passive runtime modes should be able to gate on petting playback.");
 }
 
 static void PetWindowRoutesGenericRadialActions()

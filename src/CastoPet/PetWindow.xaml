@@ -34,6 +34,23 @@
                 Visibility="Collapsed"
                 IsHitTestVisible="False" />
 
+        <Popup x:Name="RadialWheelHoldOverlay"
+               AllowsTransparency="True"
+               IsHitTestVisible="False"
+               Placement="AbsolutePoint"
+               StaysOpen="True">
+            <Grid Width="44" Height="44">
+                <Ellipse Stroke="#604B2C6E"
+                         StrokeThickness="2" />
+                <Path x:Name="RadialWheelHoldArc"
+                      Fill="Transparent"
+                      Stroke="#F0EED7FF"
+                      StrokeThickness="2.5"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round" />
+            </Grid>
+        </Popup>
+
         <Popup x:Name="RadialWheelOverlay"
                AllowsTransparency="True"
                IsHitTestVisible="False"

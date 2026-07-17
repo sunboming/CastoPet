@@ -8,6 +8,6 @@ public sealed record WheelCatalog(IReadOnlyList<WheelCategory> Categories)
     public const double SecondRingOuterRadius = 210;
     public const double SelectedScale = 1.18;
 
-    public static readonly TimeSpan HoldDelay = TimeSpan.FromMilliseconds(250);
+    public static readonly TimeSpan HoldDelay = TimeSpan.FromMilliseconds(400);
     public static readonly TimeSpan CategoryDwellDelay = TimeSpan.FromMilliseconds(120);
 }
