@@ -7,14 +7,18 @@ var tests = new (string Name, Action Test)[]
     ("Default active movement is disabled", DefaultActiveMovementIsDisabled),
     ("Default push cursor is disabled", DefaultPushCursorIsDisabled),
     ("Default input reactive mode is disabled", DefaultInputReactiveModeIsDisabled),
+    ("Default theme follows the system", DefaultThemeFollowsTheSystem),
     ("Settings round trip as JSON", SettingsRoundTripAsJson),
     ("Settings round trip includes active movement", SettingsRoundTripIncludesActiveMovement),
     ("Settings round trip includes push cursor", SettingsRoundTripIncludesPushCursor),
     ("Settings round trip includes input reactive mode", SettingsRoundTripIncludesInputReactiveMode),
     ("Settings round trip includes skin manifest path", SettingsRoundTripIncludesSkinManifestPath),
+    ("Settings round trip includes theme mode", SettingsRoundTripIncludesThemeMode),
     ("App paths include local crash reports", AppPathsIncludeLocalCrashReports),
     ("Settings round trip includes crash and update state", SettingsRoundTripIncludesCrashAndUpdateState),
     ("Settings clone includes crash and update state", SettingsCloneIncludesCrashAndUpdateState),
+    ("Settings clone includes theme mode", SettingsCloneIncludesThemeMode),
+    ("Theme mode resolves system preference", ThemeModeResolvesSystemPreference),
     ("Crash reports sanitize user paths and include exception chains", CrashReportsSanitizeUserPathsAndIncludeExceptionChains),
     ("Crash reports keep a bounded log tail", CrashReportsKeepABoundedLogTail),
     ("Crash report service writes and acknowledges reports", CrashReportServiceWritesAndAcknowledgesReports),
@@ -208,6 +212,11 @@ static void DefaultInputReactiveModeIsDisabled()
     Assert.False(settings.InputReactiveMode, "Input reactive mode should default to false.");
 }
 
+static void DefaultThemeFollowsTheSystem()
+{
+    Assert.Equal(AppThemeMode.System, AppSettings.Default.ThemeMode, "Existing users should follow the Windows app theme by default.");
+}
+
 static void SettingsRoundTripAsJson()
 {
     using var temp = TempDirectory.Create();
@@ -312,6 +321,19 @@ static void SettingsRoundTripIncludesSkinManifestPath()
     Assert.Equal(@"D:\Skins\Custom\skin.json", loaded.SkinManifestPath, "Skin manifest path should round trip.");
 }
 
+static void SettingsRoundTripIncludesThemeMode()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var service = new SettingsService(paths, new LoggingService(paths));
+    var settings = new AppSettings { ThemeMode = AppThemeMode.Dark };
+
+    service.Save(settings);
+    var loaded = service.Load();
+
+    Assert.Equal(AppThemeMode.Dark, loaded.ThemeMode, "Theme mode should round trip.");
+}
+
 static void AppPathsIncludeLocalCrashReports()
 {
     using var temp = TempDirectory.Create();
@@ -353,6 +375,21 @@ static void SettingsCloneIncludesCrashAndUpdateState()
 
     Assert.Equal(settings.LastAcknowledgedCrashId, clone.LastAcknowledgedCrashId, "Clone should retain crash acknowledgement.");
     Assert.Equal(settings.LastAutomaticUpdateCheckDate, clone.LastAutomaticUpdateCheckDate, "Clone should retain update check date.");
+}
+
+static void SettingsCloneIncludesThemeMode()
+{
+    var settings = new AppSettings { ThemeMode = AppThemeMode.Light };
+
+    Assert.Equal(AppThemeMode.Light, settings.Clone().ThemeMode, "Clone should retain the selected theme mode.");
+}
+
+static void ThemeModeResolvesSystemPreference()
+{
+    Assert.Equal(AppThemeMode.Light, ThemeModeResolver.Resolve(AppThemeMode.Light, systemUsesDark: true), "Explicit light mode should ignore the system theme.");
+    Assert.Equal(AppThemeMode.Dark, ThemeModeResolver.Resolve(AppThemeMode.Dark, systemUsesDark: false), "Explicit dark mode should ignore the system theme.");
+    Assert.Equal(AppThemeMode.Dark, ThemeModeResolver.Resolve(AppThemeMode.System, systemUsesDark: true), "System mode should resolve to dark when Windows uses dark apps.");
+    Assert.Equal(AppThemeMode.Light, ThemeModeResolver.Resolve(AppThemeMode.System, systemUsesDark: false), "System mode should resolve to light when Windows uses light apps.");
 }
 
 static void CrashReportsSanitizeUserPathsAndIncludeExceptionChains()
