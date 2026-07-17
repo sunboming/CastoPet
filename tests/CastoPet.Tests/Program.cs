@@ -92,6 +92,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window follows live wheel catalog snapshots", PetWindowFollowsLiveWheelCatalogSnapshots),
     ("Radial wheel selector distinguishes all pointer regions", RadialWheelSelectorDistinguishesAllPointerRegions),
     ("Radial wheel controller honors category dwell", RadialWheelControllerHonorsCategoryDwell),
+    ("Radial wheel tolerates slight outer overshoot", RadialWheelToleratesSlightOuterOvershoot),
     ("Radial wheel controller resets and collapses state", RadialWheelControllerResetsAndCollapsesState),
     ("Radial wheel controller paginates without persisting controls", RadialWheelControllerPaginatesWithoutPersistingControls),
     ("Shortcut service loads empty state and round trips", ShortcutServiceLoadsEmptyStateAndRoundTrips),
@@ -1372,6 +1373,8 @@ static void RadialWheelLayoutKeepsGenericTwoRingGeometry()
     Assert.Equal(8, WheelCatalog.MaxVisibleItemsPerRing, "Each radial ring should remain readable at no more than eight sectors.");
     Assert.True(WheelCatalog.InnerRadius < WheelCatalog.FirstRingOuterRadius, "The first ring should surround the center cancel zone.");
     Assert.True(WheelCatalog.FirstRingOuterRadius < WheelCatalog.SecondRingOuterRadius, "The second ring should surround the category ring.");
+    Assert.Equal(28d, WheelCatalog.OuterExitTolerance, "The outer ring should allow a deliberate pointer overshoot.");
+    Assert.Equal(238d, WheelCatalog.InteractionOuterRadius, "The interaction radius should include the visual radius and tolerance.");
     Assert.Equal(1.18d, WheelCatalog.SelectedScale, "Selected wheel text should still scale up visibly.");
 }
 
@@ -1581,7 +1584,9 @@ static void RadialWheelSelectorDistinguishesAllPointerRegions()
     Assert.Equal(RadialWheelRing.First, first.Ring, "First ring point should select a category.");
     Assert.Equal(0, first.SectorIndex, "Top should map to the first clockwise sector.");
     Assert.Equal(RadialWheelRing.Second, RadialWheelSelector.GetSelection(0, -170, 2, 4).Ring, "Outer ring point should select level two.");
-    Assert.Equal(RadialWheelRing.Outside, RadialWheelSelector.GetSelection(0, -220, 2, 4).Ring, "Point beyond the wheel should be outside.");
+    Assert.Equal(RadialWheelRing.Second, RadialWheelSelector.GetSelection(0, -220, 2, 4).Ring, "A slight outer overshoot should retain the outer-ring selection.");
+    Assert.Equal(RadialWheelRing.Second, RadialWheelSelector.GetSelection(0, -238, 2, 4).Ring, "The tolerance boundary should remain interactive.");
+    Assert.Equal(RadialWheelRing.Outside, RadialWheelSelector.GetSelection(0, -239, 2, 4).Ring, "A point beyond the outer tolerance should be outside.");
 }
 
 static void RadialWheelControllerHonorsCategoryDwell()
@@ -1595,6 +1600,23 @@ static void RadialWheelControllerHonorsCategoryDwell()
     controller.UpdatePointer(0, -80, now + TimeSpan.FromMilliseconds(120));
     Assert.True(controller.IsSecondLevelOpen, "Second level should open at 120 ms.");
     Assert.Equal(0, controller.SelectedCategoryIndex, "The dwelled category should remain selected.");
+}
+
+static void RadialWheelToleratesSlightOuterOvershoot()
+{
+    var controller = new RadialWheelController(CreateWheelCatalog(3));
+    var now = DateTimeOffset.UtcNow;
+    controller.Open(now);
+    controller.UpdatePointer(0, -80, now);
+    controller.UpdatePointer(0, -80, now + WheelCatalog.CategoryDwellDelay);
+
+    controller.UpdatePointer(0, -220, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(1));
+
+    Assert.True(controller.IsOpen, "A slight overshoot should not close the wheel.");
+    Assert.Equal(0, controller.SelectedSecondLevelIndex, "The overshoot area should preserve angular outer-ring selection.");
+
+    controller.UpdatePointer(0, -239, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(2));
+    Assert.False(controller.IsOpen, "Moving beyond the tolerance should still close the wheel.");
 }
 
 static void RadialWheelControllerResetsAndCollapsesState()
@@ -1612,7 +1634,7 @@ static void RadialWheelControllerResetsAndCollapsesState()
     controller.UpdatePointer(0, 0, now + TimeSpan.FromMilliseconds(240));
     Assert.False(controller.IsSecondLevelOpen, "Returning to center should collapse level two.");
     Assert.True(controller.IsOpen, "Center collapse should keep level one open.");
-    controller.UpdatePointer(0, -220, now + TimeSpan.FromMilliseconds(241));
+    controller.UpdatePointer(0, -239, now + TimeSpan.FromMilliseconds(241));
     Assert.False(controller.IsOpen, "Moving outside should cancel the wheel.");
 
     controller.Open(now);

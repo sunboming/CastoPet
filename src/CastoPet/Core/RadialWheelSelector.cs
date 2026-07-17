@@ -31,7 +31,7 @@ public static class RadialWheelSelector
                 GetSectorIndex(pointerX, pointerY, firstRingItemCount));
         }
 
-        if (distance <= WheelCatalog.SecondRingOuterRadius)
+        if (distance <= WheelCatalog.InteractionOuterRadius)
         {
             return new RadialWheelSelection(
                 RadialWheelRing.Second,

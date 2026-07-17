@@ -6,6 +6,8 @@ public sealed record WheelCatalog(IReadOnlyList<WheelCategory> Categories)
     public const double InnerRadius = 34;
     public const double FirstRingOuterRadius = 124;
     public const double SecondRingOuterRadius = 210;
+    public const double OuterExitTolerance = 28;
+    public const double InteractionOuterRadius = SecondRingOuterRadius + OuterExitTolerance;
     public const double SelectedScale = 1.18;
 
     public static readonly TimeSpan HoldDelay = TimeSpan.FromMilliseconds(400);
