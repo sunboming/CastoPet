@@ -77,6 +77,9 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
     ("Radial wheel layout keeps generic two-ring geometry", RadialWheelLayoutKeepsGenericTwoRingGeometry),
     ("Radial wheel style keeps readable ring hierarchy", RadialWheelStyleKeepsReadableRingHierarchy),
+    ("Pointer gestures classify left click and drag", PointerGesturesClassifyLeftClickAndDrag),
+    ("Pointer gestures classify right click movement and hold", PointerGesturesClassifyRightClickMovementAndHold),
+    ("Pointer gestures cancel conflicts and commit once", PointerGesturesCancelConflictsAndCommitOnce),
     ("Wheel catalog preserves ordered action references", WheelCatalogPreservesOrderedActionReferences),
     ("Wheel catalog exposes disabled empty shortcut content", WheelCatalogExposesDisabledEmptyShortcutContent),
     ("Wheel catalog service refreshes successful shortcut mutations", WheelCatalogServiceRefreshesSuccessfulShortcutMutations),
@@ -1272,6 +1275,57 @@ static void RadialWheelStyleKeepsReadableRingHierarchy()
     Assert.True(RadialWheelStyle.SelectedFill.Alpha > first.Alpha, "Selection should be stronger than the first ring.");
     Assert.True(RadialWheelStyle.SelectedFill.Alpha > second.Alpha, "Selection should be stronger than the second ring.");
     Assert.Equal(0.016d, RadialWheelStyle.SectorGapRadians, "Sector dividers should use the refined gap.");
+}
+
+static void PointerGesturesClassifyLeftClickAndDrag()
+{
+    var classifier = new PetPointerGestureClassifier(6, 6, 14, TimeSpan.FromMilliseconds(400));
+    var now = DateTimeOffset.Parse("2026-07-17T08:00:00Z");
+
+    Assert.Equal(PetPointerIntent.None, classifier.Press(PetPointerButton.Left, 100, 100, now), "Left press should remain pending.");
+    Assert.Equal(PetPointerIntent.None, classifier.Move(105.9, 105.9, now), "Movement below both axis thresholds should remain a click candidate.");
+    Assert.Equal(PetPointerIntent.Petting, classifier.Release(PetPointerButton.Left, 105.9, 105.9, now), "Left release below threshold should pet.");
+
+    classifier.Press(PetPointerButton.Left, 100, 100, now);
+    Assert.Equal(PetPointerIntent.Drag, classifier.Move(106, 100, now), "Horizontal threshold should begin drag immediately.");
+    Assert.Equal(PetPointerIntent.None, classifier.Release(PetPointerButton.Left, 106, 100, now), "Committed drag should not also pet on release.");
+
+    classifier.Press(PetPointerButton.Left, 100, 100, now);
+    Assert.Equal(PetPointerIntent.Drag, classifier.Move(100, 94, now), "Vertical threshold should begin drag immediately.");
+}
+
+static void PointerGesturesClassifyRightClickMovementAndHold()
+{
+    var classifier = new PetPointerGestureClassifier(6, 6, 14, TimeSpan.FromMilliseconds(400));
+    var now = DateTimeOffset.Parse("2026-07-17T08:00:00Z");
+
+    classifier.Press(PetPointerButton.Right, 50, 50, now);
+    Assert.Equal(PetPointerIntent.None, classifier.Move(59, 59, now), "Radial movement below fourteen DIP should remain a menu candidate.");
+    Assert.Equal(PetPointerIntent.ContextMenu, classifier.Release(PetPointerButton.Right, 59, 59, now.AddMilliseconds(399)), "Right release before hold delay should open the menu.");
+
+    classifier.Press(PetPointerButton.Right, 50, 50, now);
+    Assert.Equal(PetPointerIntent.RadialWheel, classifier.Move(64, 50, now), "Fourteen DIP movement should open the wheel without waiting.");
+
+    classifier.Cancel();
+    classifier.Press(PetPointerButton.Right, 50, 50, now);
+    Assert.Equal(PetPointerIntent.None, classifier.UpdateHold(now.AddMilliseconds(399)), "Hold should remain pending before four hundred milliseconds.");
+    Assert.Equal(PetPointerIntent.RadialWheel, classifier.UpdateHold(now.AddMilliseconds(400)), "Hold should open the wheel at four hundred milliseconds.");
+}
+
+static void PointerGesturesCancelConflictsAndCommitOnce()
+{
+    var classifier = new PetPointerGestureClassifier(6, 6, 14, TimeSpan.FromMilliseconds(400));
+    var now = DateTimeOffset.Parse("2026-07-17T08:00:00Z");
+
+    classifier.Press(PetPointerButton.Left, 0, 0, now);
+    Assert.Equal(PetPointerIntent.None, classifier.Press(PetPointerButton.Right, 0, 0, now), "A second button should cancel the pending gesture.");
+    Assert.Equal(PetPointerGestureState.Idle, classifier.State, "Conflicting buttons should return the classifier to idle.");
+
+    classifier.Press(PetPointerButton.Right, 0, 0, now);
+    Assert.Equal(PetPointerIntent.RadialWheel, classifier.Move(14, 0, now), "Movement should commit the wheel once.");
+    Assert.Equal(PetPointerIntent.None, classifier.Move(20, 0, now), "Committed wheel movement should not emit a second intent.");
+    classifier.Cancel();
+    Assert.Equal(PetPointerGestureState.Idle, classifier.State, "Cancellation should clear committed state.");
 }
 
 static void WheelCatalogPreservesOrderedActionReferences()
