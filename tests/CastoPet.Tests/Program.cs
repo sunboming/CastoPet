@@ -19,6 +19,9 @@ var tests = new (string Name, Action Test)[]
     ("Settings clone includes crash and update state", SettingsCloneIncludesCrashAndUpdateState),
     ("Settings clone includes theme mode", SettingsCloneIncludesThemeMode),
     ("Theme mode resolves system preference", ThemeModeResolvesSystemPreference),
+    ("Settings theme palette defines light and dark contrast", SettingsThemePaletteDefinesLightAndDarkContrast),
+    ("Windows system theme reader handles app preference", WindowsSystemThemeReaderHandlesAppPreference),
+    ("Settings backdrop targets supported Windows versions", SettingsBackdropTargetsSupportedWindowsVersions),
     ("Crash reports sanitize user paths and include exception chains", CrashReportsSanitizeUserPathsAndIncludeExceptionChains),
     ("Crash reports keep a bounded log tail", CrashReportsKeepABoundedLogTail),
     ("Crash report service writes and acknowledges reports", CrashReportServiceWritesAndAcknowledgesReports),
@@ -132,6 +135,7 @@ var tests = new (string Name, Action Test)[]
     ("Settings window service reuses the open window", SettingsWindowServiceReusesTheOpenWindow),
     ("Settings window service releases a closed window", SettingsWindowServiceReleasesAClosedWindow),
     ("Settings window defines the approved visual structure", SettingsWindowDefinesTheApprovedVisualStructure),
+    ("Settings window supports theme switching and backdrop", SettingsWindowSupportsThemeSwitchingAndBackdrop),
     ("Settings window exposes shortcut launcher management", SettingsWindowExposesShortcutLauncherManagement),
     ("Settings window shares shortcut services and live updates", SettingsWindowSharesShortcutServicesAndLiveUpdates),
     ("Direct menus expose the settings command", DirectMenusExposeTheSettingsCommand),
@@ -390,6 +394,38 @@ static void ThemeModeResolvesSystemPreference()
     Assert.Equal(AppThemeMode.Dark, ThemeModeResolver.Resolve(AppThemeMode.Dark, systemUsesDark: false), "Explicit dark mode should ignore the system theme.");
     Assert.Equal(AppThemeMode.Dark, ThemeModeResolver.Resolve(AppThemeMode.System, systemUsesDark: true), "System mode should resolve to dark when Windows uses dark apps.");
     Assert.Equal(AppThemeMode.Light, ThemeModeResolver.Resolve(AppThemeMode.System, systemUsesDark: false), "System mode should resolve to light when Windows uses light apps.");
+}
+
+static void SettingsThemePaletteDefinesLightAndDarkContrast()
+{
+    var light = SettingsThemePalette.Create(AppThemeMode.Light);
+    var dark = SettingsThemePalette.Create(AppThemeMode.Dark);
+    var fallback = SettingsThemePalette.Create(AppThemeMode.Light, translucent: false);
+
+    Assert.Equal(SettingsThemePalette.RequiredBrushKeys.Count, light.Count, "Light theme should define every required settings brush.");
+    Assert.Equal(SettingsThemePalette.RequiredBrushKeys.Count, dark.Count, "Dark theme should define every required settings brush.");
+    Assert.True(SettingsThemePalette.RequiredBrushKeys.All(light.ContainsKey), "Light theme should contain every required key.");
+    Assert.True(SettingsThemePalette.RequiredBrushKeys.All(dark.ContainsKey), "Dark theme should contain every required key.");
+    Assert.False(light["SurfaceBrush"].Equals(dark["SurfaceBrush"]), "Light and dark surfaces should be visibly distinct.");
+    Assert.False(light["TextBrush"].Equals(dark["TextBrush"]), "Text colors should adapt to surface brightness.");
+    Assert.True(light["WindowTintBrush"].A < 255 && dark["WindowTintBrush"].A < 255, "Both themes should retain translucent fallback tinting.");
+    Assert.Equal((byte)255, fallback["WindowTintBrush"].A, "Unsupported systems should receive an opaque window tint.");
+    Assert.Equal((byte)255, fallback["SurfaceBrush"].A, "Unsupported systems should not expose a black native window background.");
+}
+
+static void WindowsSystemThemeReaderHandlesAppPreference()
+{
+    Assert.True(WindowsSystemThemeReader.ParseUsesDarkApps(0), "AppsUseLightTheme=0 should mean dark apps.");
+    Assert.False(WindowsSystemThemeReader.ParseUsesDarkApps(1), "AppsUseLightTheme=1 should mean light apps.");
+    Assert.False(WindowsSystemThemeReader.ParseUsesDarkApps(null), "Missing preference should use the safe light fallback.");
+}
+
+static void SettingsBackdropTargetsSupportedWindowsVersions()
+{
+    Assert.False(SettingsBackdropService.IsSupported(new Version(10, 0, 22000)), "The backdrop attribute should not be used before Windows 11 22621.");
+    Assert.True(SettingsBackdropService.IsSupported(new Version(10, 0, 22621)), "Windows 11 22621 should support system backdrop type.");
+    Assert.True(SettingsBackdropService.IsSupported(new Version(10, 0, 26100)), "Newer Windows builds should keep backdrop support.");
+    Assert.Equal(0x88776655u, SettingsBackdropService.PackAccentColor(0x88, 0x55, 0x66, 0x77), "Accent tint should use the native ABGR byte order.");
 }
 
 static void CrashReportsSanitizeUserPathsAndIncludeExceptionChains()
@@ -2439,6 +2475,27 @@ static void SettingsWindowDefinesTheApprovedVisualStructure()
     Assert.Contains(xaml, "#FAF9FC", "The main surface should use cool near-white.");
     Assert.False(xaml.Contains("#6F4AA8", StringComparison.Ordinal), "The old saturated purple should be removed.");
     Assert.Contains(xaml, "CloseButton", "The custom title bar should expose a close button.");
+}
+
+static void SettingsWindowSupportsThemeSwitchingAndBackdrop()
+{
+    var workspace = FindWorkspaceRoot();
+    var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml"));
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
+    var commands = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "MenuCommandService.cs"));
+    var backdrop = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "SettingsBackdropService.cs"));
+
+    Assert.Contains(xaml, "AllowsTransparency=\"False\"", "Native backdrop windows should not use WPF layered transparency.");
+    Assert.Contains(xaml, "SystemThemeButton", "Settings should expose a follow-system theme choice.");
+    Assert.Contains(xaml, "LightThemeButton", "Settings should expose a light theme choice.");
+    Assert.Contains(xaml, "DarkThemeButton", "Settings should expose a dark theme choice.");
+    Assert.Contains(xaml, "ThemeMode_Checked", "Theme choices should apply immediately.");
+    Assert.Contains(source, "ThemeModeResolver.Resolve", "Settings should resolve the persisted theme against Windows.");
+    Assert.Contains(source, "WindowsSystemThemeReader.UsesDarkApps", "Follow-system mode should read the Windows app preference.");
+    Assert.Contains(source, "SettingsThemePalette.Apply", "Settings should apply its centralized palette.");
+    Assert.Contains(source, "SettingsBackdropService.TryApply", "Settings should request the supported native backdrop.");
+    Assert.Contains(backdrop, "DwmExtendFrameIntoClientArea", "The native backdrop should extend through the custom client area.");
+    Assert.Contains(commands, "SetThemeMode(AppThemeMode mode)", "Theme selection should persist through the shared settings command service.");
 }
 
 static void SettingsWindowExposesShortcutLauncherManagement()

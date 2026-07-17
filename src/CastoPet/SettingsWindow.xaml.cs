@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Input;
 using CastoPet.Core;
 using WpfControls = System.Windows.Controls;
-using WpfMedia = System.Windows.Media;
 
 namespace CastoPet;
 
@@ -16,6 +15,7 @@ public partial class SettingsWindow : Window, ISettingsWindow
     private readonly ShortcutLauncher _shortcutLauncher;
     private readonly IReadOnlyList<SettingDefinition> _definitions;
     private readonly Dictionary<string, WpfControls.CheckBox> _switches = new(StringComparer.Ordinal);
+    private bool _updatingThemeChoice;
 
     public SettingsWindow(
         MenuCommandService commands,
@@ -33,6 +33,8 @@ public partial class SettingsWindow : Window, ISettingsWindow
         _shortcutDropHandler = shortcutDropHandler;
         _shortcutLauncher = shortcutLauncher;
         _definitions = SettingCatalog.Create(commands);
+        ApplyTheme();
+        RefreshThemeChoice();
         BuildSettingsRows();
         RefreshValues();
         RefreshShortcutRows();
@@ -40,8 +42,10 @@ public partial class SettingsWindow : Window, ISettingsWindow
         UpdateStatusText.Text = _updates.IsInstalled
             ? "每天启动时检查一次"
             : "开发版本不支持自动更新";
-        _commands.SettingsChanged += RefreshValues;
+        _commands.SettingsChanged += OnSettingsChanged;
         _shortcutService.Changed += OnShortcutsChanged;
+        SourceInitialized += OnSourceInitialized;
+        Activated += OnSettingsWindowActivated;
         Closed += OnSettingsWindowClosed;
     }
 
@@ -59,21 +63,24 @@ public partial class SettingsWindow : Window, ISettingsWindow
 
     private FrameworkElement CreateGroupHeader(SettingGroup group)
     {
-        return new WpfControls.Border
+        var label = new WpfControls.TextBlock
+        {
+            Text = GetGroupLabel(group),
+            FontSize = 12.5,
+            FontWeight = FontWeights.Medium,
+        };
+        label.SetResourceReference(WpfControls.TextBlock.ForegroundProperty, "PurpleBrush");
+
+        var header = new WpfControls.Border
         {
             Margin = new Thickness(0, 6, 0, 0),
             Padding = new Thickness(11, 7, 11, 7),
-            Background = (WpfMedia.Brush)FindResource("LavenderBrush"),
-            BorderBrush = (WpfMedia.Brush)FindResource("DividerBrush"),
             BorderThickness = new Thickness(0, 0, 0, 1),
-            Child = new WpfControls.TextBlock
-            {
-                Text = GetGroupLabel(group),
-                FontSize = 12.5,
-                FontWeight = FontWeights.Medium,
-                Foreground = (WpfMedia.Brush)FindResource("PurpleBrush"),
-            },
+            Child = label,
         };
+        header.SetResourceReference(WpfControls.Border.BackgroundProperty, "LavenderBrush");
+        header.SetResourceReference(WpfControls.Border.BorderBrushProperty, "DividerBrush");
+        return header;
     }
 
     private FrameworkElement CreateSettingRow(SettingDefinition definition)
@@ -89,21 +96,24 @@ public partial class SettingsWindow : Window, ISettingsWindow
         _switches.Add(definition.Id, toggle);
 
         var text = new WpfControls.StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new WpfControls.TextBlock
+        var title = new WpfControls.TextBlock
         {
             Text = definition.Label,
             FontSize = 13.5,
             FontWeight = FontWeights.Medium,
-            Foreground = (WpfMedia.Brush)FindResource("TextBrush"),
-        });
-        text.Children.Add(new WpfControls.TextBlock
+        };
+        title.SetResourceReference(WpfControls.TextBlock.ForegroundProperty, "TextBrush");
+        text.Children.Add(title);
+
+        var description = new WpfControls.TextBlock
         {
             Text = definition.Description,
             Margin = new Thickness(0, 3, 0, 0),
             FontSize = 11,
-            Foreground = (WpfMedia.Brush)FindResource("SecondaryTextBrush"),
             TextWrapping = TextWrapping.Wrap,
-        });
+        };
+        description.SetResourceReference(WpfControls.TextBlock.ForegroundProperty, "SecondaryTextBrush");
+        text.Children.Add(description);
 
         var grid = new WpfControls.Grid { Margin = new Thickness(11, 0, 11, 0) };
         grid.ColumnDefinitions.Add(new WpfControls.ColumnDefinition());
@@ -112,14 +122,15 @@ public partial class SettingsWindow : Window, ISettingsWindow
         WpfControls.Grid.SetColumn(toggle, 1);
         grid.Children.Add(toggle);
 
-        return new WpfControls.Border
+        var row = new WpfControls.Border
         {
             MinHeight = 56,
             Padding = new Thickness(0, 5, 0, 5),
-            BorderBrush = (WpfMedia.Brush)FindResource("DividerBrush"),
             BorderThickness = new Thickness(0, 0, 0, 1),
             Child = grid,
         };
+        row.SetResourceReference(WpfControls.Border.BorderBrushProperty, "DividerBrush");
+        return row;
     }
 
     private void RefreshValues()
@@ -127,6 +138,59 @@ public partial class SettingsWindow : Window, ISettingsWindow
         foreach (var definition in _definitions)
         {
             _switches[definition.Id].IsChecked = definition.GetValue();
+        }
+    }
+
+    private void OnSettingsChanged()
+    {
+        RefreshValues();
+        ApplyTheme();
+        RefreshThemeChoice();
+    }
+
+    private void ApplyTheme()
+    {
+        var effectiveMode = ThemeModeResolver.Resolve(
+            _commands.Settings.ThemeMode,
+            WindowsSystemThemeReader.UsesDarkApps());
+        var hasNativeHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle != IntPtr.Zero;
+        var hasNativeBackdrop = SettingsBackdropService.TryApply(this, effectiveMode == AppThemeMode.Dark);
+        SettingsThemePalette.Apply(Resources, effectiveMode, translucent: !hasNativeHandle || hasNativeBackdrop);
+    }
+
+    private void RefreshThemeChoice()
+    {
+        _updatingThemeChoice = true;
+        try
+        {
+            SystemThemeButton.IsChecked = _commands.Settings.ThemeMode == AppThemeMode.System;
+            LightThemeButton.IsChecked = _commands.Settings.ThemeMode == AppThemeMode.Light;
+            DarkThemeButton.IsChecked = _commands.Settings.ThemeMode == AppThemeMode.Dark;
+        }
+        finally
+        {
+            _updatingThemeChoice = false;
+        }
+    }
+
+    private void ThemeMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_updatingThemeChoice || sender is not WpfControls.RadioButton { Tag: string value } ||
+            !Enum.TryParse<AppThemeMode>(value, ignoreCase: true, out var mode))
+        {
+            return;
+        }
+
+        _commands.SetThemeMode(mode);
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e) => ApplyTheme();
+
+    private void OnSettingsWindowActivated(object? sender, EventArgs e)
+    {
+        if (_commands.Settings.ThemeMode == AppThemeMode.System)
+        {
+            ApplyTheme();
         }
     }
 
@@ -395,8 +459,10 @@ public partial class SettingsWindow : Window, ISettingsWindow
 
     private void OnSettingsWindowClosed(object? sender, EventArgs e)
     {
-        _commands.SettingsChanged -= RefreshValues;
+        _commands.SettingsChanged -= OnSettingsChanged;
         _shortcutService.Changed -= OnShortcutsChanged;
+        SourceInitialized -= OnSourceInitialized;
+        Activated -= OnSettingsWindowActivated;
         Closed -= OnSettingsWindowClosed;
     }
 

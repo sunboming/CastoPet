@@ -96,6 +96,19 @@ public sealed class MenuCommandService
         ApplyAndSave("Start with Windows setting changed.");
     }
 
+    public void SetThemeMode(AppThemeMode mode)
+    {
+        if (!Enum.IsDefined(mode) || Settings.ThemeMode == mode)
+        {
+            return;
+        }
+
+        Settings.ThemeMode = mode;
+        _settingsService.Save(Settings);
+        _logger.Info($"Settings theme changed to {mode}.");
+        SettingsChanged?.Invoke();
+    }
+
     public void Exit()
     {
         _logger.Info("CastoPet exiting.");
