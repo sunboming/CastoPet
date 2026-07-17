@@ -164,6 +164,10 @@ var tests = new (string Name, Action Test)[]
     ("Cursor nudge planner detects manual movement cooldown", CursorNudgePlannerDetectsManualMovementCooldown),
     ("Cursor nudge planner blocks while mouse button is pressed", CursorNudgePlannerBlocksWhileMouseButtonIsPressed),
     ("Cursor nudge planner limits continuous push duration", CursorNudgePlannerLimitsContinuousPushDuration),
+    ("Animation controller loops idle frames", AnimationControllerLoopsIdleFrames),
+    ("Animation controller completes one-shot actions", AnimationControllerCompletesOneShotActions),
+    ("Animation controller completes expression transitions", AnimationControllerCompletesExpressionTransitions),
+    ("Animation controller centralizes passive blockers", AnimationControllerCentralizesPassiveBlockers),
     ("Pet animation timings are responsive", PetAnimationTimingsAreResponsive),
     ("Idle breathing values are neutral during stabilization", IdleBreathingValuesAreNeutralDuringStabilization),
     ("Character stationary animations are enabled", CharacterStationaryAnimationsAreEnabled),
@@ -2503,7 +2507,7 @@ static void PetWindowDefinesHoldFeedbackAndPettingPlayback()
     Assert.False(xaml.Contains("DropShadowEffect", StringComparison.Ordinal), "The changing hold arc should not invalidate a real-time blur effect every frame.");
     Assert.Contains(source, "LoadPettingFrames", "PetWindow should load optional skin petting frames.");
     Assert.Contains(source, "AdvancePettingFrame", "Petting should play as a one-shot frame sequence.");
-    Assert.Contains(source, "_isPetting", "Passive runtime modes should be able to gate on petting playback.");
+    Assert.Contains(source, "_animationController.IsPetting", "Passive runtime modes should gate on centralized petting playback state.");
 }
 
 static void PetWindowRoutesGenericRadialActions()
@@ -2948,6 +2952,70 @@ static void CursorNudgePlannerLimitsContinuousPushDuration()
             lastManualMovement: null,
             pushStartedAt: TimeSpan.Zero),
         "Cursor push should stop after the continuous duration cap.");
+}
+
+static void AnimationControllerLoopsIdleFrames()
+{
+    var controller = new PetAnimationController();
+
+    Assert.Equal(1, controller.AdvanceIdle(3), "Idle should advance to frame 1.");
+    Assert.Equal(2, controller.AdvanceIdle(3), "Idle should advance to frame 2.");
+    Assert.Equal(0, controller.AdvanceIdle(3), "Idle should loop to frame 0.");
+    controller.ResetIdle();
+    Assert.Equal(0, controller.IdleFrameIndex, "Idle reset should restore frame 0.");
+}
+
+static void AnimationControllerCompletesOneShotActions()
+{
+    var controller = new PetAnimationController();
+
+    Assert.True(controller.BeginBlink(3), "Blink should start when frames exist.");
+    Assert.Equal(new PetFrameAdvance(1, false), controller.AdvanceBlink(3), "Blink should advance through authored frames.");
+    Assert.Equal(new PetFrameAdvance(2, false), controller.AdvanceBlink(3), "Blink should expose its final authored frame.");
+    Assert.Equal(new PetFrameAdvance(0, true), controller.AdvanceBlink(3), "Blink should complete after its final frame.");
+    Assert.False(controller.IsBlinking, "Completed blink should clear its active state.");
+
+    Assert.True(controller.BeginPetting(2), "Petting should start even when the visual sequence is a fallback.");
+    Assert.Equal(new PetFrameAdvance(1, false), controller.AdvancePetting(2), "Petting should advance through authored frames.");
+    Assert.Equal(new PetFrameAdvance(0, true), controller.AdvancePetting(2), "Petting should complete once.");
+    Assert.False(controller.IsPetting, "Completed petting should clear its active state.");
+}
+
+static void AnimationControllerCompletesExpressionTransitions()
+{
+    var controller = new PetAnimationController();
+    Assert.True(controller.BeginExpressionTransition(PetExpressionTransitionMode.In, 2), "Expression transition should start with frames.");
+
+    var middle = controller.AdvanceExpressionTransition(2);
+    var completed = controller.AdvanceExpressionTransition(2);
+
+    Assert.Equal(1, middle.FrameIndex, "Expression transition should expose its final frame.");
+    Assert.False(middle.Completed, "Expression transition should not complete before the final frame has displayed.");
+    Assert.True(completed.Completed, "Expression transition should complete after its final frame.");
+    Assert.Equal(PetExpressionTransitionMode.In, completed.CompletedMode, "Completion should retain the transition direction.");
+    Assert.Equal(PetExpressionTransitionMode.None, controller.ExpressionTransitionMode, "Completed transition should return to none.");
+}
+
+static void AnimationControllerCentralizesPassiveBlockers()
+{
+    var controller = new PetAnimationController();
+    var available = new PetPassiveAnimationContext(
+        PassiveAnimationAllowed: true,
+        IsDragging: false,
+        HasActiveMovementTarget: false,
+        IsRadialWheelOpen: false,
+        HasTemporaryExpression: false);
+
+    Assert.True(controller.CanRunIdle(available, frameCount: 8), "Idle should run when no higher-priority activity is present.");
+    Assert.True(controller.CanBeginBlink(available, frameCount: 3), "Blink should run when no higher-priority activity is present.");
+
+    controller.BeginPetting(1);
+    Assert.False(controller.CanRunIdle(available, frameCount: 8), "Petting should block idle playback.");
+    Assert.False(controller.CanBeginBlink(available, frameCount: 3), "Petting should block blink playback.");
+    controller.StopPetting();
+
+    var blocked = available with { IsRadialWheelOpen = true };
+    Assert.False(controller.CanRunIdle(blocked, frameCount: 8), "The radial wheel should block idle playback.");
 }
 
 static void PetAnimationTimingsAreResponsive()

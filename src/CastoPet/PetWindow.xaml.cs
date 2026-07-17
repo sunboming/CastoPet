@@ -42,6 +42,7 @@ public partial class PetWindow : Window
 
     private readonly LoggingService _logger;
     private readonly PetRuntimeState _runtimeState = new();
+    private readonly PetAnimationController _animationController = new();
     private readonly ImageSource _defaultCharacter;
     private readonly ImageSource _draggingCharacter;
     private readonly IReadOnlyList<ImageSource> _idleFrames;
@@ -91,8 +92,6 @@ public partial class PetWindow : Window
     private bool _applySettingsOnSourceInitialized;
     private bool _isClickThrough;
     private bool _isDragging;
-    private bool _isBlinking;
-    private bool _isPetting;
     private bool _isRadialWheelOpen;
     private bool _hasRadialWheelPointer;
     private bool _hasRadialWheelPointerEntered;
@@ -108,11 +107,6 @@ public partial class PetWindow : Window
     private TimeSpan? _lastActiveMovementRenderTime;
     private TimeSpan? _lastManualCursorMovementTime;
     private TimeSpan? _cursorPushStartedAt;
-    private ExpressionTransitionMode _expressionTransitionMode;
-    private int _expressionTransitionFrameIndex;
-    private int _idleFrameIndex;
-    private int _blinkFrameIndex;
-    private int _pettingFrameIndex;
     private int _activeMovementVisualDirection;
     private bool _dragMovementVisualApplied;
     private double _lastMovementDeltaX;
@@ -125,13 +119,6 @@ public partial class PetWindow : Window
     private bool _activeMovementRenderingSubscribed;
     private bool _radialWheelHoldRenderingSubscribed;
     private WpfControls.ContextMenu? _petContextMenu;
-
-    private enum ExpressionTransitionMode
-    {
-        None,
-        In,
-        Out,
-    }
 
     private sealed class RadialWheelItemVisual(
         WpfShapes.Path sector,
@@ -414,16 +401,27 @@ public partial class PetWindow : Window
             && _inputReactiveBase is not null
             && IsVisible
             && !_isDragging
-            && !_isPetting
+            && !_animationController.IsPetting
             && !_dragRestoreTimer.IsEnabled
             && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
-            && _expressionTransitionMode == ExpressionTransitionMode.None;
+            && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None;
     }
 
     private bool IsInputReactiveModeBlockingPassiveAnimation()
     {
         return _inputReactiveModeEnabled && _inputReactiveBase is not null;
+    }
+
+    private PetPassiveAnimationContext GetPassiveAnimationContext()
+    {
+        return new PetPassiveAnimationContext(
+            PassiveAnimationAllowed: InputReactiveModePolicy.AllowsPassiveAnimation(
+                IsInputReactiveModeBlockingPassiveAnimation()),
+            IsDragging: _isDragging,
+            HasActiveMovementTarget: _hasActiveMovementTarget,
+            IsRadialWheelOpen: _isRadialWheelOpen,
+            HasTemporaryExpression: _temporaryExpressionTimer.IsEnabled);
     }
 
     private void UpdateInputReactiveMode()
@@ -463,10 +461,10 @@ public partial class PetWindow : Window
 
         if (restoreIdle
             && !_isDragging
-            && !_isPetting
+            && !_animationController.IsPetting
             && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
-            && _expressionTransitionMode == ExpressionTransitionMode.None)
+            && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None)
         {
             CharacterImage.Source = GetCurrentIdleFrame();
             StartIdleAnimation();
@@ -820,7 +818,7 @@ public partial class PetWindow : Window
     private void RestoreAfterDrag()
     {
         _dragRestoreTimer.Stop();
-        _idleFrameIndex = 0;
+        _animationController.ResetIdle();
         ResetActiveMovementVisual();
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
@@ -832,7 +830,7 @@ public partial class PetWindow : Window
     private void BeginPetting()
     {
         StopPetting(restoreIdle: false);
-        _isPetting = true;
+        _animationController.BeginPetting(Math.Max(1, _pettingFrames.Count));
         CancelTemporaryExpression();
         StopInputReactiveMode(restoreIdle: false);
         StopActiveMovementProbe();
@@ -844,7 +842,6 @@ public partial class PetWindow : Window
         ResetMoveFrameState();
         ResetActiveMovementVisual();
         ResetCharacterTransitionAnimations();
-        _pettingFrameIndex = 0;
 
         if (_pettingFrames.Count > 0)
         {
@@ -890,7 +887,7 @@ public partial class PetWindow : Window
 
     private void AdvancePettingFrame()
     {
-        if (!_isPetting)
+        if (!_animationController.IsPetting)
         {
             _pettingFrameTimer.Stop();
             return;
@@ -902,14 +899,14 @@ public partial class PetWindow : Window
             return;
         }
 
-        _pettingFrameIndex++;
-        if (_pettingFrameIndex >= _pettingFrames.Count)
+        var advance = _animationController.AdvancePetting(_pettingFrames.Count);
+        if (advance.Completed)
         {
             CompletePetting();
             return;
         }
 
-        CharacterImage.Source = _pettingFrames[_pettingFrameIndex];
+        CharacterImage.Source = _pettingFrames[advance.FrameIndex];
     }
 
     private void CompletePetting()
@@ -919,14 +916,14 @@ public partial class PetWindow : Window
 
     private void StopPetting(bool restoreIdle)
     {
+        var wasActive = _animationController.IsPetting || _pettingFrameTimer.IsEnabled;
         _pettingFrameTimer.Stop();
-        if (!_isPetting)
+        if (!wasActive)
         {
             return;
         }
 
-        _isPetting = false;
-        _pettingFrameIndex = 0;
+        _animationController.StopPetting();
         CharacterTranslateTransform.BeginAnimation(TranslateTransform.YProperty, null);
         ResetCharacterTransitionAnimations();
         CharacterTranslateTransform.Y = 0;
@@ -935,7 +932,7 @@ public partial class PetWindow : Window
             return;
         }
 
-        _idleFrameIndex = 0;
+        _animationController.ResetIdle();
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
         ScheduleNextBlink();
@@ -950,11 +947,11 @@ public partial class PetWindow : Window
             && IsVisible
             && !_isClickThrough
             && !_isDragging
-            && !_isPetting
+            && !_animationController.IsPetting
             && !_dragRestoreTimer.IsEnabled
             && !_isRadialWheelOpen
             && !_temporaryExpressionTimer.IsEnabled
-            && _expressionTransitionMode == ExpressionTransitionMode.None;
+            && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None;
     }
 
     private void UpdateActiveMovementTimer()
@@ -1313,7 +1310,8 @@ public partial class PetWindow : Window
         _moveFrameDistanceAccumulator = 0;
         _moveFrameIndex = 0;
 
-        if (!_isDragging && !_temporaryExpressionTimer.IsEnabled && _expressionTransitionMode == ExpressionTransitionMode.None)
+        if (!_isDragging && !_temporaryExpressionTimer.IsEnabled &&
+            _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None)
         {
             CharacterImage.Source = GetCurrentIdleFrame();
             StartIdleAnimation();
@@ -1351,7 +1349,8 @@ public partial class PetWindow : Window
 
     private void ResetActiveMovementVisual()
     {
-        if (_isDragging || _temporaryExpressionTimer.IsEnabled || _expressionTransitionMode != ExpressionTransitionMode.None)
+        if (_isDragging || _temporaryExpressionTimer.IsEnabled ||
+            _animationController.ExpressionTransitionMode != PetExpressionTransitionMode.None)
         {
             return;
         }
@@ -2219,12 +2218,11 @@ public partial class PetWindow : Window
         }
 
         ResetCharacterTransitionAnimations();
-        _expressionTransitionMode = ExpressionTransitionMode.In;
-        _expressionTransitionFrameIndex = 0;
+        _animationController.BeginExpressionTransition(PetExpressionTransitionMode.In, _activeExpressionTransitionFrames.Count);
         _expressionTransitionFrameTimer.Interval = _activeExpressionUsesSpecificTransition
             ? _pendingExpressionAsset.Definition.TransitionFrameInterval ?? DefaultExpressionTransitionFrameInterval
             : GetActionFrameInterval(_expressionTransitionInAction, DefaultExpressionTransitionFrameInterval);
-        CharacterImage.Source = _activeExpressionTransitionFrames[_expressionTransitionFrameIndex];
+        CharacterImage.Source = _activeExpressionTransitionFrames[_animationController.ExpressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
     }
@@ -2241,12 +2239,11 @@ public partial class PetWindow : Window
         }
 
         ResetCharacterTransitionAnimations();
-        _expressionTransitionMode = ExpressionTransitionMode.Out;
-        _expressionTransitionFrameIndex = 0;
+        _animationController.BeginExpressionTransition(PetExpressionTransitionMode.Out, _activeExpressionTransitionFrames.Count);
         _expressionTransitionFrameTimer.Interval = _activeExpressionUsesSpecificTransition
             ? _activeExpressionAsset?.Definition.TransitionFrameInterval ?? DefaultExpressionTransitionFrameInterval
             : GetActionFrameInterval(_expressionTransitionOutAction, DefaultExpressionTransitionFrameInterval);
-        CharacterImage.Source = _activeExpressionTransitionFrames[_expressionTransitionFrameIndex];
+        CharacterImage.Source = _activeExpressionTransitionFrames[_animationController.ExpressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
     }
@@ -2255,23 +2252,22 @@ public partial class PetWindow : Window
     {
         var frames = _activeExpressionTransitionFrames;
 
-        if (_expressionTransitionMode == ExpressionTransitionMode.None || frames.Count == 0)
+        if (_animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None || frames.Count == 0)
         {
             StopExpressionTransition();
             return;
         }
 
-        _expressionTransitionFrameIndex++;
-        if (_expressionTransitionFrameIndex < frames.Count)
+        var advance = _animationController.AdvanceExpressionTransition(frames.Count);
+        if (!advance.Completed)
         {
-            CharacterImage.Source = frames[_expressionTransitionFrameIndex];
+            CharacterImage.Source = frames[advance.FrameIndex];
             return;
         }
 
-        var completedMode = _expressionTransitionMode;
         StopExpressionTransition();
 
-        if (completedMode == ExpressionTransitionMode.In)
+        if (advance.CompletedMode == PetExpressionTransitionMode.In)
         {
             ShowPendingExpression();
             return;
@@ -2310,7 +2306,7 @@ public partial class PetWindow : Window
             return;
         }
 
-        _idleFrameIndex = 0;
+        _animationController.ResetIdle();
         _pendingExpressionAsset = null;
         _activeExpressionAsset = null;
         _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
@@ -2326,8 +2322,7 @@ public partial class PetWindow : Window
     private void StopExpressionTransition()
     {
         _expressionTransitionFrameTimer.Stop();
-        _expressionTransitionMode = ExpressionTransitionMode.None;
-        _expressionTransitionFrameIndex = 0;
+        _animationController.StopExpressionTransition();
         _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
     }
 
@@ -2401,8 +2396,8 @@ public partial class PetWindow : Window
             return;
         }
 
-        _idleFrameIndex = (_idleFrameIndex + 1) % _idleFrames.Count;
-        if (!_isBlinking)
+        _animationController.AdvanceIdle(_idleFrames.Count);
+        if (!_animationController.IsBlinking)
         {
             CharacterImage.Source = GetCurrentIdleFrame();
         }
@@ -2410,20 +2405,13 @@ public partial class PetWindow : Window
 
     private ImageSource GetCurrentIdleFrame()
     {
-        return _idleFrames.Count == 0 ? _defaultCharacter : _idleFrames[_idleFrameIndex];
+        return _idleFrames.Count == 0 ? _defaultCharacter : _idleFrames[_animationController.IdleFrameIndex];
     }
 
     private bool CanIdleAnimate()
     {
         return PetAnimationTimings.CharacterFrameAnimationEnabled
-            && InputReactiveModePolicy.AllowsPassiveAnimation(IsInputReactiveModeBlockingPassiveAnimation())
-            && !_isDragging
-            && !_isPetting
-            && !_hasActiveMovementTarget
-            && !_isRadialWheelOpen
-            && !_temporaryExpressionTimer.IsEnabled
-            && _expressionTransitionMode == ExpressionTransitionMode.None
-            && _idleFrames.Count > 0;
+            && _animationController.CanRunIdle(GetPassiveAnimationContext(), _idleFrames.Count);
     }
 
     private void ScheduleNextBlink()
@@ -2472,36 +2460,31 @@ public partial class PetWindow : Window
             return;
         }
 
-        _isBlinking = true;
-        _blinkFrameIndex = 0;
-        CharacterImage.Source = _blinkFrames[_blinkFrameIndex];
+        if (!_animationController.BeginBlink(_blinkFrames.Count))
+        {
+            return;
+        }
+
+        CharacterImage.Source = _blinkFrames[_animationController.BlinkFrameIndex];
         _blinkFrameTimer.Start();
     }
 
     private bool CanBlink()
     {
         return PetAnimationTimings.BlinkFrameAnimationEnabled
-            && InputReactiveModePolicy.AllowsPassiveAnimation(IsInputReactiveModeBlockingPassiveAnimation())
-            && !_isDragging
-            && !_isPetting
-            && !_isBlinking
-            && !_hasActiveMovementTarget
-            && !_isRadialWheelOpen
-            && !_temporaryExpressionTimer.IsEnabled
-            && _expressionTransitionMode == ExpressionTransitionMode.None
-            && _blinkFrames.Count > 0;
+            && _animationController.CanBeginBlink(GetPassiveAnimationContext(), _blinkFrames.Count);
     }
 
     private void AdvanceBlinkFrame()
     {
-        if (_isDragging || !_isBlinking)
+        if (_isDragging || !_animationController.IsBlinking)
         {
             StopBlinkAnimation();
             return;
         }
 
-        _blinkFrameIndex++;
-        if (_blinkFrameIndex >= _blinkFrames.Count)
+        var advance = _animationController.AdvanceBlink(_blinkFrames.Count);
+        if (advance.Completed)
         {
             StopBlinkAnimation();
             CharacterImage.Source = GetCurrentIdleFrame();
@@ -2509,15 +2492,14 @@ public partial class PetWindow : Window
             return;
         }
 
-        CharacterImage.Source = _blinkFrames[_blinkFrameIndex];
+        CharacterImage.Source = _blinkFrames[advance.FrameIndex];
     }
 
     private void StopBlinkAnimation()
     {
         _blinkScheduleTimer.Stop();
         _blinkFrameTimer.Stop();
-        _isBlinking = false;
-        _blinkFrameIndex = 0;
+        _animationController.StopBlink();
     }
 
     private static WpfControls.MenuItem CreateMenuItem(string header, Action action)
