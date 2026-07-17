@@ -90,6 +90,7 @@ public static class PetSkinManifestWriter
             PetActionKind.Idle => "idle",
             PetActionKind.Move => "move",
             PetActionKind.Blink => "blink",
+            PetActionKind.Petting => "petting",
             PetActionKind.ExpressionTransitionIn => "expression-transition-in",
             PetActionKind.ExpressionTransitionOut => "expression-transition-out",
             _ => throw new InvalidOperationException($"Unsupported action kind {kind}."),

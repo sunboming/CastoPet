@@ -34,6 +34,11 @@ public static class BuiltInPetSkins
                 MinScheduleDelay: TimeSpan.FromSeconds(3),
                 MaxScheduleDelay: TimeSpan.FromSeconds(7)),
             new PetActionDefinition(
+                Id: "petting",
+                Kind: PetActionKind.Petting,
+                FramePaths: CreateFramePaths("States/Petting/Castorice.Petting", 8),
+                FrameInterval: TimeSpan.FromMilliseconds(80)),
+            new PetActionDefinition(
                 Id: "expression-transition-in",
                 Kind: PetActionKind.ExpressionTransitionIn,
                 FramePaths: CreateFramePaths("Expressions/Transition/Castorice.ExpressionTransition.In", 4),

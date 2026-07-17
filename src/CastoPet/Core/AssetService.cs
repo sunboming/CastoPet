@@ -63,6 +63,11 @@ public sealed class AssetService
         return LoadActionFrames(PetActionKind.Move, "Move frames");
     }
 
+    public IReadOnlyList<ImageSource> LoadPettingFrames()
+    {
+        return LoadOptionalActionFrames(PetActionKind.Petting, "Petting frames");
+    }
+
     public IReadOnlyList<ImageSource> LoadExpressionTransitionInFrames()
     {
         return LoadOptionalActionFrames(PetActionKind.ExpressionTransitionIn, "Expression transition in frames");

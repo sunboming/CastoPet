@@ -50,6 +50,7 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice idle action preserves current frames", BuiltInCastoriceIdleActionPreservesCurrentFrames),
     ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
     ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
+    ("Built-in Castorice defines optional petting action", BuiltInCastoriceDefinesOptionalPettingAction),
     ("Built-in Castorice expressions are ordered skin definitions", BuiltInCastoriceExpressionsAreOrderedSkinDefinitions),
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
     ("Pet skin manifest loads expression transition metadata", PetSkinManifestLoadsExpressionTransitionMetadata),
@@ -57,6 +58,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
     ("Pet skin manifest writer emits loadable JSON", PetSkinManifestWriterEmitsLoadableJson),
     ("Pet skin manifest writer stores paths relative to resource root", PetSkinManifestWriterStoresPathsRelativeToResourceRoot),
+    ("Pet skin manifest round trips optional petting action", PetSkinManifestRoundTripsOptionalPettingAction),
     ("Pet skin selection defaults to built-in skin", PetSkinSelectionDefaultsToBuiltInSkin),
     ("Pet skin selection loads configured manifest", PetSkinSelectionLoadsConfiguredManifest),
     ("Pet skin selection falls back when manifest fails", PetSkinSelectionFallsBackWhenManifestFails),
@@ -64,6 +66,7 @@ var tests = new (string Name, Action Test)[]
     ("Asset service uses configured skin paths", AssetServiceUsesConfiguredSkinPaths),
     ("Asset service loads file system skin image paths", AssetServiceLoadsFileSystemSkinImagePaths),
     ("Asset service loads expression images with isolated transitions", AssetServiceLoadsExpressionImagesWithIsolatedTransitions),
+    ("Asset service treats missing petting frames as optional", AssetServiceTreatsMissingPettingFramesAsOptional),
     ("Built-in idle action defines eight authored-rate frame paths", BuiltInIdleActionDefinesEightAuthoredRateFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Built-in blink action defines random blink frames", BuiltInBlinkActionDefinesRandomBlinkFrames),
@@ -809,6 +812,15 @@ static void BuiltInCastoriceBlinkActionPreservesSchedule()
     Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink max schedule should stay compatible.");
 }
 
+static void BuiltInCastoriceDefinesOptionalPettingAction()
+{
+    Assert.True(BuiltInPetSkins.Castorice.TryGetAction(PetActionKind.Petting, out var petting), "Castorice should define petting without making it a required skin action.");
+    Assert.Equal(8, petting.FramePaths.Count, "Petting should define eight authored frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(80), petting.FrameInterval, "Petting should play once at 12.5 FPS.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Petting/Castorice.Petting.00.png", petting.FramePaths[0], "Petting paths should use the runtime convention.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Petting/Castorice.Petting.07.png", petting.FramePaths[^1], "Petting should end on frame seven.");
+}
+
 static void BuiltInCastoriceExpressionsAreOrderedSkinDefinitions()
 {
     var expressions = BuiltInPetSkins.Castorice.Expressions;
@@ -986,6 +998,34 @@ static void PetSkinManifestWriterStoresPathsRelativeToResourceRoot()
     Assert.Contains(json, @"""States/Idle/Castorice.Idle.00.png""", "Action frame paths should be stored relative to resource root.");
 }
 
+static void PetSkinManifestRoundTripsOptionalPettingAction()
+{
+    var skin = PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "pettable",
+          "displayName": "Pettable",
+          "resourceRoot": "Skins/Pettable",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": ["Idle/00.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move/00.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink/00.png"] },
+            { "id": "petting", "kind": "petting", "frameIntervalMs": 80, "frames": ["Petting/00.png", "Petting/01.png"] }
+          ]
+        }
+        """);
+
+    Assert.True(skin.TryGetAction(PetActionKind.Petting, out var petting), "Manifest should load optional petting actions.");
+    Assert.Equal("Skins/Pettable/Petting/00.png", petting.FramePaths[0], "Petting paths should resolve under the resource root.");
+    Assert.Equal(TimeSpan.FromMilliseconds(80), petting.FrameInterval, "Petting frame interval should load.");
+
+    var json = PetSkinManifestWriter.ToJson(skin);
+    Assert.Contains(json, @"""kind"": ""petting""", "Manifest writer should preserve optional petting actions.");
+    var reloaded = PetSkinManifestLoader.LoadFromJson(json);
+    Assert.True(reloaded.TryGetAction(PetActionKind.Petting, out _), "Written petting actions should remain loadable.");
+}
+
 static void PetSkinSelectionDefaultsToBuiltInSkin()
 {
     using var temp = TempDirectory.Create();
@@ -1125,6 +1165,22 @@ static void AssetServiceLoadsExpressionImagesWithIsolatedTransitions()
     Assert.Equal(expression, assets.Values.Single().Definition, "Loaded expression assets should retain their definition.");
     Assert.Equal(0, service.LoadExpressionTransitionInFrames().Count, "A missing generic transition-in action should return no fallback frames.");
     Assert.Equal(0, service.LoadExpressionTransitionOutFrames().Count, "A missing generic transition-out action should return no fallback frames.");
+}
+
+static void AssetServiceTreatsMissingPettingFramesAsOptional()
+{
+    using var temp = TempDirectory.Create();
+    var paths = new AppPaths(temp.Path);
+    var logger = new LoggingService(paths);
+    var skin = BuiltInPetSkins.Castorice with
+    {
+        Actions = BuiltInPetSkins.Castorice.Actions
+            .Where(action => action.Kind != PetActionKind.Petting)
+            .ToArray(),
+    };
+    var service = new AssetService(logger, skin);
+
+    Assert.Equal(0, service.LoadPettingFrames().Count, "Old skins without petting should use the runtime fallback instead of failing.");
 }
 
 static void BuiltInIdleActionDefinesEightAuthoredRateFramePaths()

@@ -140,6 +140,7 @@ public static class PetSkinManifestLoader
             _ when value.Equals("idle", StringComparison.OrdinalIgnoreCase) => PetActionKind.Idle,
             _ when value.Equals("move", StringComparison.OrdinalIgnoreCase) => PetActionKind.Move,
             _ when value.Equals("blink", StringComparison.OrdinalIgnoreCase) => PetActionKind.Blink,
+            _ when value.Equals("petting", StringComparison.OrdinalIgnoreCase) => PetActionKind.Petting,
             _ when value.Equals("expressionTransitionIn", StringComparison.OrdinalIgnoreCase) => PetActionKind.ExpressionTransitionIn,
             _ when value.Equals("expression-transition-in", StringComparison.OrdinalIgnoreCase) => PetActionKind.ExpressionTransitionIn,
             _ when value.Equals("expressionTransitionOut", StringComparison.OrdinalIgnoreCase) => PetActionKind.ExpressionTransitionOut,
