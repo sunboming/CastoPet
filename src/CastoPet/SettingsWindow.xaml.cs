@@ -256,6 +256,7 @@ public partial class SettingsWindow : Window, ISettingsWindow
         ShortcutType.Folder => "文件夹",
         ShortcutType.WindowsShortcut => "快捷方式",
         ShortcutType.WebUrl => "网页",
+        ShortcutType.SteamGame => "Steam 游戏",
         _ => "未知",
     };
 
@@ -338,7 +339,7 @@ public partial class SettingsWindow : Window, ISettingsWindow
         }
         else if (result.UnsupportedCount > 0)
         {
-            ShortcutUrlErrorText.Text = "仅支持 http 或 https 地址";
+            ShortcutUrlErrorText.Text = "支持 http、https 或 steam://rungameid/游戏ID";
         }
         else
         {

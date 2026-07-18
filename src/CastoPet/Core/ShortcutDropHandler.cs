@@ -32,7 +32,7 @@ public sealed class ShortcutDropHandler
 
         foreach (var textValue in textValues)
         {
-            if (TryCreateWebShortcut(textValue, name: null, out var definition))
+            if (TryCreateUriShortcut(textValue, name: null, out var definition))
             {
                 AddDefinition(definition, counts);
             }
@@ -99,7 +99,7 @@ public sealed class ShortcutDropHandler
                 .Select(TryReadInternetShortcutUrl)
                 .FirstOrDefault(value => value is not null);
             var name = Path.GetFileNameWithoutExtension(path);
-            if (TryCreateWebShortcut(url, name, out var definition))
+            if (TryCreateUriShortcut(url, name, out var definition))
             {
                 AddDefinition(definition, counts);
             }
@@ -141,26 +141,32 @@ public sealed class ShortcutDropHandler
         return CreateDefinition(name, type, path);
     }
 
-    private static bool TryCreateWebShortcut(
+    private static bool TryCreateUriShortcut(
         string? value,
         string? name,
         out ShortcutDefinition definition)
     {
         definition = null!;
         var target = value?.Trim();
-        if (!Uri.TryCreate(target, UriKind.Absolute, out var uri) ||
-            string.IsNullOrWhiteSpace(uri.Host) ||
-            !(uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-              uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        if (ShortcutUriPolicy.TryGetWebUri(target, out var webUri))
         {
-            return false;
+            definition = CreateDefinition(
+                string.IsNullOrWhiteSpace(name) ? webUri!.IdnHost.ToLowerInvariant() : name,
+                ShortcutType.WebUrl,
+                target!);
+            return true;
         }
 
-        definition = CreateDefinition(
-            string.IsNullOrWhiteSpace(name) ? uri.IdnHost.ToLowerInvariant() : name,
-            ShortcutType.WebUrl,
-            target!);
-        return true;
+        if (ShortcutUriPolicy.TryGetSteamGameUri(target, out _, out var gameId))
+        {
+            definition = CreateDefinition(
+                string.IsNullOrWhiteSpace(name) ? $"Steam {gameId}" : name,
+                ShortcutType.SteamGame,
+                target!);
+            return true;
+        }
+
+        return false;
     }
 
     private static string? TryReadInternetShortcutUrl(string line)

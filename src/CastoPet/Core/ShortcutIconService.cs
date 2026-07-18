@@ -61,7 +61,7 @@ internal static class ShortcutIconService
     private static (string Path, uint Attributes, bool UseFileAttributes) ResolveShellLookup(
         ShortcutDefinition definition)
     {
-        if (definition.Type == ShortcutType.WebUrl)
+        if (definition.Type is ShortcutType.WebUrl or ShortcutType.SteamGame)
         {
             return ("shortcut.url", FileAttributeNormal, true);
         }

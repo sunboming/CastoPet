@@ -7,4 +7,5 @@ public enum ShortcutType
     Folder,
     WindowsShortcut,
     WebUrl,
+    SteamGame,
 }

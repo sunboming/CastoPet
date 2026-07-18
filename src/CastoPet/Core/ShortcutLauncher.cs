@@ -116,9 +116,17 @@ public sealed class ShortcutLauncher
                 break;
 
             case ShortcutType.WebUrl:
-                if (!TryGetSafeWebUri(definition.Target, out _))
+                if (!ShortcutUriPolicy.TryGetWebUri(definition.Target, out _))
                 {
                     throw new InvalidOperationException("Web target must be an absolute HTTP or HTTPS URL with a host.");
+                }
+
+                break;
+
+            case ShortcutType.SteamGame:
+                if (!ShortcutUriPolicy.TryGetSteamGameUri(definition.Target, out _, out _))
+                {
+                    throw new InvalidOperationException("Steam target must use steam://rungameid/<numeric-id>.");
                 }
 
                 break;
@@ -126,18 +134,6 @@ public sealed class ShortcutLauncher
             default:
                 throw new InvalidOperationException($"Unsupported shortcut type: {definition.Type}.");
         }
-    }
-
-    private static bool TryGetSafeWebUri(string target, out Uri? uri)
-    {
-        if (!Uri.TryCreate(target, UriKind.Absolute, out uri) ||
-            string.IsNullOrWhiteSpace(uri.Host))
-        {
-            return false;
-        }
-
-        return uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-               uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
     }
 
     private void TryLogFailure(string target, Exception exception)

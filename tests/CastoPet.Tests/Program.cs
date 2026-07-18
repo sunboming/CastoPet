@@ -133,6 +133,7 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut drop handler classifies existing file system items", ShortcutDropHandlerClassifiesExistingFileSystemItems),
     ("Shortcut drop handler rejects executable scripts", ShortcutDropHandlerRejectsExecutableScripts),
     ("Shortcut drop handler accepts safe web targets", ShortcutDropHandlerAcceptsSafeWebTargets),
+    ("Shortcut drop handler accepts Steam game URIs", ShortcutDropHandlerAcceptsSteamGameUris),
     ("Shortcut drop handler rejects missing and unsafe inputs", ShortcutDropHandlerRejectsMissingAndUnsafeInputs),
     ("Shortcut drop handler aggregates mixed batch duplicates", ShortcutDropHandlerAggregatesMixedBatchDuplicates),
     ("Shortcut drop handler reports shortcut limit failures", ShortcutDropHandlerReportsShortcutLimitFailures),
@@ -2452,6 +2453,25 @@ static void ShortcutDropHandlerAcceptsSafeWebTargets()
     Assert.Equal(internetShortcutContents, File.ReadAllText(internetShortcutPath), "Reading an internet shortcut must not modify it.");
 }
 
+static void ShortcutDropHandlerAcceptsSteamGameUris()
+{
+    using var temp = TempDirectory.Create();
+    var service = CreateShortcutService(temp.Path);
+    var handler = new ShortcutDropHandler(service);
+
+    var result = handler.AddDroppedItems([], [" steam://rungameid/3419430 "]);
+
+    Assert.Equal(1, result.AddedCount, "A Steam rungameid URI should be added.");
+    Assert.Equal(0, result.UnsupportedCount, "A valid Steam game URI should not be rejected.");
+    var entry = service.GetAll().Single();
+    Assert.Equal(ShortcutType.SteamGame, entry.Type, "Steam game URIs should retain a constrained type.");
+    Assert.Equal("steam://rungameid/3419430", entry.Target, "The original Steam game URI should be persisted.");
+    Assert.Equal("Steam 3419430", entry.Name, "Steam game URIs should have a readable fallback name.");
+
+    var duplicates = handler.AddDroppedItems([], ["STEAM://RUNGAMEID/3419430"]);
+    Assert.Equal(1, duplicates.DuplicateCount, "Equivalent Steam game URIs should be duplicates.");
+}
+
 static void ShortcutDropHandlerRejectsMissingAndUnsafeInputs()
 {
     using var temp = TempDirectory.Create();
@@ -2591,6 +2611,7 @@ static void ShortcutLauncherAcceptsEverySupportedTargetType()
         new ShortcutDefinition("link", "Link", ShortcutType.WindowsShortcut, linkPath, "", null, 3),
         new ShortcutDefinition("http", "HTTP", ShortcutType.WebUrl, "http://example.com/start", "", null, 4),
         new ShortcutDefinition("https", "HTTPS", ShortcutType.WebUrl, "https://example.com/docs", "", null, 5),
+        new ShortcutDefinition("steam", "Steam", ShortcutType.SteamGame, "steam://rungameid/3419430", "", null, 6),
     };
 
     foreach (var definition in definitions)
@@ -2635,6 +2656,8 @@ static void ShortcutLauncherRejectsMissingAndMalformedDefinitions()
         new ShortcutDefinition("ftp", "FTP", ShortcutType.WebUrl, "ftp://example.com/file", "", null, 9),
         new ShortcutDefinition("relative", "Relative", ShortcutType.WebUrl, "example.com/path", "", null, 10),
         new ShortcutDefinition("hostless", "Hostless", ShortcutType.WebUrl, "http:///path", "", null, 11),
+        new ShortcutDefinition("steam-command", "Steam", ShortcutType.SteamGame, "steam://open/console", "", null, 12),
+        new ShortcutDefinition("steam-injection", "Steam", ShortcutType.SteamGame, "steam://rungameid/3419430?x=1", "", null, 13),
         new ShortcutDefinition("unknown", "Unknown", (ShortcutType)999, existingFile, "", null, 12),
     };
 

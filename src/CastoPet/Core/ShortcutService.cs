@@ -275,13 +275,16 @@ public sealed class ShortcutService
 
     private static bool HasSameIdentity(ShortcutDefinition left, ShortcutDefinition right)
     {
-        if (left.Type == ShortcutType.WebUrl || right.Type == ShortcutType.WebUrl)
+        if (IsUriType(left.Type) || IsUriType(right.Type))
         {
             return left.Type == right.Type && string.Equals(NormalizeUrl(left.Target), NormalizeUrl(right.Target), StringComparison.OrdinalIgnoreCase);
         }
 
         return string.Equals(NormalizeWindowsPath(left.Target), NormalizeWindowsPath(right.Target), StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsUriType(ShortcutType type) =>
+        type is ShortcutType.WebUrl or ShortcutType.SteamGame;
 
     private static string NormalizeWindowsPath(string path)
     {
