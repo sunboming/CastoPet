@@ -104,6 +104,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
     ("Radial wheel layout keeps generic two-ring geometry", RadialWheelLayoutKeepsGenericTwoRingGeometry),
     ("Radial wheel style keeps readable ring hierarchy", RadialWheelStyleKeepsReadableRingHierarchy),
+    ("Shortcut wheel loads shell icons", ShortcutWheelLoadsShellIcons),
     ("Pointer gestures classify left click and drag", PointerGesturesClassifyLeftClickAndDrag),
     ("Pointer gestures classify right click movement and hold", PointerGesturesClassifyRightClickMovementAndHold),
     ("Pointer gestures cancel conflicts and commit once", PointerGesturesCancelConflictsAndCommitOnce),
@@ -156,6 +157,7 @@ var tests = new (string Name, Action Test)[]
     ("Settings window supports theme switching and backdrop", SettingsWindowSupportsThemeSwitchingAndBackdrop),
     ("Settings window exposes shortcut launcher management", SettingsWindowExposesShortcutLauncherManagement),
     ("Settings window shares shortcut services and live updates", SettingsWindowSharesShortcutServicesAndLiveUpdates),
+    ("Settings shortcut list accepts shared drop data", SettingsShortcutListAcceptsSharedDropData),
     ("Direct menus expose the settings command", DirectMenusExposeTheSettingsCommand),
     ("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
     ("Input keyboard layout exposes drawable keys", InputKeyboardLayoutExposesDrawableKeys),
@@ -1825,6 +1827,27 @@ static void RadialWheelStyleKeepsReadableRingHierarchy()
     Assert.Equal(0.016d, RadialWheelStyle.SectorGapRadians, "Sector dividers should use the refined gap.");
 }
 
+static void ShortcutWheelLoadsShellIcons()
+{
+    using var temp = TempDirectory.Create();
+    var filePath = System.IO.Path.Combine(temp.Path, "notes.txt");
+    File.WriteAllText(filePath, "icon fixture");
+
+    var fileIcon = ShortcutIconService.TryLoadSmallIcon(
+        new ShortcutDefinition("file", "Notes", ShortcutType.File, filePath, "", null, 0));
+    var webIcon = ShortcutIconService.TryLoadSmallIcon(
+        new ShortcutDefinition("web", "Website", ShortcutType.WebUrl, "https://example.com", "", null, 1));
+
+    Assert.True(fileIcon is not null, "Existing file shortcuts should expose a shell icon.");
+    Assert.True(webIcon is not null, "Web shortcuts should expose the registered .url shell icon.");
+
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    Assert.Contains(source, "LoadShortcutWheelIcon", "Second-level shortcut items should resolve their icons.");
+    Assert.Contains(source, "WpfControls.Image", "Shortcut wheel content should render icon images.");
+    Assert.Contains(source, "visual.Content", "Selection scaling should apply to the combined icon-and-name content.");
+}
+
 static void PointerGesturesClassifyLeftClickAndDrag()
 {
     var classifier = new PetPointerGestureClassifier(6, 6, 14, TimeSpan.FromMilliseconds(400));
@@ -2761,10 +2784,11 @@ static void PetWindowExtractsNeutralShortcutDropData()
 {
     var workspace = FindWorkspaceRoot();
     var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    var readerSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "ShortcutDropDataReader.cs"));
 
-    Assert.Contains(source, "DataFormats.FileDrop", "WPF file-drop data should be extracted into paths.");
-    Assert.Contains(source, "DataFormats.UnicodeText", "Unicode text drops should be extracted into neutral strings.");
-    Assert.Contains(source, "UniformResourceLocator", "Browser URL clipboard formats should be recognized.");
+    Assert.Contains(readerSource, "WpfDataFormats.FileDrop", "WPF file-drop data should be extracted into paths.");
+    Assert.Contains(readerSource, "WpfDataFormats.UnicodeText", "Unicode text drops should be extracted into neutral strings.");
+    Assert.Contains(readerSource, "UniformResourceLocator", "Browser URL clipboard formats should be recognized.");
     Assert.Contains(source, "_shortcutDrops.AddDroppedItems", "Only neutral path and text lists should cross into Core.");
     Assert.Contains(source, "DragDropEffects.Link", "Drop feedback should communicate that source files remain untouched.");
     Assert.False(source.Contains("File.Move(", StringComparison.Ordinal), "PetWindow must never move a dropped source file.");
@@ -2933,6 +2957,22 @@ static void SettingsWindowSharesShortcutServicesAndLiveUpdates()
     Assert.Contains(windowSource, "_shortcutService.Delete", "Delete actions should persist through the shortcut service.");
     Assert.Contains(windowSource, "_shortcutService.UpdateLaunchOptions", "Program launch options should persist through the shortcut service.");
     Assert.Contains(compactAppSource, "newSettingsWindow(commands,_crashReports,_updates,_shortcutService,_shortcutDropHandler,_shortcutLauncher)", "App should pass the same composed shortcut dependencies to settings.");
+}
+
+static void SettingsShortcutListAcceptsSharedDropData()
+{
+    var workspace = FindWorkspaceRoot();
+    var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+    var xaml = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml"));
+    var settingsSource = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml.cs"));
+    var petSource = File.ReadAllText(System.IO.Path.Combine(projectRoot, "PetWindow.xaml.cs"));
+
+    Assert.Contains(xaml, "AllowDrop=\"True\"", "The shortcut list should accept external drops.");
+    Assert.Contains(xaml, "DragOver=\"ShortcutList_DragOver\"", "The shortcut list should classify incoming drag data.");
+    Assert.Contains(xaml, "Drop=\"ShortcutList_Drop\"", "The shortcut list should add dropped items.");
+    Assert.Contains(settingsSource, "ShortcutDropDataReader.ExtractPaths", "Settings should use the shared neutral path reader.");
+    Assert.Contains(settingsSource, "_shortcutDropHandler.AddDroppedItems", "Settings drops should reuse shortcut safety and persistence rules.");
+    Assert.Contains(petSource, "ShortcutDropDataReader.ExtractPaths", "Pet drops should use the same neutral path reader.");
 }
 
 static void DirectMenusExposeTheSettingsCommand()

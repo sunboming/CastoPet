@@ -264,6 +264,49 @@ public partial class SettingsWindow : Window, ISettingsWindow
         RefreshShortcutEditor();
     }
 
+    private void ShortcutList_DragOver(object sender, System.Windows.DragEventArgs e)
+    {
+        try
+        {
+            e.Effects = ShortcutDropDataReader.ContainsSupportedFormat(e.Data)
+                ? System.Windows.DragDropEffects.Link
+                : System.Windows.DragDropEffects.None;
+        }
+        catch (Exception)
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+        }
+
+        e.Handled = true;
+    }
+
+    private void ShortcutList_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            var result = _shortcutDropHandler.AddDroppedItems(
+                ShortcutDropDataReader.ExtractPaths(e.Data),
+                ShortcutDropDataReader.ExtractTextValues(e.Data));
+            e.Effects = result.AddedCount > 0
+                ? System.Windows.DragDropEffects.Link
+                : System.Windows.DragDropEffects.None;
+            ShortcutUrlErrorText.Text = result switch
+            {
+                { AddedCount: > 0, DuplicateCount: 0, UnsupportedCount: 0, FailedCount: 0 } => "",
+                { AddedCount: > 0 } => $"已添加 {result.AddedCount} 项，部分内容未加入",
+                { DuplicateCount: > 0, UnsupportedCount: 0, FailedCount: 0 } => "拖入的项目已存在",
+                { UnsupportedCount: > 0, FailedCount: 0 } => "不支持该拖入内容",
+                _ => "添加失败，请稍后重试",
+            };
+        }
+        catch (Exception)
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+            ShortcutUrlErrorText.Text = "无法读取拖入内容";
+        }
+    }
+
     private void RefreshShortcutEditor()
     {
         var row = ShortcutList.SelectedItem as ShortcutListItem;

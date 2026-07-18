@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -9,10 +7,8 @@ using WpfControls = System.Windows.Controls;
 using WpfInput = System.Windows.Input;
 using WpfAnimation = System.Windows.Media.Animation;
 using WpfColor = System.Windows.Media.Color;
-using WpfDataFormats = System.Windows.DataFormats;
 using WpfDragDropEffects = System.Windows.DragDropEffects;
 using WpfDragEventArgs = System.Windows.DragEventArgs;
-using WpfDataObject = System.Windows.IDataObject;
 using WpfPoint = System.Windows.Point;
 using WpfShapes = System.Windows.Shapes;
 using WpfSize = System.Windows.Size;
@@ -30,7 +26,6 @@ public partial class PetWindow : Window
     private static readonly TimeSpan RadialWheelPointerProbeInterval = TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan RadialWheelHoldRevealDelay = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan PettingFallbackDuration = TimeSpan.FromMilliseconds(240);
-    private static readonly string[] UrlDropFormats = ["UniformResourceLocatorW", "UniformResourceLocator"];
     private const double MinimumLeftDragThreshold = 6;
     private const double RightWheelDragThreshold = 14;
     private const double HoldIndicatorSize = 58;
@@ -76,6 +71,7 @@ public partial class PetWindow : Window
     private readonly WindowsCursorService _cursorService = new();
     private readonly List<RadialWheelItemVisual> _firstRingVisuals = new();
     private readonly List<RadialWheelItemVisual> _secondRingVisuals = new();
+    private readonly Dictionary<string, ImageSource?> _shortcutIconCache = new(StringComparer.Ordinal);
     private readonly Random _blinkRandom = new();
     private PetWindowSettingsSnapshot? _pendingSettings;
     private WpfPoint _requestedRadialWheelOrigin;
@@ -107,11 +103,13 @@ public partial class PetWindow : Window
     private sealed class RadialWheelItemVisual(
         WpfShapes.Path sector,
         WpfControls.TextBlock label,
+        FrameworkElement content,
         bool isEnabled,
         RadialWheelRing ring)
     {
         public WpfShapes.Path Sector { get; } = sector;
         public WpfControls.TextBlock Label { get; } = label;
+        public FrameworkElement Content { get; } = content;
         public bool IsEnabled { get; } = isEnabled;
         public RadialWheelRing Ring { get; } = ring;
         public bool IsSelected { get; set; }
@@ -1354,6 +1352,7 @@ public partial class PetWindow : Window
         }
 
         _interactions.UpdateCatalog(_wheelCatalogService.Current);
+        _shortcutIconCache.Clear();
         _secondRingContentKey = "closed";
         SecondRingSurface.Children.Clear();
         _secondRingVisuals.Clear();
@@ -1396,7 +1395,8 @@ public partial class PetWindow : Window
                 WheelCatalog.FirstRingOuterRadius,
                 WheelCatalog.SecondRingOuterRadius,
                 item.IsEnabled,
-                isSecondRing: true));
+                isSecondRing: true,
+                icon: LoadShortcutWheelIcon(item)));
         }
 
         SecondRingSurface.Visibility = _interactions.RadialWheel.IsSecondLevelOpen
@@ -1412,7 +1412,8 @@ public partial class PetWindow : Window
         double innerRadius,
         double outerRadius,
         bool isEnabled,
-        bool isSecondRing)
+        bool isSecondRing,
+        ImageSource? icon = null)
     {
         var ring = isSecondRing ? RadialWheelRing.Second : RadialWheelRing.First;
         var panel = new WpfControls.Canvas
@@ -1442,8 +1443,6 @@ public partial class PetWindow : Window
             Width = isSecondRing ? 88 : 96,
             MaxHeight = 40,
             Opacity = isEnabled ? 0.9 : 0.58,
-            RenderTransformOrigin = new WpfPoint(0.5, 0.5),
-            RenderTransform = new ScaleTransform(1, 1),
             Effect = new System.Windows.Media.Effects.DropShadowEffect
             {
                 Color = WpfColor.FromArgb(RadialWheelStyle.LabelShadowAlpha, 40, 25, 68),
@@ -1452,17 +1451,61 @@ public partial class PetWindow : Window
                 Opacity = RadialWheelStyle.LabelShadowOpacity,
             },
         };
+        FrameworkElement content = label;
+        if (icon is not null)
+        {
+            var iconImage = new WpfControls.Image
+            {
+                Source = icon,
+                Width = 24,
+                Height = 24,
+                Margin = new Thickness(0, 0, 0, 3),
+                Stretch = Stretch.Uniform,
+                Opacity = isEnabled ? 0.96 : 0.58,
+            };
+            var stack = new WpfControls.StackPanel
+            {
+                Width = label.Width,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            };
+            label.MaxHeight = 30;
+            stack.Children.Add(iconImage);
+            stack.Children.Add(label);
+            content = stack;
+        }
+
+        content.RenderTransformOrigin = new WpfPoint(0.5, 0.5);
+        content.RenderTransform = new ScaleTransform(1, 1);
         var center = RadialWheelSurface.Width / 2;
         var labelRadius = (innerRadius + outerRadius) / 2;
         var labelAngle = count == 1
             ? -Math.PI / 2
             : -Math.PI / 2 + (index + 0.5) * Math.Tau / count;
         var labelCenter = PointOnWheel(center, labelRadius, labelAngle);
-        WpfControls.Canvas.SetLeft(label, labelCenter.X - label.Width / 2);
-        WpfControls.Canvas.SetTop(label, labelCenter.Y - (isSecondRing ? 15 : 12));
-        panel.Children.Add(label);
+        WpfControls.Canvas.SetLeft(content, labelCenter.X - label.Width / 2);
+        WpfControls.Canvas.SetTop(content, labelCenter.Y - (icon is not null ? 29 : isSecondRing ? 15 : 12));
+        panel.Children.Add(content);
         surface.Children.Add(panel);
-        return new RadialWheelItemVisual(sector, label, isEnabled, ring);
+        return new RadialWheelItemVisual(sector, label, content, isEnabled, ring);
+    }
+
+    private ImageSource? LoadShortcutWheelIcon(WheelActionItem item)
+    {
+        if (item.ActionType != WheelActionType.Shortcut || string.IsNullOrWhiteSpace(item.ActionReference))
+        {
+            return null;
+        }
+
+        if (_shortcutIconCache.TryGetValue(item.ActionReference, out var cached))
+        {
+            return cached;
+        }
+
+        var shortcut = _shortcutService.GetAll().FirstOrDefault(
+            candidate => string.Equals(candidate.Id, item.ActionReference, StringComparison.Ordinal));
+        var icon = shortcut is null ? null : ShortcutIconService.TryLoadSmallIcon(shortcut);
+        _shortcutIconCache[item.ActionReference] = icon;
+        return icon;
     }
 
     private Geometry CreateRadialWheelSectorGeometry(
@@ -1857,10 +1900,10 @@ public partial class PetWindow : Window
                 : null;
             visual.Label.Opacity = isSelected ? 1 : visual.IsEnabled ? 0.9 : 0.58;
             visual.Label.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Medium;
-            if (visual.Label.RenderTransform is not ScaleTransform scaleTransform)
+            if (visual.Content.RenderTransform is not ScaleTransform scaleTransform)
             {
                 scaleTransform = new ScaleTransform(1, 1);
-                visual.Label.RenderTransform = scaleTransform;
+                visual.Content.RenderTransform = scaleTransform;
             }
 
             var targetScale = isSelected ? WheelCatalog.SelectedScale : 1;
@@ -1906,7 +1949,7 @@ public partial class PetWindow : Window
     {
         try
         {
-            e.Effects = ContainsSupportedDropFormat(e.Data)
+            e.Effects = ShortcutDropDataReader.ContainsSupportedFormat(e.Data)
                 ? WpfDragDropEffects.Link
                 : WpfDragDropEffects.None;
         }
@@ -1924,8 +1967,8 @@ public partial class PetWindow : Window
         e.Handled = true;
         try
         {
-            var paths = ExtractDroppedPaths(e.Data);
-            var textValues = ExtractDroppedTextValues(e.Data);
+            var paths = ShortcutDropDataReader.ExtractPaths(e.Data);
+            var textValues = ShortcutDropDataReader.ExtractTextValues(e.Data);
             var result = _shortcutDrops.AddDroppedItems(paths, textValues);
             ShowShortcutDropFeedback(result);
             e.Effects = WpfDragDropEffects.Link;
@@ -1936,108 +1979,6 @@ public partial class PetWindow : Window
             TryLogError("Shortcut drop could not be processed.", ex);
             ApplyTemporaryExpression("confused");
         }
-    }
-
-    private static bool ContainsSupportedDropFormat(WpfDataObject data)
-    {
-        if (data.GetDataPresent(WpfDataFormats.FileDrop, autoConvert: true) ||
-            data.GetDataPresent(WpfDataFormats.UnicodeText, autoConvert: true) ||
-            data.GetDataPresent(WpfDataFormats.Text, autoConvert: true) ||
-            data.GetDataPresent(WpfDataFormats.StringFormat, autoConvert: true))
-        {
-            return true;
-        }
-
-        return UrlDropFormats.Any(format => data.GetDataPresent(format, autoConvert: true));
-    }
-
-    private static IReadOnlyList<string> ExtractDroppedPaths(WpfDataObject data)
-    {
-        if (!data.GetDataPresent(WpfDataFormats.FileDrop, autoConvert: true))
-        {
-            return [];
-        }
-
-        return data.GetData(WpfDataFormats.FileDrop, autoConvert: true) is string[] paths
-            ? paths.Where(path => !string.IsNullOrWhiteSpace(path)).ToArray()
-            : [];
-    }
-
-    private static IReadOnlyList<string> ExtractDroppedTextValues(WpfDataObject data)
-    {
-        string[] formats =
-        [
-            WpfDataFormats.UnicodeText,
-            WpfDataFormats.Text,
-            WpfDataFormats.StringFormat,
-            .. UrlDropFormats,
-        ];
-        var values = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var format in formats)
-        {
-            if (!data.GetDataPresent(format, autoConvert: true))
-            {
-                continue;
-            }
-
-            var value = ReadDroppedText(data.GetData(format, autoConvert: true), format);
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                values.Add(value);
-            }
-        }
-
-        return values.ToArray();
-    }
-
-    private static string? ReadDroppedText(object? value, string format)
-    {
-        if (value is string text)
-        {
-            return NormalizeDroppedText(text);
-        }
-
-        if (value is byte[] bytes)
-        {
-            var encoding = format.EndsWith('W') ? Encoding.Unicode : Encoding.UTF8;
-            return NormalizeDroppedText(encoding.GetString(bytes));
-        }
-
-        if (value is not Stream stream)
-        {
-            return null;
-        }
-
-        var originalPosition = stream.CanSeek ? stream.Position : (long?)null;
-        try
-        {
-            if (stream.CanSeek)
-            {
-                stream.Position = 0;
-            }
-
-            var encoding = format.EndsWith('W') ? Encoding.Unicode : Encoding.UTF8;
-            using var reader = new StreamReader(
-                stream,
-                encoding,
-                detectEncodingFromByteOrderMarks: true,
-                bufferSize: 1024,
-                leaveOpen: true);
-            return NormalizeDroppedText(reader.ReadToEnd());
-        }
-        finally
-        {
-            if (originalPosition is long position)
-            {
-                stream.Position = position;
-            }
-        }
-    }
-
-    private static string? NormalizeDroppedText(string text)
-    {
-        var normalized = text.Trim('\0', ' ', '\t', '\r', '\n');
-        return normalized.Length == 0 ? null : normalized;
     }
 
     private void ShowShortcutDropFeedback(ShortcutDropResult result)
