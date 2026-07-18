@@ -71,8 +71,20 @@ public partial class App : System.Windows.Application
 
         var updateService = new VelopackUpdateService();
         _updates = new UpdateCoordinator(updateService, settings, settingsService.Save, logger: _logger);
-        _settingsWindow = new SettingsWindowService(
-            () => new SettingsWindow(commands, _crashReports, _updates, _shortcutService, _shortcutDropHandler, _shortcutLauncher));
+        _settingsWindow = new SettingsWindowService(() =>
+        {
+            var settingsWindow = new SettingsWindow(
+                commands,
+                _crashReports,
+                _updates,
+                _shortcutService,
+                _shortcutDropHandler,
+                _shortcutLauncher)
+            {
+                Owner = _window,
+            };
+            return settingsWindow;
+        });
         commands.SettingsRequested += _settingsWindow.ShowOrActivate;
 
         _window.AttachContextMenu(commands);

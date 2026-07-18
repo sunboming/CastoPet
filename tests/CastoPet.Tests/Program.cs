@@ -43,6 +43,8 @@ var tests = new (string Name, Action Test)[]
     ("Update coordinator rejects concurrent checks", UpdateCoordinatorRejectsConcurrentChecks),
     ("Project pins semantic version and Velopack", ProjectPinsSemanticVersionAndVelopack),
     ("Application defines packaged icon", ApplicationDefinesPackagedIcon),
+    ("Application surfaces share one icon", ApplicationSurfacesShareOneIcon),
+    ("Settings window avoids a duplicate taskbar entry", SettingsWindowAvoidsDuplicateTaskbarEntry),
     ("Continuous integration builds both configurations", ContinuousIntegrationBuildsBothConfigurations),
     ("Repository ignores local working assets", RepositoryIgnoresLocalWorkingAssets),
     ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
@@ -771,6 +773,39 @@ static void ApplicationDefinesPackagedIcon()
     Assert.True(icon[0] == 0 && icon[1] == 0 && icon[2] == 1 && icon[3] == 0, "The application icon should use the ICO signature.");
     var imageCount = icon[4] | icon[5] << 8;
     Assert.True(imageCount >= 4, "The application icon should contain multiple sizes for Windows shell surfaces.");
+}
+
+static void ApplicationSurfacesShareOneIcon()
+{
+    var workspace = FindWorkspaceRoot();
+    var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+    var project = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
+    var petWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "PetWindow.xaml"));
+    var settingsWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml"));
+    var crashWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CrashNotificationWindow.xaml"));
+    var trayService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Core", "TrayService.cs"));
+    var iconService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Core", "ApplicationIconService.cs"));
+
+    Assert.Contains(project, @"<Resource Include=""Assets\AppIcon.ico"" />", "The shared icon should be available as a WPF resource.");
+    Assert.Contains(petWindow, "Icon=\"Assets/AppIcon.ico\"", "The pet taskbar surface should use the shared icon.");
+    Assert.Contains(settingsWindow, "Icon=\"Assets/AppIcon.ico\"", "Settings should use the shared icon.");
+    Assert.Contains(crashWindow, "Icon=\"Assets/AppIcon.ico\"", "Crash notifications should use the shared icon.");
+    Assert.Contains(trayService, "ApplicationIconService.LoadTrayIcon()", "The notification-area icon should use the shared icon service.");
+    Assert.False(trayService.Contains("SystemIcons.Application", StringComparison.Ordinal), "The notification area should not fall back to the generic Windows application icon.");
+    Assert.Contains(iconService, "/CastoPet;component/Assets/AppIcon.ico", "The tray icon service should load the icon from the CastoPet assembly.");
+    using var trayIcon = ApplicationIconService.LoadTrayIcon();
+    Assert.True(trayIcon.Width > 0 && trayIcon.Height > 0, "The packaged icon should decode for the notification area at runtime.");
+}
+
+static void SettingsWindowAvoidsDuplicateTaskbarEntry()
+{
+    var workspace = FindWorkspaceRoot();
+    var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+    var settingsWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml"));
+    var app = File.ReadAllText(System.IO.Path.Combine(projectRoot, "App.xaml.cs"));
+
+    Assert.Contains(settingsWindow, "ShowInTaskbar=\"False\"", "Settings should remain an auxiliary window instead of creating a second taskbar button.");
+    Assert.Contains(app, "Owner = _window", "Settings should be owned by the pet window for activation and lifetime behavior.");
 }
 
 static void ContinuousIntegrationBuildsBothConfigurations()
@@ -2885,6 +2920,7 @@ static void SettingsWindowSharesShortcutServicesAndLiveUpdates()
     var workspace = FindWorkspaceRoot();
     var windowSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
     var appSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+    var compactAppSource = string.Concat(appSource.Where(character => !char.IsWhiteSpace(character)));
 
     Assert.Contains(windowSource, "ShortcutService shortcutService", "Settings should receive the shared shortcut service.");
     Assert.Contains(windowSource, "ShortcutDropHandler shortcutDropHandler", "Manual URL add should reuse safe shortcut parsing.");
@@ -2896,7 +2932,7 @@ static void SettingsWindowSharesShortcutServicesAndLiveUpdates()
     Assert.Contains(windowSource, "_shortcutService.Move", "Reorder actions should persist through the shortcut service.");
     Assert.Contains(windowSource, "_shortcutService.Delete", "Delete actions should persist through the shortcut service.");
     Assert.Contains(windowSource, "_shortcutService.UpdateLaunchOptions", "Program launch options should persist through the shortcut service.");
-    Assert.Contains(appSource, "new SettingsWindow(commands, _crashReports, _updates, _shortcutService, _shortcutDropHandler, _shortcutLauncher)", "App should pass the same composed shortcut dependencies to settings.");
+    Assert.Contains(compactAppSource, "newSettingsWindow(commands,_crashReports,_updates,_shortcutService,_shortcutDropHandler,_shortcutLauncher)", "App should pass the same composed shortcut dependencies to settings.");
 }
 
 static void DirectMenusExposeTheSettingsCommand()

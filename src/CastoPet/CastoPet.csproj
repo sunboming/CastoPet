@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="Assets\AppIcon.ico" />
     <Resource Include="Assets\Runtime\Castorice\**\*.png" />
     <EmbeddedResource
       Include="Assets\Runtime\Castorice\skin.json"

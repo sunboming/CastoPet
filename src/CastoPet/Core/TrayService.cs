@@ -10,6 +10,7 @@ public sealed class TrayService : IDisposable
     public const string ExitText = "退出";
 
     private readonly MenuCommandService _commands;
+    private readonly Drawing.Icon _applicationIcon;
     private readonly Forms.NotifyIcon _notifyIcon;
     private readonly IReadOnlyList<(SettingDefinition Definition, Forms.ToolStripMenuItem Item)> _settingItems;
 
@@ -32,10 +33,11 @@ public sealed class TrayService : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(ExitText, null, (_, _) => _commands.Exit());
 
+        _applicationIcon = ApplicationIconService.LoadTrayIcon();
         _notifyIcon = new Forms.NotifyIcon
         {
             Text = "CastoPet",
-            Icon = Drawing.SystemIcons.Application,
+            Icon = _applicationIcon,
             ContextMenuStrip = menu,
             Visible = true,
         };
@@ -65,5 +67,6 @@ public sealed class TrayService : IDisposable
         _commands.SettingsChanged -= RefreshChecks;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _applicationIcon.Dispose();
     }
 }
