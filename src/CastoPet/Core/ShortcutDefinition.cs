@@ -7,7 +7,10 @@ public sealed record ShortcutDefinition(
     string Target,
     string Arguments,
     string? WorkingDirectory,
-    int SortOrder);
+    int SortOrder)
+{
+    public string? IconPath { get; init; }
+}
 
 public sealed record ShortcutMutationResult(
     bool Succeeded,

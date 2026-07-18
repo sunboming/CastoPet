@@ -1833,16 +1833,23 @@ static void ShortcutWheelLoadsShellIcons()
     using var temp = TempDirectory.Create();
     var filePath = System.IO.Path.Combine(temp.Path, "notes.txt");
     File.WriteAllText(filePath, "icon fixture");
+    var workspace = FindWorkspaceRoot();
+    var steamIconPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets", "AppIcon.ico");
 
     var fileIcon = ShortcutIconService.TryLoadSmallIcon(
         new ShortcutDefinition("file", "Notes", ShortcutType.File, filePath, "", null, 0));
     var webIcon = ShortcutIconService.TryLoadSmallIcon(
         new ShortcutDefinition("web", "Website", ShortcutType.WebUrl, "https://example.com", "", null, 1));
+    var steamIcon = ShortcutIconService.TryLoadSmallIcon(
+        new ShortcutDefinition("steam", "Steam", ShortcutType.SteamGame, "steam://rungameid/3419430", "", null, 2)
+        {
+            IconPath = steamIconPath,
+        });
 
     Assert.True(fileIcon is not null, "Existing file shortcuts should expose a shell icon.");
     Assert.True(webIcon is not null, "Web shortcuts should expose the registered .url shell icon.");
+    Assert.True(steamIcon is not null, "Steam shortcuts should load their persisted game icon.");
 
-    var workspace = FindWorkspaceRoot();
     var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
     Assert.Contains(source, "LoadShortcutWheelIcon", "Second-level shortcut items should resolve their icons.");
     Assert.Contains(source, "WpfControls.Image", "Shortcut wheel content should render icon images.");
@@ -2470,6 +2477,19 @@ static void ShortcutDropHandlerAcceptsSteamGameUris()
 
     var duplicates = handler.AddDroppedItems([], ["STEAM://RUNGAMEID/3419430"]);
     Assert.Equal(1, duplicates.DuplicateCount, "Equivalent Steam game URIs should be duplicates.");
+
+    var iconPath = System.IO.Path.Combine(temp.Path, "game.ico");
+    File.WriteAllBytes(iconPath, [0]);
+    var internetShortcutPath = System.IO.Path.Combine(temp.Path, "Bongo Cat.url");
+    File.WriteAllText(
+        internetShortcutPath,
+        $"[InternetShortcut]\r\nURL=steam://rungameid/3419430\r\nIconFile={iconPath}\r\nIconIndex=0\r\n");
+
+    var shortcutResult = handler.AddDroppedItems([internetShortcutPath], []);
+    Assert.Equal(1, shortcutResult.DuplicateCount, "A Steam .url shortcut should match an existing URI entry.");
+    var enrichedEntry = service.GetAll().Single();
+    Assert.Equal("Bongo Cat", enrichedEntry.Name, "A Steam .url shortcut should enrich the fallback name.");
+    Assert.Equal(iconPath, enrichedEntry.IconPath, "A Steam .url shortcut should enrich the game icon path.");
 }
 
 static void ShortcutDropHandlerRejectsMissingAndUnsafeInputs()

@@ -92,8 +92,21 @@ public sealed class ShortcutService
                 return new(false, Error: "Shortcut is invalid.");
             }
 
-            if (_entries.Any(entry => HasSameIdentity(entry, candidate)))
+            var duplicateIndex = _entries.FindIndex(entry => HasSameIdentity(entry, candidate));
+            if (duplicateIndex >= 0)
             {
+                var existing = _entries[duplicateIndex];
+                var enriched = EnrichSteamGameMetadata(existing, candidate);
+                if (!existing.Equals(enriched))
+                {
+                    var enrichedEntries = _entries.ToList();
+                    enrichedEntries[duplicateIndex] = enriched;
+                    var persisted = PersistMutation(Renumber(enrichedEntries));
+                    return persisted.Succeeded
+                        ? new(true, Duplicate: true)
+                        : persisted;
+                }
+
                 return new(true, Duplicate: true);
             }
 
@@ -285,6 +298,30 @@ public sealed class ShortcutService
 
     private static bool IsUriType(ShortcutType type) =>
         type is ShortcutType.WebUrl or ShortcutType.SteamGame;
+
+    private static ShortcutDefinition EnrichSteamGameMetadata(
+        ShortcutDefinition existing,
+        ShortcutDefinition candidate)
+    {
+        if (existing.Type != ShortcutType.SteamGame || candidate.Type != ShortcutType.SteamGame ||
+            string.IsNullOrWhiteSpace(candidate.IconPath))
+        {
+            return existing;
+        }
+
+        var name = existing.Name;
+        if (ShortcutUriPolicy.TryGetSteamGameUri(existing.Target, out _, out var gameId) &&
+            string.Equals(name, $"Steam {gameId}", StringComparison.Ordinal))
+        {
+            name = candidate.Name;
+        }
+
+        return existing with
+        {
+            Name = name,
+            IconPath = candidate.IconPath,
+        };
+    }
 
     private static string NormalizeWindowsPath(string path)
     {
