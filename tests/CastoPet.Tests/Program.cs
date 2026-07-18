@@ -42,6 +42,9 @@ var tests = new (string Name, Action Test)[]
     ("Update coordinator logs network failures", UpdateCoordinatorLogsNetworkFailures),
     ("Update coordinator rejects concurrent checks", UpdateCoordinatorRejectsConcurrentChecks),
     ("Project pins semantic version and Velopack", ProjectPinsSemanticVersionAndVelopack),
+    ("Application defines packaged icon", ApplicationDefinesPackagedIcon),
+    ("Continuous integration builds both configurations", ContinuousIntegrationBuildsBothConfigurations),
+    ("Repository ignores local working assets", RepositoryIgnoresLocalWorkingAssets),
     ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
     ("Update source points to the public releases repository", UpdateSourcePointsToThePublicReleasesRepository),
     ("Settings window exposes crash and update actions", SettingsWindowExposesCrashAndUpdateActions),
@@ -747,9 +750,54 @@ static void ProjectPinsSemanticVersionAndVelopack()
 {
     var workspace = FindWorkspaceRoot();
     var project = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "CastoPet.csproj"));
+    var sharedProperties = File.ReadAllText(System.IO.Path.Combine(workspace, "Directory.Build.props"));
 
-    Assert.Contains(project, "<Version>0.1.0</Version>", "The application should have an explicit semantic version.");
+    Assert.Contains(sharedProperties, "<VersionPrefix>0.1.0</VersionPrefix>", "The repository should have one explicit semantic version source.");
+    Assert.False(project.Contains("<Version>", StringComparison.Ordinal), "The application project should inherit the central semantic version.");
     Assert.Contains(project, "<PackageReference Include=\"Velopack\" Version=\"1.2.0\"", "Velopack should be pinned to the verified stable version.");
+}
+
+static void ApplicationDefinesPackagedIcon()
+{
+    var workspace = FindWorkspaceRoot();
+    var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+    var project = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
+    var iconPath = System.IO.Path.Combine(projectRoot, "Assets", "AppIcon.ico");
+
+    Assert.Contains(project, @"<ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>", "The Windows executable should embed the CastoPet icon.");
+    Assert.True(File.Exists(iconPath), "The configured application icon should exist.");
+    var icon = File.ReadAllBytes(iconPath);
+    Assert.True(icon.Length > 6, "The application icon should contain an ICO directory.");
+    Assert.True(icon[0] == 0 && icon[1] == 0 && icon[2] == 1 && icon[3] == 0, "The application icon should use the ICO signature.");
+    var imageCount = icon[4] | icon[5] << 8;
+    Assert.True(imageCount >= 4, "The application icon should contain multiple sizes for Windows shell surfaces.");
+}
+
+static void ContinuousIntegrationBuildsBothConfigurations()
+{
+    var workspace = FindWorkspaceRoot();
+    var workflow = File.ReadAllText(System.IO.Path.Combine(workspace, ".github", "workflows", "build.yml"));
+
+    Assert.Contains(workflow, "runs-on: windows-latest", "WPF CI should run on Windows.");
+    Assert.Contains(workflow, "uses: actions/checkout@v6", "CI should use the current official checkout action.");
+    Assert.Contains(workflow, "uses: actions/setup-dotnet@v5", "CI should use the current official .NET setup action.");
+    Assert.Contains(workflow, "dotnet-version: 10.0.x", "CI should install the .NET 10 SDK.");
+    Assert.Contains(workflow, "configuration: [Debug, Release]", "CI should cover both supported build configurations.");
+    Assert.Contains(workflow, "dotnet run --project tests/CastoPet.Tests/CastoPet.Tests.csproj", "CI should execute the repository test harness.");
+    Assert.Contains(workflow, "dotnet build CastoPet.sln", "CI should build the complete solution.");
+    Assert.False(workflow.Contains("dotnet publish", StringComparison.OrdinalIgnoreCase), "Build CI should not publish release artifacts.");
+}
+
+static void RepositoryIgnoresLocalWorkingAssets()
+{
+    var workspace = FindWorkspaceRoot();
+    var gitignore = File.ReadAllText(System.IO.Path.Combine(workspace, ".gitignore"));
+
+    Assert.Contains(gitignore, "/.codex/", "Repository-local Codex state should remain untracked.");
+    Assert.Contains(gitignore, "/.task6-artifacts/", "Repository-local task artifacts should remain untracked.");
+    Assert.Contains(gitignore, "/sample/", "Reference expression images should remain untracked.");
+    Assert.Contains(gitignore, "/tmp/", "Temporary generated output should remain untracked.");
+    Assert.Contains(gitignore, "/Castorice.png", "The root reference character image should remain untracked.");
 }
 
 static void VelopackRunsAtTheApplicationEntryPoint()
@@ -793,6 +841,9 @@ static void LocalPackagingScriptCannotPublishArtifacts()
     Assert.Contains(script, "win-x64", "The first installer should target Windows x64.");
     Assert.Contains(script, "vpk pack", "Local packaging should create a Velopack installer.");
     Assert.Contains(script, "--packId CastoPet.App", "Installer files must not share the CastoPet user-data directory.");
+    Assert.Contains(script, "Directory.Build.props", "Local packaging should read the repository's central version source.");
+    Assert.Contains(script, "VersionPrefix", "Local packaging should default to the central semantic version.");
+    Assert.False(script.Contains("[string]$Version = '0.1.0'", StringComparison.Ordinal), "Local packaging should not duplicate the current version as a parameter default.");
     Assert.False(script.Contains("vpk upload", StringComparison.OrdinalIgnoreCase), "Local packaging must not upload packages.");
     Assert.False(script.Contains("gh release", StringComparison.OrdinalIgnoreCase), "Local packaging must not create GitHub Releases.");
     Assert.Contains(gitignore, "artifacts/local-package/", "Generated local packages should stay outside version control.");

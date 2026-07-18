@@ -5,8 +5,10 @@ CastoPet uses Velopack 1.2.0 to create a per-user Windows installer and local up
 Run from the repository root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\package-local.ps1 -Version 0.1.0
+powershell -ExecutionPolicy Bypass -File tools\package-local.ps1
 ```
+
+The default package version is read from `Directory.Build.props`. Pass `-Version 0.1.0-beta.1` only when intentionally building a different local prerelease.
 
 Generated files are written only to:
 

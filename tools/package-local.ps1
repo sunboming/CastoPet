@@ -1,11 +1,20 @@
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '0.1.0'
+    [string]$Version
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$versionPropertiesFile = Join-Path $repoRoot 'Directory.Build.props'
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    [xml]$versionProperties = Get-Content -LiteralPath $versionPropertiesFile -Raw
+    $Version = [string]$versionProperties.Project.PropertyGroup.VersionPrefix
+}
+
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+    throw "Version '$Version' must be a semantic version such as 0.1.0 or 0.1.0-beta.1."
+}
+
 $artifactRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'artifacts\local-package'))
 $expectedPrefix = $repoRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 if (-not $artifactRoot.StartsWith($expectedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {

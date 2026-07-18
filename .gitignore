@@ -4,3 +4,8 @@ obj/
 *.suo
 .vs/
 artifacts/local-package/
+/.codex/
+/.task6-artifacts/
+/sample/
+/tmp/
+/Castorice.png
