@@ -1748,18 +1748,15 @@ public partial class PetWindow : Window
 
     private void PositionRadialWheelOverlay(WpfPoint requestedOrigin)
     {
-        var halfWidth = RadialWheelSurface.Width / 2;
-        var halfHeight = RadialWheelSurface.Height / 2;
-        var workArea = SystemParameters.WorkArea;
-        var centerX = ClampWheelCenter(requestedOrigin.X, workArea.Left + halfWidth, workArea.Right - halfWidth);
-        var centerY = ClampWheelCenter(requestedOrigin.Y, workArea.Top + halfHeight, workArea.Bottom - halfHeight);
-        _radialWheelOrigin = new WpfPoint(centerX, centerY);
-        RadialWheelOverlay.HorizontalOffset = centerX - halfWidth;
-        RadialWheelOverlay.VerticalOffset = centerY - halfHeight;
+        var placement = RadialWheelOverlayPlacement.Calculate(
+            requestedOrigin.X,
+            requestedOrigin.Y,
+            RadialWheelSurface.Width,
+            RadialWheelSurface.Height);
+        _radialWheelOrigin = new WpfPoint(placement.CenterX, placement.CenterY);
+        RadialWheelOverlay.HorizontalOffset = placement.Left;
+        RadialWheelOverlay.VerticalOffset = placement.Top;
     }
-
-    private static double ClampWheelCenter(double value, double minimum, double maximum) =>
-        minimum <= maximum ? Math.Clamp(value, minimum, maximum) : (minimum + maximum) / 2;
 
     private void AnimateRadialWheelOpen()
     {

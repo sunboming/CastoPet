@@ -103,6 +103,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition paths use app resources", ExpressionTransitionPathsUseAppResources),
     ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
     ("Radial wheel layout keeps generic two-ring geometry", RadialWheelLayoutKeepsGenericTwoRingGeometry),
+    ("Radial wheel overlay stays centered on invocation point", RadialWheelOverlayStaysCenteredOnInvocationPoint),
     ("Radial wheel style keeps readable ring hierarchy", RadialWheelStyleKeepsReadableRingHierarchy),
     ("Shortcut wheel loads shell icons", ShortcutWheelLoadsShellIcons),
     ("Pointer gestures classify left click and drag", PointerGesturesClassifyLeftClickAndDrag),
@@ -1811,6 +1812,21 @@ static void RadialWheelLayoutKeepsGenericTwoRingGeometry()
     Assert.Equal(28d, WheelCatalog.OuterExitTolerance, "The outer ring should allow a deliberate pointer overshoot.");
     Assert.Equal(238d, WheelCatalog.InteractionOuterRadius, "The interaction radius should include the visual radius and tolerance.");
     Assert.Equal(1.18d, WheelCatalog.SelectedScale, "Selected wheel text should still scale up visibly.");
+}
+
+static void RadialWheelOverlayStaysCenteredOnInvocationPoint()
+{
+    var centered = RadialWheelOverlayPlacement.Calculate(640, 420, 436, 436);
+    Assert.Equal(640d, centered.CenterX, "The interaction center should equal the invocation X coordinate.");
+    Assert.Equal(420d, centered.CenterY, "The interaction center should equal the invocation Y coordinate.");
+    Assert.Equal(422d, centered.Left, "The overlay should extend equally to the left of the invocation point.");
+    Assert.Equal(202d, centered.Top, "The overlay should extend equally above the invocation point.");
+
+    var nearBottomRight = RadialWheelOverlayPlacement.Calculate(1910, 1070, 436, 436);
+    Assert.Equal(1910d, nearBottomRight.CenterX, "Screen-edge placement must not move the interaction center horizontally.");
+    Assert.Equal(1070d, nearBottomRight.CenterY, "Screen-edge placement must not move the interaction center vertically.");
+    Assert.Equal(1692d, nearBottomRight.Left, "Screen-edge placement should remain centered instead of clamping the wheel inward.");
+    Assert.Equal(852d, nearBottomRight.Top, "Screen-edge placement should remain centered instead of clamping the wheel inward.");
 }
 
 static void RadialWheelStyleKeepsReadableRingHierarchy()
