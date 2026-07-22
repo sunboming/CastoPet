@@ -151,6 +151,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window routes classified pointer gestures", PetWindowRoutesClassifiedPointerGestures),
     ("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
     ("Pet window releases runtime resources on close", PetWindowReleasesRuntimeResourcesOnClose),
+    ("Pet window detaches context menu subscriptions", PetWindowDetachesContextMenuSubscriptions),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
     ("Pet window extracts neutral shortcut drop data", PetWindowExtractsNeutralShortcutDropData),
     ("Pet window retires expression-only wheel integration", PetWindowRetiresExpressionOnlyWheelIntegration),
@@ -2913,6 +2914,17 @@ static void PetWindowReleasesRuntimeResourcesOnClose()
     Assert.Contains(cleanup, "RadialWheelHoldOverlay.IsOpen = false;", "Runtime cleanup should close the hold popup.");
     Assert.Contains(cleanup, "_inputHookService.Dispose();", "Runtime cleanup should release native input hooks.");
     Assert.Contains(cleanup, "_runtimeResourcesReleased", "Runtime cleanup should be idempotent.");
+}
+
+static void PetWindowDetachesContextMenuSubscriptions()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(source, "Action? _menuSettingsChangedHandler", "PetWindow should retain the context-menu settings handler for unsubscription.");
+    Assert.Contains(source, "DetachContextMenuSubscriptions();", "Context-menu subscriptions should be detached during replacement and shutdown.");
+    Assert.Contains(source, "_menuCommands.SettingsChanged -= _menuSettingsChangedHandler", "The shared command service must not retain a closed pet menu.");
+    Assert.False(source.Contains("commands.SettingsChanged += () => RefreshContextMenuChecks(menu);", StringComparison.Ordinal), "The context menu must not use an anonymous external subscription.");
 }
 
 static void PetWindowRoutesGenericRadialActions()

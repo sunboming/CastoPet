@@ -100,6 +100,8 @@ public partial class PetWindow : Window
     private bool _radialWheelHoldRenderingSubscribed;
     private bool _runtimeResourcesReleased;
     private WpfControls.ContextMenu? _petContextMenu;
+    private MenuCommandService? _menuCommands;
+    private Action? _menuSettingsChangedHandler;
     private WpfPoint _requestedRadialWheelOriginDevice;
 
     private sealed class RadialWheelItemVisual(
@@ -267,6 +269,7 @@ public partial class PetWindow : Window
 
         _runtimeResourcesReleased = true;
         _wheelCatalogService.Changed -= OnWheelCatalogChanged;
+        DetachContextMenuSubscriptions();
         if (_applySettingsOnSourceInitialized)
         {
             SourceInitialized -= ApplyPendingSettings;
@@ -348,6 +351,8 @@ public partial class PetWindow : Window
 
     public void AttachContextMenu(MenuCommandService commands)
     {
+        ArgumentNullException.ThrowIfNull(commands);
+        DetachContextMenuSubscriptions();
         var menu = new WpfControls.ContextMenu();
         var directSettings = SettingCatalog.Create(commands)
             .Where(definition => definition.ShowInDirectMenu)
@@ -365,7 +370,28 @@ public partial class PetWindow : Window
 
         menu.Opened += (_, _) => RefreshContextMenuChecks(menu);
         _petContextMenu = menu;
-        commands.SettingsChanged += () => RefreshContextMenuChecks(menu);
+        _menuCommands = commands;
+        _menuSettingsChangedHandler = () => RefreshContextMenuChecks(menu);
+        commands.SettingsChanged += _menuSettingsChangedHandler;
+    }
+
+    private void DetachContextMenuSubscriptions()
+    {
+        if (_menuCommands is not null && _menuSettingsChangedHandler is not null)
+        {
+            _menuCommands.SettingsChanged -= _menuSettingsChangedHandler;
+        }
+
+        _menuCommands = null;
+        _menuSettingsChangedHandler = null;
+        if (_petContextMenu is null)
+        {
+            return;
+        }
+
+        _petContextMenu.IsOpen = false;
+        _petContextMenu.PlacementTarget = null;
+        _petContextMenu = null;
     }
 
     private void ShowPetContextMenu()
