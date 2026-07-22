@@ -23,4 +23,5 @@ These instructions apply to the entire repository.
 
 - Preserve existing project patterns and keep changes narrowly scoped.
 - Do not move, delete, or overwrite source images and generated animation assets unless the task explicitly requires it.
+- If a running `CastoPet.exe` locks the normal Debug or Release output during a requested build, terminate that CastoPet process and retry the build without asking for separate confirmation.
 - Report whether verification used Debug or Release builds, and provide the executable path when producing a build for user testing.
