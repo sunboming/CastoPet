@@ -104,6 +104,7 @@ var tests = new (string Name, Action Test)[]
     ("Expression transition planner prefers specific reversible frames", ExpressionTransitionPlannerPrefersSpecificReversibleFrames),
     ("Radial wheel layout keeps generic two-ring geometry", RadialWheelLayoutKeepsGenericTwoRingGeometry),
     ("Radial wheel overlay stays centered on invocation point", RadialWheelOverlayStaysCenteredOnInvocationPoint),
+    ("Radial wheel popup overrides WPF edge repositioning", RadialWheelPopupOverridesWpfEdgeRepositioning),
     ("Radial wheel style keeps readable ring hierarchy", RadialWheelStyleKeepsReadableRingHierarchy),
     ("Shortcut wheel loads shell icons", ShortcutWheelLoadsShellIcons),
     ("Pointer gestures classify left click and drag", PointerGesturesClassifyLeftClickAndDrag),
@@ -1827,6 +1828,19 @@ static void RadialWheelOverlayStaysCenteredOnInvocationPoint()
     Assert.Equal(1070d, nearBottomRight.CenterY, "Screen-edge placement must not move the interaction center vertically.");
     Assert.Equal(1692d, nearBottomRight.Left, "Screen-edge placement should remain centered instead of clamping the wheel inward.");
     Assert.Equal(852d, nearBottomRight.Top, "Screen-edge placement should remain centered instead of clamping the wheel inward.");
+}
+
+static void RadialWheelPopupOverridesWpfEdgeRepositioning()
+{
+    var devicePlacement = RadialWheelPopupPosition.Calculate(1910, 1070, 436, 436);
+    Assert.Equal(1692, devicePlacement.Left, "The native popup should be centered horizontally on the device invocation point.");
+    Assert.Equal(852, devicePlacement.Top, "The native popup should be centered vertically on the device invocation point.");
+
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+    Assert.Contains(xaml, "Opened=\"OnRadialWheelOverlayOpened\"", "The wheel should correct its native position after WPF opens the popup.");
+    Assert.Contains(source, "WindowsPopupPositioner.TryCenterAt", "The opened popup should bypass WPF edge flipping through its native window position.");
 }
 
 static void RadialWheelStyleKeepsReadableRingHierarchy()

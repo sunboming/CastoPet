@@ -99,6 +99,7 @@ public partial class PetWindow : Window
     private bool _activeMovementRenderingSubscribed;
     private bool _radialWheelHoldRenderingSubscribed;
     private WpfControls.ContextMenu? _petContextMenu;
+    private WpfPoint _requestedRadialWheelOriginDevice;
 
     private sealed class RadialWheelItemVisual(
         WpfShapes.Path sector,
@@ -626,7 +627,8 @@ public partial class PetWindow : Window
             return;
         }
 
-        _requestedRadialWheelOrigin = ToScreenPoint(position);
+        _requestedRadialWheelOriginDevice = RootGrid.PointToScreen(position);
+        _requestedRadialWheelOrigin = FromDevicePoint(_requestedRadialWheelOriginDevice);
         CaptureMouse();
         StopRadialWheelHoldRendering();
         if (_interactions.HasWheelCategories)
@@ -1634,6 +1636,11 @@ public partial class PetWindow : Window
     private WpfPoint ToScreenPoint(WpfPoint localPoint)
     {
         var devicePoint = RootGrid.PointToScreen(localPoint);
+        return FromDevicePoint(devicePoint);
+    }
+
+    private WpfPoint FromDevicePoint(WpfPoint devicePoint)
+    {
         var source = PresentationSource.FromVisual(this);
         return source?.CompositionTarget is null
             ? devicePoint
@@ -1757,6 +1764,9 @@ public partial class PetWindow : Window
         RadialWheelOverlay.HorizontalOffset = placement.Left;
         RadialWheelOverlay.VerticalOffset = placement.Top;
     }
+
+    private void OnRadialWheelOverlayOpened(object? sender, EventArgs e) =>
+        WindowsPopupPositioner.TryCenterAt(RadialWheelSurface, _requestedRadialWheelOriginDevice);
 
     private void AnimateRadialWheelOpen()
     {
