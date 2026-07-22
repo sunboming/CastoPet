@@ -4,24 +4,17 @@ internal readonly record struct RadialWheelColor(byte Alpha, byte Red, byte Gree
 
 internal static class RadialWheelStyle
 {
-    private static readonly RadialWheelColor FirstRingFill = new(180, 75, 44, 110);
-    private static readonly RadialWheelColor SecondRingFill = new(166, 94, 60, 130);
-    private static readonly RadialWheelColor FirstRingDisabledFill = new(110, 75, 44, 110);
-    private static readonly RadialWheelColor SecondRingDisabledFill = new(96, 94, 60, 130);
+    private static readonly RadialWheelColor FirstRingFill = new(218, 238, 228, 248);
+    private static readonly RadialWheelColor SecondRingFill = new(210, 228, 212, 244);
+    private static readonly RadialWheelColor FirstRingDisabledFill = new(145, 238, 228, 248);
+    private static readonly RadialWheelColor SecondRingDisabledFill = new(136, 228, 212, 244);
 
-    public static readonly RadialWheelColor SelectedFill = new(220, 143, 99, 187);
-    public static readonly RadialWheelColor NormalStroke = new(135, 224, 211, 240);
-    public static readonly RadialWheelColor SelectedStroke = new(235, 250, 239, 255);
-    public static readonly RadialWheelColor SelectedGlow = new(210, 190, 153, 222);
+    public static readonly RadialWheelColor NormalStroke = new(175, 170, 145, 197);
+    public static readonly RadialWheelColor SelectedStroke = new(255, 126, 85, 164);
 
-    public const double NormalStrokeThickness = 0.9;
-    public const double SelectedStrokeThickness = 1.35;
-    public const double SectorGapRadians = 0.016;
-    public const byte LabelShadowAlpha = 120;
-    public const double LabelShadowBlurRadius = 5;
-    public const double LabelShadowOpacity = 0.55;
-    public const double SelectedGlowBlurRadius = 12;
-    public const double SelectedGlowOpacity = 0.32;
+    public const double NormalStrokeThickness = 1.05;
+    public const double SelectedStrokeThickness = 2;
+    public const double SectorGapRadians = 0;
 
     public static RadialWheelColor GetNormalFill(RadialWheelRing ring, bool isEnabled) =>
         (ring, isEnabled) switch

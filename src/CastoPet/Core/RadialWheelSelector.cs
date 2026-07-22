@@ -16,7 +16,8 @@ public static class RadialWheelSelector
         double pointerX,
         double pointerY,
         int firstRingItemCount,
-        int secondRingItemCount)
+        int secondRingItemCount,
+        int selectedCategoryIndex = -1)
     {
         var distance = Math.Sqrt((pointerX * pointerX) + (pointerY * pointerY));
         if (distance < WheelCatalog.InnerRadius)
@@ -33,9 +34,18 @@ public static class RadialWheelSelector
 
         if (distance <= WheelCatalog.InteractionOuterRadius)
         {
+            var secondRingIndex = selectedCategoryIndex >= 0
+                ? RadialWheelArcLayout.GetItemIndex(
+                    GetPointerAngle(pointerX, pointerY),
+                    RadialWheelArcLayout.CreateSecondRingArc(
+                        selectedCategoryIndex,
+                        firstRingItemCount,
+                        secondRingItemCount),
+                    secondRingItemCount)
+                : GetSectorIndex(pointerX, pointerY, secondRingItemCount);
             return new RadialWheelSelection(
                 RadialWheelRing.Second,
-                GetSectorIndex(pointerX, pointerY, secondRingItemCount));
+                secondRingIndex);
         }
 
         return new RadialWheelSelection(RadialWheelRing.Outside, -1);
@@ -48,12 +58,18 @@ public static class RadialWheelSelector
             return -1;
         }
 
+        var angle = GetPointerAngle(pointerX, pointerY);
+        return Math.Min((int)(angle / (Math.Tau / itemCount)), itemCount - 1);
+    }
+
+    private static double GetPointerAngle(double pointerX, double pointerY)
+    {
         var angle = Math.Atan2(pointerX, -pointerY);
         if (angle < 0)
         {
             angle += Math.Tau;
         }
 
-        return Math.Min((int)(angle / (Math.Tau / itemCount)), itemCount - 1);
+        return angle;
     }
 }

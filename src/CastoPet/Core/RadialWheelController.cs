@@ -51,7 +51,8 @@ public sealed class RadialWheelController
             pointerX,
             pointerY,
             catalog.Categories.Count,
-            VisibleSecondLevelItems.Count);
+            VisibleSecondLevelItems.Count,
+            SelectedCategoryIndex);
 
         switch (selection.Ring)
         {

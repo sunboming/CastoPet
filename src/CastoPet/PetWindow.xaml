@@ -70,9 +70,28 @@
                     Background="Transparent"
                     RenderTransformOrigin="0.5,0.5"
                     SnapsToDevicePixels="True">
+                <Canvas.Resources>
+                    <LinearGradientBrush x:Key="WheelBoundaryBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#C8C8B7DC" Offset="0" />
+                        <GradientStop Color="#B8AD98CC" Offset="0.52" />
+                        <GradientStop Color="#C4D8C9E6" Offset="1" />
+                    </LinearGradientBrush>
+                </Canvas.Resources>
                 <Canvas.RenderTransform>
                     <ScaleTransform x:Name="RadialWheelScaleTransform" ScaleX="1" ScaleY="1" />
                 </Canvas.RenderTransform>
+                <Path x:Name="SecondRingBoundary"
+                      IsHitTestVisible="False"
+                      Visibility="Collapsed"
+                      Stroke="{StaticResource WheelBoundaryBrush}"
+                      StrokeThickness="1.7" />
+                <Ellipse Width="248"
+                         Height="248"
+                         Canvas.Left="94"
+                         Canvas.Top="94"
+                         IsHitTestVisible="False"
+                         Stroke="{StaticResource WheelBoundaryBrush}"
+                         StrokeThickness="1.55" />
                 <Canvas x:Name="SecondRingSurface"
                         Width="436"
                         Height="436"
@@ -84,22 +103,16 @@
                          Height="68"
                          Canvas.Left="184"
                          Canvas.Top="184"
-                         StrokeThickness="0.9">
+                         Stroke="{StaticResource WheelBoundaryBrush}"
+                         StrokeThickness="1.55">
                     <Ellipse.Fill>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Color="#C08A5EB4" Offset="0" />
-                            <GradientStop Color="#B8663A91" Offset="0.42" />
-                            <GradientStop Color="#B0442A72" Offset="0.72" />
-                            <GradientStop Color="#A62C1B52" Offset="1" />
+                            <GradientStop Color="#F2FFFFFF" Offset="0" />
+                            <GradientStop Color="#E8F4E9FC" Offset="0.34" />
+                            <GradientStop Color="#DEDCCAF2" Offset="0.7" />
+                            <GradientStop Color="#D2C7AFE8" Offset="1" />
                         </LinearGradientBrush>
                     </Ellipse.Fill>
-                    <Ellipse.Stroke>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Color="#B0F8E8FF" Offset="0" />
-                            <GradientStop Color="#88E5BDF5" Offset="0.48" />
-                            <GradientStop Color="#70B99BD6" Offset="1" />
-                        </LinearGradientBrush>
-                    </Ellipse.Stroke>
                 </Ellipse>
             </Canvas>
         </Popup>

@@ -1357,6 +1357,7 @@ public partial class PetWindow : Window
         SecondRingSurface.Children.Clear();
         _secondRingVisuals.Clear();
         SecondRingSurface.Visibility = Visibility.Collapsed;
+        SecondRingBoundary.Visibility = Visibility.Collapsed;
         BuildFirstRadialWheelRing();
     }
 
@@ -1384,6 +1385,10 @@ public partial class PetWindow : Window
         SecondRingSurface.Children.Clear();
         _secondRingVisuals.Clear();
         var items = _interactions.RadialWheel.VisibleSecondLevelItems;
+        var arc = RadialWheelArcLayout.CreateSecondRingArc(
+            _interactions.RadialWheel.SelectedCategoryIndex,
+            _interactions.Catalog.Categories.Count,
+            items.Count);
         for (var index = 0; index < items.Count; index++)
         {
             var item = items[index];
@@ -1396,12 +1401,17 @@ public partial class PetWindow : Window
                 WheelCatalog.SecondRingOuterRadius,
                 item.IsEnabled,
                 isSecondRing: true,
-                icon: LoadShortcutWheelIcon(item)));
+                icon: LoadShortcutWheelIcon(item),
+                arc: arc));
         }
 
         SecondRingSurface.Visibility = _interactions.RadialWheel.IsSecondLevelOpen
             ? Visibility.Visible
             : Visibility.Collapsed;
+        SecondRingBoundary.Visibility = SecondRingSurface.Visibility;
+        SecondRingBoundary.Data = CreateRadialWheelArcBoundaryGeometry(
+            WheelCatalog.SecondRingOuterRadius,
+            arc);
     }
 
     private RadialWheelItemVisual AddRadialWheelItem(
@@ -1413,9 +1423,11 @@ public partial class PetWindow : Window
         double outerRadius,
         bool isEnabled,
         bool isSecondRing,
-        ImageSource? icon = null)
+        ImageSource? icon = null,
+        RadialWheelArc? arc = null)
     {
         var ring = isSecondRing ? RadialWheelRing.Second : RadialWheelRing.First;
+        var itemArc = arc ?? new RadialWheelArc(0, Math.Tau);
         var panel = new WpfControls.Canvas
         {
             Width = RadialWheelSurface.Width,
@@ -1425,7 +1437,7 @@ public partial class PetWindow : Window
         };
         var sector = new WpfShapes.Path
         {
-            Data = CreateRadialWheelSectorGeometry(index, count, innerRadius, outerRadius),
+            Data = CreateRadialWheelSectorGeometry(index, count, innerRadius, outerRadius, itemArc),
             Fill = CreateRadialWheelFillBrush(RadialWheelStyle.GetNormalFill(ring, isEnabled), isSelected: false),
             Stroke = CreateRadialWheelStrokeBrush(RadialWheelStyle.NormalStroke),
             StrokeThickness = RadialWheelStyle.NormalStrokeThickness,
@@ -1435,22 +1447,17 @@ public partial class PetWindow : Window
         var label = new WpfControls.TextBlock
         {
             Text = displayName,
-            Foreground = new SolidColorBrush(WpfColor.FromArgb(242, 247, 244, 250)),
-            FontSize = isSecondRing ? 11.5 : 13,
-            FontWeight = FontWeights.Medium,
+            Foreground = new SolidColorBrush(WpfColor.FromArgb(255, 56, 39, 72)),
+            FontSize = isSecondRing ? 12 : 13.5,
+            FontWeight = FontWeights.SemiBold,
             TextAlignment = TextAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
             Width = isSecondRing ? 88 : 96,
             MaxHeight = 40,
-            Opacity = isEnabled ? 0.9 : 0.58,
-            Effect = new System.Windows.Media.Effects.DropShadowEffect
-            {
-                Color = WpfColor.FromArgb(RadialWheelStyle.LabelShadowAlpha, 40, 25, 68),
-                BlurRadius = RadialWheelStyle.LabelShadowBlurRadius,
-                ShadowDepth = 0,
-                Opacity = RadialWheelStyle.LabelShadowOpacity,
-            },
+            Opacity = isEnabled ? 1 : 0.55,
         };
+        TextOptions.SetTextFormattingMode(label, TextFormattingMode.Display);
+        TextOptions.SetTextRenderingMode(label, TextRenderingMode.Grayscale);
         FrameworkElement content = label;
         if (icon is not null)
         {
@@ -1478,9 +1485,9 @@ public partial class PetWindow : Window
         content.RenderTransform = new ScaleTransform(1, 1);
         var center = RadialWheelSurface.Width / 2;
         var labelRadius = (innerRadius + outerRadius) / 2;
-        var labelAngle = count == 1
-            ? -Math.PI / 2
-            : -Math.PI / 2 + (index + 0.5) * Math.Tau / count;
+        var labelAngle = -Math.PI / 2
+            + itemArc.StartAngle
+            + (index + 0.5) * itemArc.StepAngle(count);
         var labelCenter = PointOnWheel(center, labelRadius, labelAngle);
         WpfControls.Canvas.SetLeft(content, labelCenter.X - label.Width / 2);
         WpfControls.Canvas.SetTop(content, labelCenter.Y - (icon is not null ? 29 : isSecondRing ? 15 : 12));
@@ -1512,10 +1519,11 @@ public partial class PetWindow : Window
         int index,
         int count,
         double innerRadius,
-        double outerRadius)
+        double outerRadius,
+        RadialWheelArc arc)
     {
         var center = RadialWheelSurface.Width / 2;
-        if (count == 1)
+        if (count == 1 && arc.SweepAngle >= Math.Tau - 1e-9)
         {
             return new CombinedGeometry(
                 GeometryCombineMode.Exclude,
@@ -1523,10 +1531,10 @@ public partial class PetWindow : Window
                 new EllipseGeometry(new WpfPoint(center, center), innerRadius, innerRadius));
         }
 
-        var step = Math.Tau / count;
+        var step = arc.StepAngle(count);
         var gap = RadialWheelStyle.SectorGapRadians;
-        var startAngle = -Math.PI / 2 + index * step + gap;
-        var endAngle = -Math.PI / 2 + (index + 1) * step - gap;
+        var startAngle = -Math.PI / 2 + arc.StartAngle + index * step + gap;
+        var endAngle = -Math.PI / 2 + arc.StartAngle + (index + 1) * step - gap;
         var outerStart = PointOnWheel(center, outerRadius, startAngle);
         var outerEnd = PointOnWheel(center, outerRadius, endAngle);
         var innerEnd = PointOnWheel(center, innerRadius, endAngle);
@@ -1540,6 +1548,31 @@ public partial class PetWindow : Window
         figure.Segments.Add(new ArcSegment(outerEnd, new WpfSize(outerRadius, outerRadius), 0, isLargeArc, SweepDirection.Clockwise, true));
         figure.Segments.Add(new LineSegment(innerEnd, true));
         figure.Segments.Add(new ArcSegment(innerStart, new WpfSize(innerRadius, innerRadius), 0, isLargeArc, SweepDirection.Counterclockwise, true));
+        return new PathGeometry([figure]);
+    }
+
+    private Geometry CreateRadialWheelArcBoundaryGeometry(double radius, RadialWheelArc arc)
+    {
+        if (arc.SweepAngle <= 0)
+        {
+            return Geometry.Empty;
+        }
+
+        var center = RadialWheelSurface.Width / 2;
+        var startAngle = -Math.PI / 2 + arc.StartAngle;
+        var endAngle = startAngle + arc.SweepAngle;
+        var figure = new PathFigure
+        {
+            StartPoint = PointOnWheel(center, radius, startAngle),
+            IsClosed = false,
+        };
+        figure.Segments.Add(new ArcSegment(
+            PointOnWheel(center, radius, endAngle),
+            new WpfSize(radius, radius),
+            0,
+            arc.SweepAngle > Math.PI,
+            SweepDirection.Clockwise,
+            true));
         return new PathGeometry([figure]);
     }
 
@@ -1880,26 +1913,17 @@ public partial class PetWindow : Window
             }
 
             visual.IsSelected = isSelected;
-            var fill = isSelected
-                ? RadialWheelStyle.SelectedFill
-                : RadialWheelStyle.GetNormalFill(visual.Ring, visual.IsEnabled);
-            visual.Sector.Fill = CreateRadialWheelFillBrush(fill, isSelected);
+            var fill = RadialWheelStyle.GetNormalFill(visual.Ring, visual.IsEnabled);
+            visual.Sector.Fill = CreateRadialWheelFillBrush(fill, isSelected: false);
             visual.Sector.Stroke = CreateRadialWheelStrokeBrush(
                 isSelected ? RadialWheelStyle.SelectedStroke : RadialWheelStyle.NormalStroke);
             visual.Sector.StrokeThickness = isSelected
                 ? RadialWheelStyle.SelectedStrokeThickness
                 : RadialWheelStyle.NormalStrokeThickness;
-            visual.Sector.Effect = isSelected
-                ? new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    Color = ToWpfColor(RadialWheelStyle.SelectedGlow),
-                    BlurRadius = RadialWheelStyle.SelectedGlowBlurRadius,
-                    ShadowDepth = 0,
-                    Opacity = RadialWheelStyle.SelectedGlowOpacity,
-                }
-                : null;
-            visual.Label.Opacity = isSelected ? 1 : visual.IsEnabled ? 0.9 : 0.58;
-            visual.Label.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Medium;
+            visual.Sector.Effect = null;
+            visual.Label.Opacity = isSelected ? 1 : visual.IsEnabled ? 1 : 0.55;
+            visual.Label.FontWeight = isSelected ? FontWeights.Bold : FontWeights.SemiBold;
+            visual.Label.Foreground = new SolidColorBrush(WpfColor.FromArgb(255, 56, 39, 72));
             if (visual.Content.RenderTransform is not ScaleTransform scaleTransform)
             {
                 scaleTransform = new ScaleTransform(1, 1);

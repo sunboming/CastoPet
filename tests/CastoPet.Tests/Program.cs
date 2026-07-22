@@ -117,6 +117,7 @@ var tests = new (string Name, Action Test)[]
     ("Application composes one shared shortcut wheel graph", ApplicationComposesOneSharedShortcutWheelGraph),
     ("Pet window follows live wheel catalog snapshots", PetWindowFollowsLiveWheelCatalogSnapshots),
     ("Radial wheel selector distinguishes all pointer regions", RadialWheelSelectorDistinguishesAllPointerRegions),
+    ("Radial wheel second ring stays with category direction", RadialWheelSecondRingStaysWithCategoryDirection),
     ("Radial wheel controller honors category dwell", RadialWheelControllerHonorsCategoryDwell),
     ("Radial wheel tolerates slight outer overshoot", RadialWheelToleratesSlightOuterOvershoot),
     ("Radial wheel controller resets and collapses state", RadialWheelControllerResetsAndCollapsesState),
@@ -1818,14 +1819,17 @@ static void RadialWheelStyleKeepsReadableRingHierarchy()
     var firstDisabled = RadialWheelStyle.GetNormalFill(RadialWheelRing.First, isEnabled: false);
     var secondDisabled = RadialWheelStyle.GetNormalFill(RadialWheelRing.Second, isEnabled: false);
 
-    Assert.Equal((byte)180, first.Alpha, "First-ring fill should be readable over the desktop.");
-    Assert.Equal((byte)166, second.Alpha, "Second-ring fill should remain slightly lighter.");
-    Assert.Equal((byte)110, firstDisabled.Alpha, "Disabled first-ring fill should remain subdued.");
-    Assert.Equal((byte)96, secondDisabled.Alpha, "Disabled second-ring fill should remain subdued.");
+    Assert.Equal((byte)218, first.Alpha, "First-ring glass should stay readable over the desktop.");
+    Assert.Equal((byte)210, second.Alpha, "Second-ring glass should remain slightly lighter.");
+    Assert.Equal((byte)145, firstDisabled.Alpha, "Disabled first-ring glass should remain subdued.");
+    Assert.Equal((byte)136, secondDisabled.Alpha, "Disabled second-ring glass should remain subdued.");
+    Assert.True(first.Red >= 225 && first.Green >= 210 && first.Blue >= 240, "The first ring should use a pale purple-white base.");
+    Assert.True(second.Red >= 220 && second.Green >= 200 && second.Blue >= 238, "The second ring should use a distinct pale lavender base.");
     Assert.False(first.Equals(second), "The two normal ring fills should remain visually distinct.");
-    Assert.True(RadialWheelStyle.SelectedFill.Alpha > first.Alpha, "Selection should be stronger than the first ring.");
-    Assert.True(RadialWheelStyle.SelectedFill.Alpha > second.Alpha, "Selection should be stronger than the second ring.");
-    Assert.Equal(0.016d, RadialWheelStyle.SectorGapRadians, "Sector dividers should use the refined gap.");
+    Assert.True(RadialWheelStyle.SelectedStroke.Alpha > RadialWheelStyle.NormalStroke.Alpha, "Selection should rely on a clearer outline instead of a different fill.");
+    Assert.True(RadialWheelStyle.SelectedStrokeThickness >= 2d, "Selection should have a clear outline-only treatment.");
+    Assert.Equal(0d, RadialWheelStyle.SectorGapRadians, "Adjacent sectors should meet without transparent gaps.");
+    Assert.True(RadialWheelStyle.NormalStrokeThickness >= 1d, "Sector boundaries should remain visible on pale glass.");
 }
 
 static void ShortcutWheelLoadsShellIcons()
@@ -2083,6 +2087,30 @@ static void RadialWheelSelectorDistinguishesAllPointerRegions()
     Assert.Equal(RadialWheelRing.Outside, RadialWheelSelector.GetSelection(0, -239, 2, 4).Ring, "A point beyond the outer tolerance should be outside.");
 }
 
+static void RadialWheelSecondRingStaysWithCategoryDirection()
+{
+    var leftArc = RadialWheelArcLayout.CreateSecondRingArc(1, 2, 8);
+    Assert.Equal(Math.PI, leftArc.StartAngle, "The left category should start its submenu at the bottom-facing boundary.");
+    Assert.Equal(Math.PI, leftArc.SweepAngle, "Eight submenu items should occupy one same-side semicircle.");
+
+    var leftSelection = RadialWheelSelector.GetSelection(-170, 0, 2, 8, selectedCategoryIndex: 1);
+    Assert.Equal(RadialWheelRing.Second, leftSelection.Ring, "The left outer ring should remain interactive for a left category.");
+    Assert.True(leftSelection.SectorIndex >= 0, "The left outer ring should resolve a submenu item.");
+
+    var oppositeSelection = RadialWheelSelector.GetSelection(170, 0, 2, 8, selectedCategoryIndex: 1);
+    Assert.Equal(RadialWheelRing.Second, oppositeSelection.Ring, "The opposite side should remain inside the wheel tolerance.");
+    Assert.Equal(-1, oppositeSelection.SectorIndex, "The opposite side must not select a submenu item.");
+
+    var controller = new RadialWheelController(CreateWheelCatalog(8));
+    var now = DateTimeOffset.UtcNow;
+    controller.Open(now);
+    controller.UpdatePointer(-80, 0, now);
+    controller.UpdatePointer(-80, 0, now + WheelCatalog.CategoryDwellDelay);
+    controller.UpdatePointer(170, 0, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(1));
+    Assert.True(controller.IsOpen, "Crossing the opposite outer side should not abruptly close the wheel.");
+    Assert.Equal(-1, controller.SelectedSecondLevelIndex, "The opposite side should clear submenu selection.");
+}
+
 static void RadialWheelControllerHonorsCategoryDwell()
 {
     var controller = new RadialWheelController(CreateWheelCatalog(3));
@@ -2104,12 +2132,12 @@ static void RadialWheelToleratesSlightOuterOvershoot()
     controller.UpdatePointer(0, -80, now);
     controller.UpdatePointer(0, -80, now + WheelCatalog.CategoryDwellDelay);
 
-    controller.UpdatePointer(0, -220, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(1));
+    controller.UpdatePointer(220, 0, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(1));
 
     Assert.True(controller.IsOpen, "A slight overshoot should not close the wheel.");
-    Assert.Equal(0, controller.SelectedSecondLevelIndex, "The overshoot area should preserve angular outer-ring selection.");
+    Assert.True(controller.SelectedSecondLevelIndex >= 0, "The overshoot area should preserve same-side outer-ring selection.");
 
-    controller.UpdatePointer(0, -239, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(2));
+    controller.UpdatePointer(239, 0, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(2));
     Assert.False(controller.IsOpen, "Moving beyond the tolerance should still close the wheel.");
 }
 
@@ -2772,9 +2800,11 @@ static void PetWindowConsumesCentralizedRadialWheelStyling()
     Assert.Contains(source, "RadialWheelStyle.GetNormalFill", "Initial and restored fills should use the shared style contract.");
     Assert.Contains(source, "visual.Ring", "Selection refresh should restore the visual's original ring style.");
     Assert.Contains(source, "RadialWheelStyle.SectorGapRadians", "Sector geometry should use the refined divider gap.");
-    Assert.Contains(source, "RadialWheelStyle.LabelShadowOpacity", "Label shadows should use the refined style.");
-    Assert.Contains(xaml, "Color=\"#C08A5EB4\"", "The center should use the vivid lavender highlight.");
-    Assert.Contains(xaml, "Color=\"#B0F8E8FF\"", "The center should use the luminous glass edge highlight.");
+    Assert.Contains(source, "TextFormattingMode.Display", "Small wheel labels should use crisp display-oriented text formatting.");
+    Assert.Contains(source, "TextRenderingMode.Grayscale", "Transparent wheel labels should avoid blurry ClearType color fringing.");
+    Assert.Contains(xaml, "x:Name=\"SecondRingBoundary\"", "The outer ring should expose a continuous boundary.");
+    Assert.Contains(xaml, "Color=\"#F2FFFFFF\"", "The center should use a bright frosted-glass highlight.");
+    Assert.Contains(xaml, "x:Key=\"WheelBoundaryBrush\"", "Ring boundaries should share one coherent purple treatment.");
 }
 
 static void PetWindowRoutesClassifiedPointerGestures()
