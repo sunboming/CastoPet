@@ -150,6 +150,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window consumes centralized radial wheel styling", PetWindowConsumesCentralizedRadialWheelStyling),
     ("Pet window routes classified pointer gestures", PetWindowRoutesClassifiedPointerGestures),
     ("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
+    ("Pet window releases runtime resources on close", PetWindowReleasesRuntimeResourcesOnClose),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
     ("Pet window extracts neutral shortcut drop data", PetWindowExtractsNeutralShortcutDropData),
     ("Pet window retires expression-only wheel integration", PetWindowRetiresExpressionOnlyWheelIntegration),
@@ -2883,6 +2884,34 @@ static void PetWindowDefinesHoldFeedbackAndPettingPlayback()
     Assert.Contains(source, "LoadPettingFrames", "PetWindow should load optional skin petting frames.");
     Assert.Contains(source, "AdvancePettingFrame", "Petting should play as a one-shot frame sequence.");
     Assert.Contains(source, "_animationController.IsPetting", "Passive runtime modes should gate on centralized petting playback state.");
+}
+
+static void PetWindowReleasesRuntimeResourcesOnClose()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    const string signature = "private void ShutdownRuntimeResources()";
+    var start = source.IndexOf(signature, StringComparison.Ordinal);
+    Assert.True(start >= 0, "PetWindow should expose one explicit runtime cleanup path.");
+    var end = source.IndexOf("\n    private ", start + signature.Length, StringComparison.Ordinal);
+    var cleanup = source[start..(end >= 0 ? end : source.Length)];
+
+    foreach (var timer in new[]
+    {
+        "_idleFrameTimer", "_blinkScheduleTimer", "_blinkFrameTimer", "_pettingFrameTimer",
+        "_dragRestoreTimer", "_radialWheelPointerProbeTimer", "_temporaryExpressionTimer",
+        "_expressionTransitionFrameTimer", "_activeMovementProbeTimer", "_inputReactiveRenderTimer",
+    })
+    {
+        Assert.Contains(cleanup, $"{timer}.Stop();", $"Runtime cleanup should stop {timer}.");
+    }
+
+    Assert.Contains(cleanup, "StopActiveMovementRendering();", "Runtime cleanup should detach active movement rendering.");
+    Assert.Contains(cleanup, "StopRadialWheelHoldRendering();", "Runtime cleanup should detach hold-progress rendering.");
+    Assert.Contains(cleanup, "RadialWheelOverlay.IsOpen = false;", "Runtime cleanup should close the wheel popup.");
+    Assert.Contains(cleanup, "RadialWheelHoldOverlay.IsOpen = false;", "Runtime cleanup should close the hold popup.");
+    Assert.Contains(cleanup, "_inputHookService.Dispose();", "Runtime cleanup should release native input hooks.");
+    Assert.Contains(cleanup, "_runtimeResourcesReleased", "Runtime cleanup should be idempotent.");
 }
 
 static void PetWindowRoutesGenericRadialActions()

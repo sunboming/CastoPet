@@ -98,6 +98,7 @@ public partial class PetWindow : Window
     private double? _expectedCursorY;
     private bool _activeMovementRenderingSubscribed;
     private bool _radialWheelHoldRenderingSubscribed;
+    private bool _runtimeResourcesReleased;
     private WpfControls.ContextMenu? _petContextMenu;
     private WpfPoint _requestedRadialWheelOriginDevice;
 
@@ -246,16 +247,7 @@ public partial class PetWindow : Window
             UpdateInputReactiveMode();
             UpdateActiveMovementTimer();
         };
-        Closed += (_, _) =>
-        {
-            _wheelCatalogService.Changed -= OnWheelCatalogChanged;
-            StopInputReactiveMode();
-            CancelPendingPointerGesture();
-            StopPetting(restoreIdle: false);
-            CloseRadialWheel(cancelController: true, restoreAnimation: false);
-            _inputHookService.InputReceived -= OnInputReactiveInputReceived;
-            _inputHookService.Dispose();
-        };
+        Closed += (_, _) => ShutdownRuntimeResources();
         MouseLeftButtonDown += OnMouseLeftButtonDown;
         MouseLeftButtonUp += OnMouseLeftButtonUp;
         MouseRightButtonDown += OnMouseRightButtonDown;
@@ -264,6 +256,53 @@ public partial class PetWindow : Window
         LostMouseCapture += OnLostMouseCapture;
         Deactivated += OnWindowDeactivated;
         PreviewKeyDown += OnPreviewKeyDown;
+    }
+
+    private void ShutdownRuntimeResources()
+    {
+        if (_runtimeResourcesReleased)
+        {
+            return;
+        }
+
+        _runtimeResourcesReleased = true;
+        _wheelCatalogService.Changed -= OnWheelCatalogChanged;
+        if (_applySettingsOnSourceInitialized)
+        {
+            SourceInitialized -= ApplyPendingSettings;
+            _applySettingsOnSourceInitialized = false;
+        }
+
+        StopInputReactiveMode(restoreIdle: false);
+        CancelPendingPointerGesture();
+        StopPetting(restoreIdle: false);
+        CancelTemporaryExpression();
+        CloseRadialWheel(cancelController: true, restoreAnimation: false);
+        StopActiveMovementRendering();
+        StopRadialWheelHoldRendering();
+
+        _idleFrameTimer.Stop();
+        _blinkScheduleTimer.Stop();
+        _blinkFrameTimer.Stop();
+        _pettingFrameTimer.Stop();
+        _dragRestoreTimer.Stop();
+        _radialWheelPointerProbeTimer.Stop();
+        _temporaryExpressionTimer.Stop();
+        _expressionTransitionFrameTimer.Stop();
+        _activeMovementProbeTimer.Stop();
+        _inputReactiveRenderTimer.Stop();
+
+        RadialWheelOverlay.IsOpen = false;
+        RadialWheelHoldOverlay.IsOpen = false;
+        _inputHookService.InputReceived -= OnInputReactiveInputReceived;
+        _inputHookService.Dispose();
+        _shortcutIconCache.Clear();
+        _firstRingVisuals.Clear();
+        _secondRingVisuals.Clear();
+        FirstRingSurface.Children.Clear();
+        SecondRingSurface.Children.Clear();
+        InputReactiveOverlay.Children.Clear();
+        CharacterImage.Source = null;
     }
 
     private static LegacyWheelDependencies CreateLegacyWheelDependencies(
