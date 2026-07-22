@@ -161,6 +161,7 @@ var tests = new (string Name, Action Test)[]
     ("Settings window service releases a closed window", SettingsWindowServiceReleasesAClosedWindow),
     ("Settings window defines the approved visual structure", SettingsWindowDefinesTheApprovedVisualStructure),
     ("Settings window supports theme switching and backdrop", SettingsWindowSupportsThemeSwitchingAndBackdrop),
+    ("Settings window cancels update work on close", SettingsWindowCancelsUpdateWorkOnClose),
     ("Settings window exposes shortcut launcher management", SettingsWindowExposesShortcutLauncherManagement),
     ("Settings window shares shortcut services and live updates", SettingsWindowSharesShortcutServicesAndLiveUpdates),
     ("Settings shortcut list accepts shared drop data", SettingsShortcutListAcceptsSharedDropData),
@@ -3062,6 +3063,18 @@ static void SettingsWindowSupportsThemeSwitchingAndBackdrop()
     Assert.Contains(source, "SettingsBackdropService.TryApply", "Settings should request the supported native backdrop.");
     Assert.Contains(backdrop, "DwmExtendFrameIntoClientArea", "The native backdrop should extend through the custom client area.");
     Assert.Contains(commands, "SetThemeMode(AppThemeMode mode)", "Theme selection should persist through the shared settings command service.");
+}
+
+static void SettingsWindowCancelsUpdateWorkOnClose()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
+
+    Assert.Contains(source, "CancellationTokenSource _lifetimeCancellation", "Each settings window should own cancellation for its asynchronous work.");
+    Assert.Contains(source, "CheckAsync(manual: true, _lifetimeCancellation.Token)", "Manual update checks should observe window closure.");
+    Assert.Contains(source, "DownloadUpdatesAsync(update, progress, _lifetimeCancellation.Token)", "Update downloads should observe window closure.");
+    Assert.Contains(source, "_lifetimeCancellation.Cancel();", "Closing the settings window should cancel outstanding update work.");
+    Assert.Contains(source, "if (_isClosed)", "Asynchronous continuations should guard against writing to a closed window.");
 }
 
 static void SettingsWindowExposesShortcutLauncherManagement()

@@ -15,7 +15,9 @@ public partial class SettingsWindow : Window, ISettingsWindow
     private readonly ShortcutLauncher _shortcutLauncher;
     private readonly IReadOnlyList<SettingDefinition> _definitions;
     private readonly Dictionary<string, WpfControls.CheckBox> _switches = new(StringComparer.Ordinal);
+    private readonly CancellationTokenSource _lifetimeCancellation = new();
     private bool _updatingThemeChoice;
+    private bool _isClosed;
 
     public SettingsWindow(
         MenuCommandService commands,
@@ -443,7 +445,12 @@ public partial class SettingsWindow : Window, ISettingsWindow
         UpdateStatusText.Text = "正在检查更新...";
         try
         {
-            var result = await _updates.CheckAsync(manual: true);
+            var result = await _updates.CheckAsync(manual: true, _lifetimeCancellation.Token);
+            if (_isClosed)
+            {
+                return;
+            }
+
             UpdateStatusText.Text = GetUpdateStatusText(result);
             if (result.Status == UpdateCheckStatus.Available && result.AvailableUpdate is not null)
             {
@@ -452,7 +459,10 @@ public partial class SettingsWindow : Window, ISettingsWindow
         }
         finally
         {
-            CheckForUpdatesButton.IsEnabled = true;
+            if (!_isClosed)
+            {
+                CheckForUpdatesButton.IsEnabled = true;
+            }
         }
     }
 
@@ -477,10 +487,25 @@ public partial class SettingsWindow : Window, ISettingsWindow
             return;
         }
 
-        var progress = new Progress<int>(value => UpdateStatusText.Text = $"正在下载更新 {value}%");
-        if (!await _updates.DownloadUpdatesAsync(update, progress))
+        var progress = new Progress<int>(value =>
         {
-            UpdateStatusText.Text = "下载失败，请稍后重试";
+            if (!_isClosed)
+            {
+                UpdateStatusText.Text = $"正在下载更新 {value}%";
+            }
+        });
+        if (!await _updates.DownloadUpdatesAsync(update, progress, _lifetimeCancellation.Token))
+        {
+            if (!_isClosed)
+            {
+                UpdateStatusText.Text = "下载失败，请稍后重试";
+            }
+
+            return;
+        }
+
+        if (_isClosed)
+        {
             return;
         }
 
@@ -503,11 +528,19 @@ public partial class SettingsWindow : Window, ISettingsWindow
 
     private void OnSettingsWindowClosed(object? sender, EventArgs e)
     {
+        if (_isClosed)
+        {
+            return;
+        }
+
+        _isClosed = true;
+        _lifetimeCancellation.Cancel();
         _commands.SettingsChanged -= OnSettingsChanged;
         _shortcutService.Changed -= OnShortcutsChanged;
         SourceInitialized -= OnSourceInitialized;
         Activated -= OnSettingsWindowActivated;
         Closed -= OnSettingsWindowClosed;
+        _lifetimeCancellation.Dispose();
     }
 
     private sealed record ShortcutListItem(
