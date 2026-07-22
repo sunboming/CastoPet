@@ -12,7 +12,9 @@ public sealed class TrayService : IDisposable
     private readonly MenuCommandService _commands;
     private readonly Drawing.Icon _applicationIcon;
     private readonly Forms.NotifyIcon _notifyIcon;
+    private readonly Forms.ContextMenuStrip _contextMenu;
     private readonly IReadOnlyList<(SettingDefinition Definition, Forms.ToolStripMenuItem Item)> _settingItems;
+    private bool _disposed;
 
     public TrayService(MenuCommandService commands)
     {
@@ -22,23 +24,23 @@ public sealed class TrayService : IDisposable
             .Select(definition => (definition, CreateCheckedItem(definition.Label, definition.Toggle)))
             .ToArray();
 
-        var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add(ShowOrRestoreText, null, (_, _) => _commands.ShowOrRestore());
-        menu.Items.Add(new Forms.ToolStripSeparator());
+        _contextMenu = new Forms.ContextMenuStrip();
+        _contextMenu.Items.Add(ShowOrRestoreText, null, (_, _) => _commands.ShowOrRestore());
+        _contextMenu.Items.Add(new Forms.ToolStripSeparator());
         foreach (var (_, item) in _settingItems)
         {
-            menu.Items.Add(item);
+            _contextMenu.Items.Add(item);
         }
-        menu.Items.Add(SettingsText, null, (_, _) => _commands.ShowSettings());
-        menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add(ExitText, null, (_, _) => _commands.Exit());
+        _contextMenu.Items.Add(SettingsText, null, (_, _) => _commands.ShowSettings());
+        _contextMenu.Items.Add(new Forms.ToolStripSeparator());
+        _contextMenu.Items.Add(ExitText, null, (_, _) => _commands.Exit());
 
         _applicationIcon = ApplicationIconService.LoadTrayIcon();
         _notifyIcon = new Forms.NotifyIcon
         {
             Text = "CastoPet",
             Icon = _applicationIcon,
-            ContextMenuStrip = menu,
+            ContextMenuStrip = _contextMenu,
             Visible = true,
         };
 
@@ -64,9 +66,17 @@ public sealed class TrayService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _commands.SettingsChanged -= RefreshChecks;
         _notifyIcon.Visible = false;
+        _notifyIcon.ContextMenuStrip = null;
         _notifyIcon.Dispose();
+        _contextMenu.Dispose();
         _applicationIcon.Dispose();
     }
 }

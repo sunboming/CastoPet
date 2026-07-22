@@ -44,6 +44,7 @@ var tests = new (string Name, Action Test)[]
     ("Project pins semantic version and Velopack", ProjectPinsSemanticVersionAndVelopack),
     ("Application defines packaged icon", ApplicationDefinesPackagedIcon),
     ("Application surfaces share one icon", ApplicationSurfacesShareOneIcon),
+    ("Tray service disposes owned menu resources", TrayServiceDisposesOwnedMenuResources),
     ("Settings window avoids a duplicate taskbar entry", SettingsWindowAvoidsDuplicateTaskbarEntry),
     ("Continuous integration builds both configurations", ContinuousIntegrationBuildsBothConfigurations),
     ("Repository ignores local working assets", RepositoryIgnoresLocalWorkingAssets),
@@ -805,6 +806,17 @@ static void ApplicationSurfacesShareOneIcon()
     Assert.Contains(iconService, "/CastoPet;component/Assets/AppIcon.ico", "The tray icon service should load the icon from the CastoPet assembly.");
     using var trayIcon = ApplicationIconService.LoadTrayIcon();
     Assert.True(trayIcon.Width > 0 && trayIcon.Height > 0, "The packaged icon should decode for the notification area at runtime.");
+}
+
+static void TrayServiceDisposesOwnedMenuResources()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "TrayService.cs"));
+
+    Assert.Contains(source, "Forms.ContextMenuStrip _contextMenu", "TrayService should retain ownership of its native menu component.");
+    Assert.Contains(source, "_notifyIcon.ContextMenuStrip = null;", "TrayService should detach the menu before disposing native components.");
+    Assert.Contains(source, "_contextMenu.Dispose();", "TrayService should explicitly release its context menu and item handles.");
+    Assert.Contains(source, "if (_disposed)", "TrayService disposal should be idempotent.");
 }
 
 static void SettingsWindowAvoidsDuplicateTaskbarEntry()
