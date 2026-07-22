@@ -12,6 +12,9 @@ public readonly record struct RadialWheelSelection(RadialWheelRing Ring, int Sec
 
 public static class RadialWheelSelector
 {
+    public static int GetCategoryIndex(double pointerX, double pointerY, int categoryCount) =>
+        GetSectorIndex(pointerX, pointerY, categoryCount);
+
     public static RadialWheelSelection GetSelection(
         double pointerX,
         double pointerY,

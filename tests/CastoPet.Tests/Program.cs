@@ -118,6 +118,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window follows live wheel catalog snapshots", PetWindowFollowsLiveWheelCatalogSnapshots),
     ("Radial wheel selector distinguishes all pointer regions", RadialWheelSelectorDistinguishesAllPointerRegions),
     ("Radial wheel second ring stays with category direction", RadialWheelSecondRingStaysWithCategoryDirection),
+    ("Radial wheel fast outward motion opens second level", RadialWheelFastOutwardMotionOpensSecondLevel),
     ("Radial wheel controller honors category dwell", RadialWheelControllerHonorsCategoryDwell),
     ("Radial wheel tolerates slight outer overshoot", RadialWheelToleratesSlightOuterOvershoot),
     ("Radial wheel controller resets and collapses state", RadialWheelControllerResetsAndCollapsesState),
@@ -2109,6 +2110,22 @@ static void RadialWheelSecondRingStaysWithCategoryDirection()
     controller.UpdatePointer(170, 0, now + WheelCatalog.CategoryDwellDelay + TimeSpan.FromMilliseconds(1));
     Assert.True(controller.IsOpen, "Crossing the opposite outer side should not abruptly close the wheel.");
     Assert.Equal(-1, controller.SelectedSecondLevelIndex, "The opposite side should clear submenu selection.");
+}
+
+static void RadialWheelFastOutwardMotionOpensSecondLevel()
+{
+    var controller = new RadialWheelController(CreateWheelCatalog(8));
+    var now = DateTimeOffset.UtcNow;
+    controller.Open(now);
+
+    controller.UpdatePointer(-170, 0, now);
+    Assert.Equal(1, controller.SelectedCategoryIndex, "A direct jump to the left outer ring should infer the left category.");
+    Assert.False(controller.IsSecondLevelOpen, "The inferred category should still respect dwell timing.");
+
+    controller.UpdatePointer(-170, 0, now + WheelCatalog.CategoryDwellDelay);
+    Assert.True(controller.IsSecondLevelOpen, "Holding in the outer ring after a fast jump should open level two.");
+    Assert.Equal(1, controller.SelectedCategoryIndex, "The inferred category should remain selected after opening.");
+    Assert.True(controller.SelectedSecondLevelIndex >= 0, "The current outer pointer should select an item immediately after opening.");
 }
 
 static void RadialWheelControllerHonorsCategoryDwell()

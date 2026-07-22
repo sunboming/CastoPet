@@ -64,6 +64,22 @@ public sealed class RadialWheelController
                 UpdateCategoryDwell(selection.SectorIndex, now);
                 break;
             case RadialWheelRing.Second:
+                if (!IsSecondLevelOpen)
+                {
+                    UpdateCategoryDwell(
+                        RadialWheelSelector.GetCategoryIndex(pointerX, pointerY, catalog.Categories.Count),
+                        now);
+                    if (IsSecondLevelOpen)
+                    {
+                        selection = RadialWheelSelector.GetSelection(
+                            pointerX,
+                            pointerY,
+                            catalog.Categories.Count,
+                            VisibleSecondLevelItems.Count,
+                            SelectedCategoryIndex);
+                    }
+                }
+
                 SelectedSecondLevelIndex = IsSecondLevelOpen ? selection.SectorIndex : -1;
                 break;
             case RadialWheelRing.Outside:
