@@ -159,6 +159,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
     ("Pet window applies per-frame action durations", PetWindowAppliesPerFrameActionDurations),
     ("Pet window schedules directional turns at render priority", PetWindowSchedulesDirectionalTurnsAtRenderPriority),
+    ("Pet window retains cursor-push target ownership for the movement session", PetWindowRetainsCursorPushTargetOwnershipForMovementSession),
     ("Pet window releases runtime resources on close", PetWindowReleasesRuntimeResourcesOnClose),
     ("Pet window detaches context menu subscriptions", PetWindowDetachesContextMenuSubscriptions),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
@@ -3066,6 +3067,17 @@ static void PetWindowSchedulesDirectionalTurnsAtRenderPriority()
         source,
         "new DispatcherTimer(DispatcherPriority.Render) { Interval = DefaultTurnFrameInterval }",
         "Directional turn frames should not be starved behind continuous composition rendering.");
+}
+
+static void PetWindowRetainsCursorPushTargetOwnershipForMovementSession()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(source, "bool _cursorPushOwnsMovementTarget", "Cursor push should track target ownership separately from its duration timer.");
+    Assert.Contains(source, "&& _cursorPushOwnsMovementTarget", "Mouse target resolution should retain the active target for the owned movement session.");
+    Assert.Contains(source, "_cursorPushOwnsMovementTarget = true;", "A successful programmatic cursor push should claim target ownership.");
+    Assert.Contains(source, "_cursorPushOwnsMovementTarget = false;", "Stopping or manual cursor movement should release target ownership.");
 }
 
 static void PetWindowReleasesRuntimeResourcesOnClose()

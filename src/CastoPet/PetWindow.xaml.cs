@@ -101,6 +101,7 @@ public partial class PetWindow : Window
     private bool _activeExpressionUsesSpecificTransition;
     private TimeSpan? _lastManualCursorMovementTime;
     private TimeSpan? _cursorPushStartedAt;
+    private bool _cursorPushOwnsMovementTarget;
     private int _activeMovementVisualDirection;
     private bool _dragMovementVisualApplied;
     private double? _expectedCursorX;
@@ -1135,6 +1136,7 @@ public partial class PetWindow : Window
         _expectedCursorX = null;
         _expectedCursorY = null;
         _cursorPushStartedAt = null;
+        _cursorPushOwnsMovementTarget = false;
     }
 
     private void OnActiveMovementRendering(object? sender, EventArgs e)
@@ -1172,7 +1174,7 @@ public partial class PetWindow : Window
         if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
         {
             var retainMouseTarget = _movementController.HasTarget
-                && _cursorPushStartedAt is not null
+                && _cursorPushOwnsMovementTarget
                 && _expectedCursorX is double expectedCursorX
                 && _expectedCursorY is double expectedCursorY
                 && !CursorNudgePlanner.IsManualMovement(
@@ -1289,6 +1291,7 @@ public partial class PetWindow : Window
             _expectedCursorX = null;
             _expectedCursorY = null;
             _cursorPushStartedAt = null;
+            _cursorPushOwnsMovementTarget = false;
             return;
         }
 
@@ -1301,6 +1304,7 @@ public partial class PetWindow : Window
             _expectedCursorX = cursor.X;
             _expectedCursorY = cursor.Y;
             _cursorPushStartedAt = null;
+            _cursorPushOwnsMovementTarget = false;
             return;
         }
 
@@ -1338,6 +1342,7 @@ public partial class PetWindow : Window
         _cursorService.SetPosition(devicePoint.X, devicePoint.Y);
         _expectedCursorX = result.X;
         _expectedCursorY = result.Y;
+        _cursorPushOwnsMovementTarget = true;
     }
 
     private WpfPoint ToDevicePoint(WpfPoint point)
