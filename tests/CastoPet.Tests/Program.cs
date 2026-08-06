@@ -184,6 +184,7 @@ var tests = new (string Name, Action Test)[]
     ("Input reactive mode suppresses passive animation", InputReactiveModeSuppressesPassiveAnimation),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
+    ("Movement planner retains target while the pet pushes the cursor", MovementPlannerRetainsTargetWhilePetPushesCursor),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
     ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
     ("Movement planner detects mouse approach rest position", MovementPlannerDetectsMouseApproachRestPosition),
@@ -3424,6 +3425,43 @@ static void MovementPlannerApproachesMouseWithCursorOffset()
     Assert.True(distance >= PetMovementPlanner.MinMouseApproachOffset, "Target should not cover the cursor.");
     Assert.True(distance <= PetMovementPlanner.MaxMouseApproachOffset, "Target should stop close to the cursor.");
     Assert.True(target.Left > 100, "Target should move toward the mouse.");
+}
+
+static void MovementPlannerRetainsTargetWhilePetPushesCursor()
+{
+    var bounds = new PetMovementBounds(0, 0, 800, 600);
+    var activeTarget = PetMovementPlanner.CalculateMouseApproachTarget(
+        petLeft: 100,
+        petTop: 100,
+        petWidth: 100,
+        petHeight: 100,
+        mouseX: 160,
+        mouseY: 150,
+        bounds);
+    var recalculatedAcrossCenter = PetMovementPlanner.CalculateMouseApproachTarget(
+        petLeft: 100,
+        petTop: 100,
+        petWidth: 100,
+        petHeight: 100,
+        mouseX: 149,
+        mouseY: 150,
+        bounds);
+
+    Assert.True(activeTarget.Left < 100, "The initial close cursor position should produce a left-side approach target.");
+    Assert.True(recalculatedAcrossCenter.Left > 100, "A pushed cursor crossing the pet center would otherwise flip the target right.");
+
+    var retained = PetMovementPlanner.ResolveMouseApproachTarget(
+        petLeft: 100,
+        petTop: 100,
+        petWidth: 100,
+        petHeight: 100,
+        mouseX: 149,
+        mouseY: 150,
+        bounds,
+        activeTarget,
+        retainActiveTarget: true);
+
+    Assert.Equal(activeTarget, retained, "Programmatic cursor movement must not reverse the active approach target.");
 }
 
 static void MovementPlannerEasesTowardTarget()

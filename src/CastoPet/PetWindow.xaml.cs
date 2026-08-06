@@ -1171,14 +1171,28 @@ public partial class PetWindow : Window
 
         if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
         {
-            var mouseApproachTarget = PetMovementPlanner.CalculateMouseApproachTarget(
+            var retainMouseTarget = _movementController.HasTarget
+                && _cursorPushStartedAt is not null
+                && _expectedCursorX is double expectedCursorX
+                && _expectedCursorY is double expectedCursorY
+                && !CursorNudgePlanner.IsManualMovement(
+                    cursor.X,
+                    cursor.Y,
+                    expectedCursorX,
+                    expectedCursorY);
+            var activeMouseTarget = _movementController.HasTarget
+                ? _movementController.Target
+                : (PetMovementTarget?)null;
+            var mouseApproachTarget = PetMovementPlanner.ResolveMouseApproachTarget(
                 Left,
                 Top,
                 width,
                 height,
                 cursor.X,
                 cursor.Y,
-                bounds);
+                bounds,
+                activeMouseTarget,
+                retainMouseTarget);
             if (PetMovementPlanner.IsClose(Left, Top, mouseApproachTarget))
             {
                 if (_movementController.HasTarget)
