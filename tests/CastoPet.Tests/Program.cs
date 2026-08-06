@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Resources;
 using CastoPet.Core;
 
 var tests = new (string Name, Action Test)[]
@@ -71,6 +72,7 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice idle action preserves current frames", BuiltInCastoriceIdleActionPreservesCurrentFrames),
     ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
     ("Built-in Castorice defines separate directional movement actions", BuiltInCastoriceDefinesSeparateDirectionalMovementActions),
+    ("Built-in directional frames are embedded WPF resources", BuiltInDirectionalFramesAreEmbeddedWpfResources),
     ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
     ("Built-in Castorice defines optional petting action", BuiltInCastoriceDefinesOptionalPettingAction),
     ("Built-in petting frames are packaged and clean", BuiltInPettingFramesArePackagedAndClean),
@@ -1177,6 +1179,32 @@ static void BuiltInCastoriceDefinesSeparateDirectionalMovementActions()
     Assert.Equal("Assets/Runtime/Castorice/States/MoveRight/Castorice.MoveRight.00.png", moveRight.FramePaths[0], "Right movement should keep its own accessory direction.");
     Assert.Equal(TimeSpan.FromMilliseconds(66.66666666666667), turnLeft.FrameInterval, "Turn timing should preserve the extracted 15 FPS cadence.");
     Assert.Equal(TimeSpan.FromMilliseconds(66.66666666666667), turnRight.FrameInterval, "Both physical turns should use the same cadence.");
+}
+
+static void BuiltInDirectionalFramesAreEmbeddedWpfResources()
+{
+    var assembly = typeof(BuiltInPetSkins).Assembly;
+    var resourceName = assembly.GetManifestResourceNames()
+        .Single(name => name.EndsWith(".g.resources", StringComparison.Ordinal));
+    using var stream = assembly.GetManifestResourceStream(resourceName)
+        ?? throw new InvalidOperationException($"WPF resource stream {resourceName} is missing.");
+    using var reader = new ResourceReader(stream);
+    var resourcePaths = reader
+        .Cast<System.Collections.DictionaryEntry>()
+        .Select(entry => entry.Key?.ToString() ?? string.Empty)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var expected = new[]
+    {
+        "assets/runtime/castorice/states/moveleft/castorice.moveleft.00.png",
+        "assets/runtime/castorice/states/moveright/castorice.moveright.00.png",
+        "assets/runtime/castorice/states/turnleft/castorice.turnleft.00.png",
+        "assets/runtime/castorice/states/turnright/castorice.turnright.00.png",
+    };
+    foreach (var path in expected)
+    {
+        Assert.True(resourcePaths.Contains(path), $"Debug output should embed directional WPF resource {path}.");
+    }
 }
 
 static void BuiltInCastoriceBlinkActionPreservesSchedule()
