@@ -20,6 +20,7 @@ public partial class PetWindow : Window
     private static readonly TimeSpan DefaultIdleFrameInterval = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan DefaultBlinkFrameInterval = TimeSpan.FromMilliseconds(90);
     private static readonly TimeSpan DefaultPettingFrameInterval = TimeSpan.FromMilliseconds(80);
+    private static readonly TimeSpan DefaultTurnFrameInterval = TimeSpan.FromMilliseconds(66.66666666666667);
     private static readonly TimeSpan DefaultExpressionTransitionFrameInterval = TimeSpan.FromMilliseconds(55);
     private static readonly TimeSpan DefaultBlinkMinScheduleDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan DefaultBlinkMaxScheduleDelay = TimeSpan.FromSeconds(7);
@@ -35,6 +36,7 @@ public partial class PetWindow : Window
     private readonly PetRuntimeState _runtimeState = new();
     private readonly PetAnimationController _animationController = new();
     private readonly PetMovementController _movementController;
+    private readonly PetDirectionalMovementAnimator _directionalMovementAnimator = new();
     private readonly ImageSource _defaultCharacter;
     private readonly ImageSource _draggingCharacter;
     private readonly IReadOnlyList<ImageSource> _idleFrames;
@@ -49,9 +51,14 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _temporaryExpressionTimer;
     private readonly DispatcherTimer _expressionTransitionFrameTimer;
     private readonly DispatcherTimer _activeMovementProbeTimer;
+    private readonly DispatcherTimer _turnFrameTimer;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
     private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
     private readonly IReadOnlyList<ImageSource> _moveFrames;
+    private readonly IReadOnlyList<ImageSource> _moveLeftFrames;
+    private readonly IReadOnlyList<ImageSource> _moveRightFrames;
+    private readonly IReadOnlyList<ImageSource> _turnLeftFrames;
+    private readonly IReadOnlyList<ImageSource> _turnRightFrames;
     private readonly IReadOnlyDictionary<string, PetExpressionAsset> _expressionAssetsById;
     private readonly WheelCatalogService _wheelCatalogService;
     private readonly PetInteractionCoordinator _interactions;
@@ -61,6 +68,8 @@ public partial class PetWindow : Window
     private readonly ImageSource? _inputReactiveBase;
     private readonly PetActionDefinition _idleAction;
     private readonly PetActionDefinition _moveAction;
+    private readonly PetActionDefinition? _turnLeftAction;
+    private readonly PetActionDefinition? _turnRightAction;
     private readonly PetActionDefinition _blinkAction;
     private readonly PetActionDefinition? _pettingAction;
     private readonly PetActionDefinition? _expressionTransitionInAction;
@@ -161,6 +170,12 @@ public partial class PetWindow : Window
         _idleAction = assets.Skin.GetRequiredAction(PetActionKind.Idle);
         _moveAction = assets.Skin.GetRequiredAction(PetActionKind.Move);
         _movementController = new PetMovementController(_moveAction);
+        _turnLeftAction = assets.Skin.TryGetAction(PetActionKind.TurnLeft, out var turnLeftAction)
+            ? turnLeftAction
+            : null;
+        _turnRightAction = assets.Skin.TryGetAction(PetActionKind.TurnRight, out var turnRightAction)
+            ? turnRightAction
+            : null;
         _blinkAction = assets.Skin.GetRequiredAction(PetActionKind.Blink);
         _pettingAction = assets.Skin.TryGetAction(PetActionKind.Petting, out var pettingAction)
             ? pettingAction
@@ -189,6 +204,8 @@ public partial class PetWindow : Window
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
         _activeMovementProbeTimer = new DispatcherTimer { Interval = PetAnimationTimings.ActiveMovementProbeInterval };
         _activeMovementProbeTimer.Tick += (_, _) => ProbeActiveMovement();
+        _turnFrameTimer = new DispatcherTimer { Interval = DefaultTurnFrameInterval };
+        _turnFrameTimer.Tick += (_, _) => AdvanceTurnFrame();
         _inputReactiveRenderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _inputReactiveRenderTimer.Tick += (_, _) => RenderInputReactiveHighlights();
         _inputHookService.InputReceived += OnInputReactiveInputReceived;
@@ -208,6 +225,12 @@ public partial class PetWindow : Window
             _blinkFrames = assets.LoadBlinkFrames();
             _pettingFrames = assets.LoadPettingFrames();
             _moveFrames = assets.LoadMoveFrames();
+            var moveLeftFrames = assets.LoadMoveLeftFrames();
+            var moveRightFrames = assets.LoadMoveRightFrames();
+            _moveLeftFrames = moveLeftFrames.Count > 0 ? moveLeftFrames : _moveFrames;
+            _moveRightFrames = moveRightFrames.Count > 0 ? moveRightFrames : _moveFrames;
+            _turnLeftFrames = assets.LoadTurnLeftFrames();
+            _turnRightFrames = assets.LoadTurnRightFrames();
             _inputReactiveBase = assets.TryLoadInputReactiveBase();
             _expressionTransitionInFrames = assets.LoadExpressionTransitionInFrames();
             _expressionTransitionOutFrames = assets.LoadExpressionTransitionOutFrames();
@@ -222,6 +245,10 @@ public partial class PetWindow : Window
             _blinkFrames = Array.Empty<ImageSource>();
             _pettingFrames = Array.Empty<ImageSource>();
             _moveFrames = Array.Empty<ImageSource>();
+            _moveLeftFrames = Array.Empty<ImageSource>();
+            _moveRightFrames = Array.Empty<ImageSource>();
+            _turnLeftFrames = Array.Empty<ImageSource>();
+            _turnRightFrames = Array.Empty<ImageSource>();
             _inputReactiveBase = null;
             _expressionTransitionInFrames = Array.Empty<ImageSource>();
             _expressionTransitionOutFrames = Array.Empty<ImageSource>();
@@ -293,6 +320,7 @@ public partial class PetWindow : Window
         _temporaryExpressionTimer.Stop();
         _expressionTransitionFrameTimer.Stop();
         _activeMovementProbeTimer.Stop();
+        _turnFrameTimer.Stop();
         _inputReactiveRenderTimer.Stop();
 
         RadialWheelOverlay.IsOpen = false;
@@ -842,6 +870,7 @@ public partial class PetWindow : Window
         StopInputReactiveMode(restoreIdle: false);
         StopActiveMovementRendering();
         _movementController.CancelTarget();
+        CancelDirectionalMovement();
         _isDragging = true;
         _dragRestoreTimer.Stop();
         StopIdleAnimation();
@@ -1155,9 +1184,7 @@ public partial class PetWindow : Window
                 if (_movementController.HasTarget)
                 {
                     _movementController.CompleteTarget(DateTime.UtcNow);
-                    ResetMoveFrameState();
-                    ResetActiveMovementVisual();
-                    ScheduleNextBlink();
+                    FinishDirectionalMovement();
                 }
 
                 StopActiveMovementRendering();
@@ -1181,6 +1208,7 @@ public partial class PetWindow : Window
         if (!_movementController.HasTarget)
         {
             ResetActiveMovementVisual();
+            BeginReturnToFront();
             StopActiveMovementRendering();
             return;
         }
@@ -1188,10 +1216,14 @@ public partial class PetWindow : Window
         if (PetMovementPlanner.IsClose(Left, Top, _movementController.Target))
         {
             _movementController.CompleteTarget(DateTime.UtcNow);
-            ResetMoveFrameState();
-            ResetActiveMovementVisual();
-            ScheduleNextBlink();
+            FinishDirectionalMovement();
             StopActiveMovementRendering();
+            return;
+        }
+
+        var requestedDirection = ResolveMovementDirection(_movementController.Target.Left - Left);
+        if (EnsureMovementFacing(requestedDirection))
+        {
             return;
         }
 
@@ -1204,15 +1236,14 @@ public partial class PetWindow : Window
         Left = Math.Round(movement.Value.NextLeft);
         Top = Math.Round(movement.Value.NextTop);
         _runtimeState.SetRuntimePosition(Left, Top);
-        AdvanceMoveFrame(movement.Value.Distance);
+        AdvanceMoveFrame(movement.Value.Distance, ResolveMovementDirection(movement.Value.DeltaX));
         ApplyActiveMovementVisual();
         TryPushCursor(renderingTime, movement.Value.DeltaX, movement.Value.DeltaY);
 
         if (PetMovementPlanner.IsClose(Left, Top, _movementController.Target))
         {
             _movementController.CompleteTarget(DateTime.UtcNow);
-            ResetMoveFrameState();
-            ScheduleNextBlink();
+            FinishDirectionalMovement();
             StopActiveMovementRendering();
         }
     }
@@ -1321,23 +1352,177 @@ public partial class PetWindow : Window
         StopBlinkAnimation();
     }
 
-    private void AdvanceMoveFrame(double distance)
+    private void AdvanceMoveFrame(double distance, PetHorizontalDirection direction)
     {
-        if (_moveFrames.Count == 0 || distance <= 0)
+        var frames = GetMoveFrames(direction);
+        if (frames.Count == 0 || distance <= 0)
         {
             return;
         }
 
-        var frame = _movementController.AdvanceMoveFrame(distance, _moveFrames.Count);
+        var frame = _movementController.AdvanceMoveFrame(distance, frames.Count);
         if (frame.Changed)
         {
-            CharacterImage.Source = _moveFrames[frame.FrameIndex];
+            CharacterImage.Source = frames[frame.FrameIndex];
         }
+    }
+
+    private bool EnsureMovementFacing(PetHorizontalDirection direction)
+    {
+        var turnFrames = GetTurnFrames(direction);
+        if (turnFrames.Count == 0)
+        {
+            return false;
+        }
+
+        if (!_directionalMovementAnimator.RequestDirection(direction, turnFrames.Count))
+        {
+            return false;
+        }
+
+        ShowCurrentTurnFrame();
+        StartTurnTimer();
+        return true;
+    }
+
+    private void AdvanceTurnFrame()
+    {
+        if (!_directionalMovementAnimator.IsTurning)
+        {
+            _turnFrameTimer.Stop();
+            return;
+        }
+
+        var frames = GetTurnFrames(_directionalMovementAnimator.TurnDirection);
+        if (frames.Count == 0)
+        {
+            CancelDirectionalMovement();
+            RestoreIdleAfterDirectionalMovement();
+            return;
+        }
+
+        _directionalMovementAnimator.Advance(frames.Count);
+        if (_directionalMovementAnimator.IsTurning)
+        {
+            ShowCurrentTurnFrame();
+            StartTurnTimer();
+            return;
+        }
+
+        _turnFrameTimer.Stop();
+        if (_movementController.HasTarget && _directionalMovementAnimator.Facing != PetFacingDirection.Front)
+        {
+            var direction = _directionalMovementAnimator.Facing == PetFacingDirection.Left
+                ? PetHorizontalDirection.Left
+                : PetHorizontalDirection.Right;
+            var moveFrames = GetMoveFrames(direction);
+            if (moveFrames.Count > 0)
+            {
+                CharacterImage.Source = moveFrames[_movementController.MoveFrameIndex % moveFrames.Count];
+            }
+
+            return;
+        }
+
+        RestoreIdleAfterDirectionalMovement();
+    }
+
+    private void FinishDirectionalMovement()
+    {
+        _movementController.ResetMoveFrames();
+        ResetActiveMovementVisual();
+        BeginReturnToFront();
+        ScheduleNextBlink();
+    }
+
+    private void BeginReturnToFront()
+    {
+        var currentDirection = _directionalMovementAnimator.Facing == PetFacingDirection.Left
+            ? PetHorizontalDirection.Left
+            : PetHorizontalDirection.Right;
+        var frames = GetTurnFrames(currentDirection);
+        if (!_directionalMovementAnimator.RequestFront(frames.Count))
+        {
+            RestoreIdleAfterDirectionalMovement();
+            return;
+        }
+
+        ShowCurrentTurnFrame();
+        StartTurnTimer();
+    }
+
+    private void StartTurnTimer()
+    {
+        var action = _directionalMovementAnimator.TurnDirection == PetHorizontalDirection.Left
+            ? _turnLeftAction
+            : _turnRightAction;
+        _turnFrameTimer.Interval = PetFrameTiming.GetDuration(
+            action,
+            _directionalMovementAnimator.FrameIndex,
+            DefaultTurnFrameInterval);
+        if (!_turnFrameTimer.IsEnabled)
+        {
+            _turnFrameTimer.Start();
+        }
+    }
+
+    private void ShowCurrentTurnFrame()
+    {
+        var frames = GetTurnFrames(_directionalMovementAnimator.TurnDirection);
+        if (_directionalMovementAnimator.FrameIndex >= 0 &&
+            _directionalMovementAnimator.FrameIndex < frames.Count)
+        {
+            CharacterImage.Source = frames[_directionalMovementAnimator.FrameIndex];
+        }
+    }
+
+    private IReadOnlyList<ImageSource> GetMoveFrames(PetHorizontalDirection direction)
+    {
+        return direction == PetHorizontalDirection.Left ? _moveLeftFrames : _moveRightFrames;
+    }
+
+    private IReadOnlyList<ImageSource> GetTurnFrames(PetHorizontalDirection direction)
+    {
+        return direction == PetHorizontalDirection.Left ? _turnLeftFrames : _turnRightFrames;
+    }
+
+    private PetHorizontalDirection ResolveMovementDirection(double deltaX)
+    {
+        if (deltaX < -0.001)
+        {
+            return PetHorizontalDirection.Left;
+        }
+
+        if (deltaX > 0.001)
+        {
+            return PetHorizontalDirection.Right;
+        }
+
+        return _directionalMovementAnimator.Facing == PetFacingDirection.Left
+            ? PetHorizontalDirection.Left
+            : PetHorizontalDirection.Right;
+    }
+
+    private void RestoreIdleAfterDirectionalMovement()
+    {
+        if (!_isDragging && !_temporaryExpressionTimer.IsEnabled &&
+            _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None)
+        {
+            CharacterImage.Source = GetCurrentIdleFrame();
+            StartIdleAnimation();
+        }
+    }
+
+    private void CancelDirectionalMovement()
+    {
+        _turnFrameTimer.Stop();
+        _directionalMovementAnimator.Reset();
     }
 
     private void ResetMoveFrameState()
     {
         _movementController.ResetMoveFrames();
+        CancelDirectionalMovement();
 
         if (!_isDragging && !_temporaryExpressionTimer.IsEnabled &&
             _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None)

@@ -92,6 +92,10 @@ public static class PetSkinManifestWriter
         {
             PetActionKind.Idle => "idle",
             PetActionKind.Move => "move",
+            PetActionKind.MoveLeft => "move-left",
+            PetActionKind.MoveRight => "move-right",
+            PetActionKind.TurnLeft => "turn-left",
+            PetActionKind.TurnRight => "turn-right",
             PetActionKind.Blink => "blink",
             PetActionKind.Petting => "petting",
             PetActionKind.ExpressionTransitionIn => "expression-transition-in",

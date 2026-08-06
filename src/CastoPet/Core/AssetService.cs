@@ -60,6 +60,26 @@ public sealed class AssetService
         return LoadActionFrames(PetActionKind.Move, "Move frames");
     }
 
+    public IReadOnlyList<ImageSource> LoadMoveLeftFrames()
+    {
+        return LoadOptionalActionFrames(PetActionKind.MoveLeft, "Left move frames");
+    }
+
+    public IReadOnlyList<ImageSource> LoadMoveRightFrames()
+    {
+        return LoadOptionalActionFrames(PetActionKind.MoveRight, "Right move frames");
+    }
+
+    public IReadOnlyList<ImageSource> LoadTurnLeftFrames()
+    {
+        return LoadOptionalActionFrames(PetActionKind.TurnLeft, "Left turn frames");
+    }
+
+    public IReadOnlyList<ImageSource> LoadTurnRightFrames()
+    {
+        return LoadOptionalActionFrames(PetActionKind.TurnRight, "Right turn frames");
+    }
+
     public IReadOnlyList<ImageSource> LoadPettingFrames()
     {
         return LoadOptionalActionFrames(PetActionKind.Petting, "Petting frames");

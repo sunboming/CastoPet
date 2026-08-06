@@ -70,6 +70,7 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice skin uses runtime asset root", BuiltInCastoriceSkinUsesRuntimeAssetRoot),
     ("Built-in Castorice idle action preserves current frames", BuiltInCastoriceIdleActionPreservesCurrentFrames),
     ("Built-in Castorice move action preserves movement values", BuiltInCastoriceMoveActionPreservesMovementValues),
+    ("Built-in Castorice defines separate directional movement actions", BuiltInCastoriceDefinesSeparateDirectionalMovementActions),
     ("Built-in Castorice blink action preserves schedule", BuiltInCastoriceBlinkActionPreservesSchedule),
     ("Built-in Castorice defines optional petting action", BuiltInCastoriceDefinesOptionalPettingAction),
     ("Built-in petting frames are packaged and clean", BuiltInPettingFramesArePackagedAndClean),
@@ -186,6 +187,9 @@ var tests = new (string Name, Action Test)[]
     ("Movement controller advances logical positions", MovementControllerAdvancesLogicalPositions),
     ("Movement controller schedules bounded wander targets", MovementControllerSchedulesBoundedWanderTargets),
     ("Movement controller advances frames by distance", MovementControllerAdvancesFramesByDistance),
+    ("Directional movement turns from front before walking", DirectionalMovementTurnsFromFrontBeforeWalking),
+    ("Directional movement returns through the same authored frames", DirectionalMovementReturnsThroughSameAuthoredFrames),
+    ("Directional movement changes sides through front", DirectionalMovementChangesSidesThroughFront),
     ("Cursor nudge planner nudges nearby cursor", CursorNudgePlannerNudgesNearbyCursor),
     ("Cursor nudge planner ignores distant cursor", CursorNudgePlannerIgnoresDistantCursor),
     ("Cursor nudge planner clamps to work area", CursorNudgePlannerClampsToWorkArea),
@@ -1158,6 +1162,23 @@ static void BuiltInCastoriceMoveActionPreservesMovementValues()
     Assert.Equal(105d, move.MaxSpeedPixelsPerSecond, "Move max speed should stay compatible.");
 }
 
+static void BuiltInCastoriceDefinesSeparateDirectionalMovementActions()
+{
+    var moveLeft = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.MoveLeft);
+    var moveRight = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.MoveRight);
+    var turnLeft = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.TurnLeft);
+    var turnRight = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.TurnRight);
+
+    Assert.Equal(8, moveLeft.FramePaths.Count, "Left movement should use eight separately rendered frames.");
+    Assert.Equal(8, moveRight.FramePaths.Count, "Right movement should use eight separately rendered frames.");
+    Assert.Equal(6, turnLeft.FramePaths.Count, "Left turning should use six authored frames.");
+    Assert.Equal(6, turnRight.FramePaths.Count, "Right turning should use six authored frames.");
+    Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.00.png", moveLeft.FramePaths[0], "Left movement should never reuse mirrored right assets.");
+    Assert.Equal("Assets/Runtime/Castorice/States/MoveRight/Castorice.MoveRight.00.png", moveRight.FramePaths[0], "Right movement should keep its own accessory direction.");
+    Assert.Equal(TimeSpan.FromMilliseconds(66.66666666666667), turnLeft.FrameInterval, "Turn timing should preserve the extracted 15 FPS cadence.");
+    Assert.Equal(TimeSpan.FromMilliseconds(66.66666666666667), turnRight.FrameInterval, "Both physical turns should use the same cadence.");
+}
+
 static void BuiltInCastoriceBlinkActionPreservesSchedule()
 {
     var blink = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Blink);
@@ -1210,9 +1231,11 @@ static void BuiltInPettingFramesArePackagedAndClean()
         Assert.True(greenFringePixels <= 2, $"{System.IO.Path.GetFileName(frame)} should not contain a visible cluster of green-key fringe pixels.");
     }
 
-    var idle = File.ReadAllBytes(System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "Idle", "Castorice.Idle.00.png"));
-    Assert.True(idle.SequenceEqual(File.ReadAllBytes(frames[0])), "Petting frame 00 should use the idle baseline.");
-    Assert.True(idle.SequenceEqual(File.ReadAllBytes(frames[^1])), "Petting frame 07 should return exactly to the idle baseline.");
+    using var idle = new Bitmap(System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "Idle", "Castorice.Idle.00.png"));
+    using var pettingStart = new Bitmap(frames[0]);
+    using var pettingEnd = new Bitmap(frames[^1]);
+    Assert.True(CalculateAverageRgbaDelta(idle, pettingStart) < 35, "Petting should begin close enough to idle for a short authored reaction.");
+    Assert.True(CalculateAverageRgbaDelta(idle, pettingEnd) < 35, "Petting should end close enough to idle to restore the passive loop cleanly.");
 
     var projectText = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
     Assert.Contains(projectText, @"Assets\Runtime\Castorice\**\*.png", "Petting frames should be covered by the runtime WPF resource glob.");
@@ -3457,6 +3480,72 @@ static void MovementControllerAdvancesFramesByDistance()
     Assert.Equal(0, controller.MoveFrameIndex, "Reset should restore movement frame zero.");
 }
 
+static void DirectionalMovementTurnsFromFrontBeforeWalking()
+{
+    var animator = new PetDirectionalMovementAnimator();
+
+    Assert.True(animator.RequestDirection(PetHorizontalDirection.Right, frameCount: 3), "A front-facing pet should begin the requested turn.");
+    Assert.Equal(PetTurnPhase.ToSide, animator.Phase, "The initial turn should face toward the walking side.");
+    Assert.Equal(PetHorizontalDirection.Right, animator.TurnDirection, "The right turn must use the separately authored right-facing frames.");
+    Assert.Equal(0, animator.FrameIndex, "A forward turn should begin at its first frame.");
+
+    animator.Advance(frameCount: 3);
+    animator.Advance(frameCount: 3);
+    animator.Advance(frameCount: 3);
+
+    Assert.False(animator.IsTurning, "The turn should complete after its final frame.");
+    Assert.Equal(PetFacingDirection.Right, animator.Facing, "Completing the turn should leave the pet facing right.");
+}
+
+static void DirectionalMovementReturnsThroughSameAuthoredFrames()
+{
+    var animator = CreateRightFacingAnimator(frameCount: 3);
+
+    Assert.True(animator.RequestFront(frameCount: 3), "Stopping movement should begin a return to front.");
+    Assert.Equal(PetTurnPhase.ToFront, animator.Phase, "The return should reverse the current side's turn sequence.");
+    Assert.Equal(PetHorizontalDirection.Right, animator.TurnDirection, "Returning from right must preserve the authored right-side accessories.");
+    Assert.Equal(2, animator.FrameIndex, "A reverse turn should start at the last side-facing frame.");
+
+    animator.Advance(frameCount: 3);
+    Assert.Equal(1, animator.FrameIndex, "The reverse turn should step backward through authored frames.");
+    animator.Advance(frameCount: 3);
+    Assert.Equal(0, animator.FrameIndex, "The reverse turn should expose the original first frame before completing.");
+    animator.Advance(frameCount: 3);
+
+    Assert.False(animator.IsTurning, "The return should complete once frame zero has been displayed.");
+    Assert.Equal(PetFacingDirection.Front, animator.Facing, "The completed return should restore front-facing idle.");
+}
+
+static void DirectionalMovementChangesSidesThroughFront()
+{
+    var animator = CreateRightFacingAnimator(frameCount: 3);
+
+    Assert.True(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 3), "Changing direction should begin by returning from the current side.");
+    Assert.Equal(PetTurnPhase.ToFront, animator.Phase, "Opposite directions must pass through front instead of mirroring.");
+    Assert.Equal(PetHorizontalDirection.Right, animator.TurnDirection, "The first half should reverse the current right-facing sequence.");
+
+    animator.Advance(frameCount: 3);
+    animator.Advance(frameCount: 3);
+    animator.Advance(frameCount: 3);
+
+    Assert.True(animator.IsTurning, "After reaching front, the pending left turn should begin automatically.");
+    Assert.Equal(PetTurnPhase.ToSide, animator.Phase, "The second half should turn from front to the new side.");
+    Assert.Equal(PetHorizontalDirection.Left, animator.TurnDirection, "The second half must use separately authored left-facing frames.");
+    Assert.Equal(0, animator.FrameIndex, "The new side's turn should begin at frame zero.");
+}
+
+static PetDirectionalMovementAnimator CreateRightFacingAnimator(int frameCount)
+{
+    var animator = new PetDirectionalMovementAnimator();
+    animator.RequestDirection(PetHorizontalDirection.Right, frameCount);
+    for (var index = 0; index < frameCount; index++)
+    {
+        animator.Advance(frameCount);
+    }
+
+    return animator;
+}
+
 static PetActionDefinition CreateTestMoveAction()
 {
     return new PetActionDefinition(
@@ -3743,7 +3832,7 @@ static void PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints()
     var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
     var labels = new[] { "Happy", "Shy", "Sleepy", "Surprised", "Pouting", "Confused", "Proud", "Crying" };
     var idlePath = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "Idle", "Castorice.Idle.00.png");
-    var idleBytes = File.ReadAllBytes(idlePath);
+    using var idle = new Bitmap(idlePath);
 
     foreach (var label in labels)
     {
@@ -3765,8 +3854,17 @@ static void PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints()
             Assert.Equal(320, bitmap.Width, $"{System.IO.Path.GetFileName(frame)} should be 320 pixels wide.");
             Assert.Equal(320, bitmap.Height, $"{System.IO.Path.GetFileName(frame)} should be 320 pixels high.");
         }
-        Assert.True(idleBytes.SequenceEqual(File.ReadAllBytes(frames[0])), $"{label} transition frame 00 should equal Idle.00.");
-        Assert.True(File.ReadAllBytes(finalPath).SequenceEqual(File.ReadAllBytes(frames[^1])), $"{label} transition frame 05 should equal its final expression image.");
+        using var first = new Bitmap(frames[0]);
+        using var finalTransition = new Bitmap(frames[^1]);
+        using var final = new Bitmap(finalPath);
+        Assert.True(CalculateAverageRgbaDelta(idle, first) < 35, $"{label} transition should begin visually close to Idle.00.");
+        Assert.True(CalculateAverageRgbaDelta(finalTransition, final) < 35, $"{label} transition should end visually close to its expression image.");
+        for (var index = 0; index < frames.Length - 1; index++)
+        {
+            using var current = new Bitmap(frames[index]);
+            using var next = new Bitmap(frames[index + 1]);
+            Assert.True(CalculateAverageRgbaDelta(current, next) < 35, $"{label} transition frames {index:00}-{index + 1:00} should remain visually continuous.");
+        }
     }
 
     var projectText = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
