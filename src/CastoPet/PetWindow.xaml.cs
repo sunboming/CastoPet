@@ -1375,13 +1375,18 @@ public partial class PetWindow : Window
             return false;
         }
 
-        if (!_directionalMovementAnimator.RequestDirection(direction, turnFrames.Count))
+        var started = _directionalMovementAnimator.RequestDirection(direction, turnFrames.Count);
+        if (!_directionalMovementAnimator.IsTurning)
         {
             return false;
         }
 
-        ShowCurrentTurnFrame();
-        StartTurnTimer();
+        if (started)
+        {
+            ShowCurrentTurnFrame();
+            StartTurnTimer();
+        }
+
         return true;
     }
 

@@ -40,7 +40,7 @@ public sealed class PetDirectionalMovementAnimator
         _desiredDirection = direction;
         if (IsTurning)
         {
-            return true;
+            return false;
         }
 
         if (Facing == ToFacing(direction))

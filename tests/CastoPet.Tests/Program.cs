@@ -190,6 +190,7 @@ var tests = new (string Name, Action Test)[]
     ("Movement controller schedules bounded wander targets", MovementControllerSchedulesBoundedWanderTargets),
     ("Movement controller advances frames by distance", MovementControllerAdvancesFramesByDistance),
     ("Directional movement turns from front before walking", DirectionalMovementTurnsFromFrontBeforeWalking),
+    ("Directional movement does not restart an active turn", DirectionalMovementDoesNotRestartActiveTurn),
     ("Directional movement returns through the same authored frames", DirectionalMovementReturnsThroughSameAuthoredFrames),
     ("Directional movement changes sides through front", DirectionalMovementChangesSidesThroughFront),
     ("Cursor nudge planner nudges nearby cursor", CursorNudgePlannerNudgesNearbyCursor),
@@ -3523,6 +3524,16 @@ static void DirectionalMovementTurnsFromFrontBeforeWalking()
 
     Assert.False(animator.IsTurning, "The turn should complete after its final frame.");
     Assert.Equal(PetFacingDirection.Right, animator.Facing, "Completing the turn should leave the pet facing right.");
+}
+
+static void DirectionalMovementDoesNotRestartActiveTurn()
+{
+    var animator = new PetDirectionalMovementAnimator();
+
+    Assert.True(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 6), "The first request should start the turn timer sequence.");
+    Assert.False(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 6), "A render-loop request during the same turn must not restart its timer.");
+    Assert.True(animator.IsTurning, "The active turn should continue blocking movement until its timer advances.");
+    Assert.Equal(0, animator.FrameIndex, "Repeated render-loop requests must leave progress to the turn timer.");
 }
 
 static void DirectionalMovementReturnsThroughSameAuthoredFrames()
