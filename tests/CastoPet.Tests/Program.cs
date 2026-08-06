@@ -158,6 +158,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window routes classified pointer gestures", PetWindowRoutesClassifiedPointerGestures),
     ("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
     ("Pet window applies per-frame action durations", PetWindowAppliesPerFrameActionDurations),
+    ("Pet window schedules directional turns at render priority", PetWindowSchedulesDirectionalTurnsAtRenderPriority),
     ("Pet window releases runtime resources on close", PetWindowReleasesRuntimeResourcesOnClose),
     ("Pet window detaches context menu subscriptions", PetWindowDetachesContextMenuSubscriptions),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
@@ -3053,6 +3054,17 @@ static void PetWindowAppliesPerFrameActionDurations()
     Assert.Contains(source, "PetFrameTiming.GetDuration(_pettingAction", "Petting playback should schedule the currently displayed frame duration.");
     Assert.Contains(source, "GetExpressionTransitionFrameDuration", "Generic expression transitions should schedule each displayed frame independently.");
     Assert.Contains(source, "PetFrameTiming.GetTotalDuration", "Petting compression should follow the authored irregular sequence duration.");
+}
+
+static void PetWindowSchedulesDirectionalTurnsAtRenderPriority()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(
+        source,
+        "new DispatcherTimer(DispatcherPriority.Render) { Interval = DefaultTurnFrameInterval }",
+        "Directional turn frames should not be starved behind continuous composition rendering.");
 }
 
 static void PetWindowReleasesRuntimeResourcesOnClose()

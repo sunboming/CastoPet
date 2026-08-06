@@ -204,7 +204,7 @@ public partial class PetWindow : Window
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
         _activeMovementProbeTimer = new DispatcherTimer { Interval = PetAnimationTimings.ActiveMovementProbeInterval };
         _activeMovementProbeTimer.Tick += (_, _) => ProbeActiveMovement();
-        _turnFrameTimer = new DispatcherTimer { Interval = DefaultTurnFrameInterval };
+        _turnFrameTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = DefaultTurnFrameInterval };
         _turnFrameTimer.Tick += (_, _) => AdvanceTurnFrame();
         _inputReactiveRenderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _inputReactiveRenderTimer.Tick += (_, _) => RenderInputReactiveHighlights();
