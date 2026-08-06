@@ -36,6 +36,7 @@ public partial class PetWindow : Window
     private readonly PetRuntimeState _runtimeState = new();
     private readonly PetAnimationController _animationController = new();
     private readonly PetMovementController _movementController;
+    private readonly CursorPushGate _cursorPushGate = new();
     private readonly PetDirectionalMovementAnimator _directionalMovementAnimator = new();
     private readonly ImageSource _defaultCharacter;
     private readonly ImageSource _draggingCharacter;
@@ -358,6 +359,11 @@ public partial class PetWindow : Window
         _isClickThrough = snapshot.ClickThrough;
         _activeMovementEnabled = snapshot.ActiveMovement;
         _pushCursorEnabled = snapshot.PushCursor;
+        if (!_activeMovementEnabled || !_pushCursorEnabled)
+        {
+            _cursorPushGate.Reset();
+        }
+
         _inputReactiveModeEnabled = snapshot.InputReactiveMode;
         UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
@@ -1093,9 +1099,15 @@ public partial class PetWindow : Window
         var petCenterX = Left + width / 2;
         var petCenterY = Top + height / 2;
         var cursorDistance = Math.Sqrt(Math.Pow(cursor.X - petCenterX, 2) + Math.Pow(cursor.Y - petCenterY, 2));
+        _cursorPushGate.ObserveCursorDistance(cursorDistance, PetMovementPlanner.MouseInterestRadius);
 
         if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
         {
+            if (_pushCursorEnabled && !_cursorPushGate.AllowsPush)
+            {
+                return;
+            }
+
             if (!PetMovementPlanner.IsAtMouseApproachTarget(Left, Top, width, height, cursor.X, cursor.Y, bounds))
             {
                 StartActiveMovementRendering();
@@ -1240,6 +1252,7 @@ public partial class PetWindow : Window
         ApplyActiveMovementVisual();
         if (TryPushCursor(renderingTime, movement.Value.DeltaX, movement.Value.DeltaY))
         {
+            _cursorPushGate.CompletePush();
             _movementController.CompleteTarget(DateTime.UtcNow);
             FinishDirectionalMovement();
             StopActiveMovementRendering();

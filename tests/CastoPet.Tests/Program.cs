@@ -202,6 +202,7 @@ var tests = new (string Name, Action Test)[]
     ("Cursor nudge planner detects manual movement cooldown", CursorNudgePlannerDetectsManualMovementCooldown),
     ("Cursor nudge planner blocks while mouse button is pressed", CursorNudgePlannerBlocksWhileMouseButtonIsPressed),
     ("Cursor nudge planner limits continuous push duration", CursorNudgePlannerLimitsContinuousPushDuration),
+    ("Cursor push gate blocks repeats until the cursor exits", CursorPushGateBlocksRepeatsUntilCursorExits),
     ("Animation controller loops idle frames", AnimationControllerLoopsIdleFrames),
     ("Pet frame timing resolves authored overrides", PetFrameTimingResolvesAuthoredOverrides),
     ("Animation controller completes one-shot actions", AnimationControllerCompletesOneShotActions),
@@ -3082,6 +3083,9 @@ static void PetWindowCompletesActiveMovementAfterOneCursorPush()
     Assert.Contains(advance, "_movementController.CompleteTarget(DateTime.UtcNow);", "A successful cursor push should complete the movement target.");
     Assert.Contains(advance, "FinishDirectionalMovement();", "A successful cursor push should begin returning to front-facing idle.");
     Assert.Contains(advance, "StopActiveMovementRendering();", "A successful cursor push should stop further movement and cursor nudges.");
+    Assert.Contains(source, "_cursorPushGate.CompletePush();", "A successful cursor push should latch the current proximity session.");
+    Assert.Contains(source, "_cursorPushGate.ObserveCursorDistance(cursorDistance", "Movement probing should release the latch only after the cursor exits.");
+    Assert.Contains(source, "_pushCursorEnabled && !_cursorPushGate.AllowsPush", "Movement probing should not restart while the completed push remains latched.");
     Assert.False(source.Contains("_cursorPushOwnsMovementTarget", StringComparison.Ordinal), "One-shot pushing should not retain continuous target ownership state.");
 }
 
@@ -3751,6 +3755,21 @@ static void CursorNudgePlannerLimitsContinuousPushDuration()
             lastManualMovement: null,
             pushStartedAt: TimeSpan.Zero),
         "Cursor push should stop after the continuous duration cap.");
+}
+
+static void CursorPushGateBlocksRepeatsUntilCursorExits()
+{
+    var gate = new CursorPushGate();
+
+    Assert.True(gate.AllowsPush, "A fresh cursor proximity session should allow one push.");
+    gate.CompletePush();
+    Assert.False(gate.AllowsPush, "Completing a push should block repeated pushes in the same proximity session.");
+
+    gate.ObserveCursorDistance(100, PetMovementPlanner.MouseInterestRadius);
+    Assert.False(gate.AllowsPush, "Keeping the cursor nearby should preserve the completed-push latch.");
+
+    gate.ObserveCursorDistance(400, PetMovementPlanner.MouseInterestRadius);
+    Assert.True(gate.AllowsPush, "Leaving the interest radius should arm the next proximity session.");
 }
 
 static void AnimationControllerLoopsIdleFrames()
