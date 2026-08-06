@@ -64,32 +64,6 @@ public static class PetMovementPlanner
             bounds);
     }
 
-    public static PetMovementTarget ResolveMouseApproachTarget(
-        double petLeft,
-        double petTop,
-        double petWidth,
-        double petHeight,
-        double mouseX,
-        double mouseY,
-        PetMovementBounds bounds,
-        PetMovementTarget? activeTarget,
-        bool retainActiveTarget)
-    {
-        if (retainActiveTarget && activeTarget is { } retained)
-        {
-            return retained;
-        }
-
-        return CalculateMouseApproachTarget(
-            petLeft,
-            petTop,
-            petWidth,
-            petHeight,
-            mouseX,
-            mouseY,
-            bounds);
-    }
-
     public static PetMovementTarget StepToward(
         double currentLeft,
         double currentTop,

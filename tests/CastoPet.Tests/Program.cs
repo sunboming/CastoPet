@@ -159,7 +159,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
     ("Pet window applies per-frame action durations", PetWindowAppliesPerFrameActionDurations),
     ("Pet window schedules directional turns at render priority", PetWindowSchedulesDirectionalTurnsAtRenderPriority),
-    ("Pet window retains cursor-push target ownership for the movement session", PetWindowRetainsCursorPushTargetOwnershipForMovementSession),
+    ("Pet window completes active movement after one cursor push", PetWindowCompletesActiveMovementAfterOneCursorPush),
     ("Pet window releases runtime resources on close", PetWindowReleasesRuntimeResourcesOnClose),
     ("Pet window detaches context menu subscriptions", PetWindowDetachesContextMenuSubscriptions),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
@@ -185,7 +185,6 @@ var tests = new (string Name, Action Test)[]
     ("Input reactive mode suppresses passive animation", InputReactiveModeSuppressesPassiveAnimation),
     ("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
     ("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
-    ("Movement planner retains target while the pet pushes the cursor", MovementPlannerRetainsTargetWhilePetPushesCursor),
     ("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
     ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
     ("Movement planner detects mouse approach rest position", MovementPlannerDetectsMouseApproachRestPosition),
@@ -3069,15 +3068,21 @@ static void PetWindowSchedulesDirectionalTurnsAtRenderPriority()
         "Directional turn frames should not be starved behind continuous composition rendering.");
 }
 
-static void PetWindowRetainsCursorPushTargetOwnershipForMovementSession()
+static void PetWindowCompletesActiveMovementAfterOneCursorPush()
 {
     var workspace = FindWorkspaceRoot();
     var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    const string advanceSignature = "private void AdvanceActiveMovement(TimeSpan renderingTime)";
+    var advanceStart = source.IndexOf(advanceSignature, StringComparison.Ordinal);
+    var advanceEnd = source.IndexOf("\n    private ", advanceStart + advanceSignature.Length, StringComparison.Ordinal);
+    var advance = source[advanceStart..advanceEnd];
 
-    Assert.Contains(source, "bool _cursorPushOwnsMovementTarget", "Cursor push should track target ownership separately from its duration timer.");
-    Assert.Contains(source, "&& _cursorPushOwnsMovementTarget", "Mouse target resolution should retain the active target for the owned movement session.");
-    Assert.Contains(source, "_cursorPushOwnsMovementTarget = true;", "A successful programmatic cursor push should claim target ownership.");
-    Assert.Contains(source, "_cursorPushOwnsMovementTarget = false;", "Stopping or manual cursor movement should release target ownership.");
+    Assert.Contains(source, "private bool TryPushCursor", "Cursor pushing should report whether the single push happened.");
+    Assert.Contains(advance, "if (TryPushCursor(renderingTime", "Active movement should branch immediately after the first cursor push.");
+    Assert.Contains(advance, "_movementController.CompleteTarget(DateTime.UtcNow);", "A successful cursor push should complete the movement target.");
+    Assert.Contains(advance, "FinishDirectionalMovement();", "A successful cursor push should begin returning to front-facing idle.");
+    Assert.Contains(advance, "StopActiveMovementRendering();", "A successful cursor push should stop further movement and cursor nudges.");
+    Assert.False(source.Contains("_cursorPushOwnsMovementTarget", StringComparison.Ordinal), "One-shot pushing should not retain continuous target ownership state.");
 }
 
 static void PetWindowReleasesRuntimeResourcesOnClose()
@@ -3437,43 +3442,6 @@ static void MovementPlannerApproachesMouseWithCursorOffset()
     Assert.True(distance >= PetMovementPlanner.MinMouseApproachOffset, "Target should not cover the cursor.");
     Assert.True(distance <= PetMovementPlanner.MaxMouseApproachOffset, "Target should stop close to the cursor.");
     Assert.True(target.Left > 100, "Target should move toward the mouse.");
-}
-
-static void MovementPlannerRetainsTargetWhilePetPushesCursor()
-{
-    var bounds = new PetMovementBounds(0, 0, 800, 600);
-    var activeTarget = PetMovementPlanner.CalculateMouseApproachTarget(
-        petLeft: 100,
-        petTop: 100,
-        petWidth: 100,
-        petHeight: 100,
-        mouseX: 160,
-        mouseY: 150,
-        bounds);
-    var recalculatedAcrossCenter = PetMovementPlanner.CalculateMouseApproachTarget(
-        petLeft: 100,
-        petTop: 100,
-        petWidth: 100,
-        petHeight: 100,
-        mouseX: 149,
-        mouseY: 150,
-        bounds);
-
-    Assert.True(activeTarget.Left < 100, "The initial close cursor position should produce a left-side approach target.");
-    Assert.True(recalculatedAcrossCenter.Left > 100, "A pushed cursor crossing the pet center would otherwise flip the target right.");
-
-    var retained = PetMovementPlanner.ResolveMouseApproachTarget(
-        petLeft: 100,
-        petTop: 100,
-        petWidth: 100,
-        petHeight: 100,
-        mouseX: 149,
-        mouseY: 150,
-        bounds,
-        activeTarget,
-        retainActiveTarget: true);
-
-    Assert.Equal(activeTarget, retained, "Programmatic cursor movement must not reverse the active approach target.");
 }
 
 static void MovementPlannerEasesTowardTarget()

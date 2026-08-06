@@ -101,7 +101,6 @@ public partial class PetWindow : Window
     private bool _activeExpressionUsesSpecificTransition;
     private TimeSpan? _lastManualCursorMovementTime;
     private TimeSpan? _cursorPushStartedAt;
-    private bool _cursorPushOwnsMovementTarget;
     private int _activeMovementVisualDirection;
     private bool _dragMovementVisualApplied;
     private double? _expectedCursorX;
@@ -1136,7 +1135,6 @@ public partial class PetWindow : Window
         _expectedCursorX = null;
         _expectedCursorY = null;
         _cursorPushStartedAt = null;
-        _cursorPushOwnsMovementTarget = false;
     }
 
     private void OnActiveMovementRendering(object? sender, EventArgs e)
@@ -1173,28 +1171,14 @@ public partial class PetWindow : Window
 
         if (cursorDistance <= PetMovementPlanner.MouseInterestRadius)
         {
-            var retainMouseTarget = _movementController.HasTarget
-                && _cursorPushOwnsMovementTarget
-                && _expectedCursorX is double expectedCursorX
-                && _expectedCursorY is double expectedCursorY
-                && !CursorNudgePlanner.IsManualMovement(
-                    cursor.X,
-                    cursor.Y,
-                    expectedCursorX,
-                    expectedCursorY);
-            var activeMouseTarget = _movementController.HasTarget
-                ? _movementController.Target
-                : (PetMovementTarget?)null;
-            var mouseApproachTarget = PetMovementPlanner.ResolveMouseApproachTarget(
+            var mouseApproachTarget = PetMovementPlanner.CalculateMouseApproachTarget(
                 Left,
                 Top,
                 width,
                 height,
                 cursor.X,
                 cursor.Y,
-                bounds,
-                activeMouseTarget,
-                retainMouseTarget);
+                bounds);
             if (PetMovementPlanner.IsClose(Left, Top, mouseApproachTarget))
             {
                 if (_movementController.HasTarget)
@@ -1254,7 +1238,13 @@ public partial class PetWindow : Window
         _runtimeState.SetRuntimePosition(Left, Top);
         AdvanceMoveFrame(movement.Value.Distance, ResolveMovementDirection(movement.Value.DeltaX));
         ApplyActiveMovementVisual();
-        TryPushCursor(renderingTime, movement.Value.DeltaX, movement.Value.DeltaY);
+        if (TryPushCursor(renderingTime, movement.Value.DeltaX, movement.Value.DeltaY))
+        {
+            _movementController.CompleteTarget(DateTime.UtcNow);
+            FinishDirectionalMovement();
+            StopActiveMovementRendering();
+            return;
+        }
 
         if (PetMovementPlanner.IsClose(Left, Top, _movementController.Target))
         {
@@ -1284,15 +1274,14 @@ public partial class PetWindow : Window
             : source.CompositionTarget.TransformFromDevice.Transform(point);
     }
 
-    private void TryPushCursor(TimeSpan renderingTime, double movementDeltaX, double movementDeltaY)
+    private bool TryPushCursor(TimeSpan renderingTime, double movementDeltaX, double movementDeltaY)
     {
         if (!_pushCursorEnabled || !_activeMovementEnabled)
         {
             _expectedCursorX = null;
             _expectedCursorY = null;
             _cursorPushStartedAt = null;
-            _cursorPushOwnsMovementTarget = false;
-            return;
+            return false;
         }
 
         var cursor = GetCursorScreenPosition();
@@ -1304,8 +1293,7 @@ public partial class PetWindow : Window
             _expectedCursorX = cursor.X;
             _expectedCursorY = cursor.Y;
             _cursorPushStartedAt = null;
-            _cursorPushOwnsMovementTarget = false;
-            return;
+            return false;
         }
 
         if (!CursorNudgePlanner.CanNudge(
@@ -1315,7 +1303,7 @@ public partial class PetWindow : Window
             _cursorPushStartedAt))
         {
             _cursorPushStartedAt = null;
-            return;
+            return false;
         }
 
         var width = ActualWidth > 0 ? ActualWidth : Width;
@@ -1334,7 +1322,7 @@ public partial class PetWindow : Window
             _expectedCursorX = cursor.X;
             _expectedCursorY = cursor.Y;
             _cursorPushStartedAt = null;
-            return;
+            return false;
         }
 
         _cursorPushStartedAt ??= renderingTime;
@@ -1342,7 +1330,7 @@ public partial class PetWindow : Window
         _cursorService.SetPosition(devicePoint.X, devicePoint.Y);
         _expectedCursorX = result.X;
         _expectedCursorY = result.Y;
-        _cursorPushOwnsMovementTarget = true;
+        return true;
     }
 
     private WpfPoint ToDevicePoint(WpfPoint point)
