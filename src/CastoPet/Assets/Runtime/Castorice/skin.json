@@ -45,14 +45,11 @@
       "kind": "move-left",
       "distancePerFrame": 10,
       "frames": [
-        "States/MoveLeft/Castorice.MoveLeft.00.png",
         "States/MoveLeft/Castorice.MoveLeft.01.png",
         "States/MoveLeft/Castorice.MoveLeft.02.png",
         "States/MoveLeft/Castorice.MoveLeft.03.png",
         "States/MoveLeft/Castorice.MoveLeft.04.png",
-        "States/MoveLeft/Castorice.MoveLeft.05.png",
-        "States/MoveLeft/Castorice.MoveLeft.06.png",
-        "States/MoveLeft/Castorice.MoveLeft.07.png"
+        "States/MoveLeft/Castorice.MoveLeft.05.png"
       ]
     },
     {
@@ -60,7 +57,6 @@
       "kind": "move-right",
       "distancePerFrame": 10,
       "frames": [
-        "States/MoveRight/Castorice.MoveRight.00.png",
         "States/MoveRight/Castorice.MoveRight.01.png",
         "States/MoveRight/Castorice.MoveRight.02.png",
         "States/MoveRight/Castorice.MoveRight.03.png",
@@ -73,7 +69,7 @@
     {
       "id": "turn-left",
       "kind": "turn-left",
-      "frameIntervalMs": 66.66666666666667,
+      "frameIntervalMs": 41.66666666666667,
       "frames": [
         "States/TurnLeft/Castorice.TurnLeft.00.png",
         "States/TurnLeft/Castorice.TurnLeft.01.png",
@@ -86,7 +82,7 @@
     {
       "id": "turn-right",
       "kind": "turn-right",
-      "frameIntervalMs": 66.66666666666667,
+      "frameIntervalMs": 41.66666666666667,
       "frames": [
         "States/TurnRight/Castorice.TurnRight.00.png",
         "States/TurnRight/Castorice.TurnRight.01.png",

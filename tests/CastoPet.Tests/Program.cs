@@ -1176,14 +1176,15 @@ static void BuiltInCastoriceDefinesSeparateDirectionalMovementActions()
     var turnLeft = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.TurnLeft);
     var turnRight = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.TurnRight);
 
-    Assert.Equal(8, moveLeft.FramePaths.Count, "Left movement should use eight separately rendered frames.");
-    Assert.Equal(8, moveRight.FramePaths.Count, "Right movement should use eight separately rendered frames.");
-    Assert.Equal(6, turnLeft.FramePaths.Count, "Left turning should use six authored frames.");
-    Assert.Equal(6, turnRight.FramePaths.Count, "Right turning should use six authored frames.");
-    Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.00.png", moveLeft.FramePaths[0], "Left movement should never reuse mirrored right assets.");
-    Assert.Equal("Assets/Runtime/Castorice/States/MoveRight/Castorice.MoveRight.00.png", moveRight.FramePaths[0], "Right movement should keep its own accessory direction.");
-    Assert.Equal(TimeSpan.FromMilliseconds(66.66666666666667), turnLeft.FrameInterval, "Turn timing should preserve the extracted 15 FPS cadence.");
-    Assert.Equal(TimeSpan.FromMilliseconds(66.66666666666667), turnRight.FrameInterval, "Both physical turns should use the same cadence.");
+    Assert.Equal(5, moveLeft.FramePaths.Count, "Left movement should omit the two frames with inconsistent eye direction.");
+    Assert.Equal(7, moveRight.FramePaths.Count, "Right movement should omit the excessive three-quarter-view frame from playback.");
+    Assert.Equal(6, turnLeft.FramePaths.Count, "Left turning should use six separately authored frames.");
+    Assert.Equal(6, turnRight.FramePaths.Count, "Right turning should use six separately authored frames.");
+    Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.01.png", moveLeft.FramePaths[0], "Left movement should begin with the stable side-facing sequence.");
+    Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.05.png", moveLeft.FramePaths[^1], "Left movement should end before the eye direction changes.");
+    Assert.Equal("Assets/Runtime/Castorice/States/MoveRight/Castorice.MoveRight.01.png", moveRight.FramePaths[0], "Right movement should begin with the stable side-facing sequence.");
+    Assert.Equal(TimeSpan.FromMilliseconds(41.66666666666667), turnLeft.FrameInterval, "Turn timing should preserve the extracted 24 FPS cadence.");
+    Assert.Equal(TimeSpan.FromMilliseconds(41.66666666666667), turnRight.FrameInterval, "Both physical turns should use the same cadence.");
 }
 
 static void BuiltInDirectionalFramesAreEmbeddedWpfResources()
