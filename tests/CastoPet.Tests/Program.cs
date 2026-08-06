@@ -3667,7 +3667,7 @@ static void CursorNudgePlannerNudgesNearbyCursor()
         bounds);
 
     Assert.True(result.ShouldMove, "Nearby cursor should be nudged.");
-    Assert.Equal(123d, result.X, "Nudge should clamp to the per-frame maximum.");
+    Assert.Equal(144d, result.X, "A one-shot push should move the cursor a clearly visible fixed distance.");
     Assert.Equal(120d, result.Y, "Horizontal movement should not change Y.");
 }
 

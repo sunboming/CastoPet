@@ -5,7 +5,7 @@ public readonly record struct CursorNudgeResult(bool ShouldMove, double X, doubl
 public static class CursorNudgePlanner
 {
     public const double ActivationRadius = 60;
-    public const double MaxPixelsPerFrame = 3;
+    public const double OneShotPushDistance = 24;
     public const double ManualMovementThreshold = 8;
     public static readonly TimeSpan ManualMovementCooldown = TimeSpan.FromSeconds(1);
     public static readonly TimeSpan MaxContinuousPushDuration = TimeSpan.FromSeconds(2);
@@ -31,9 +31,8 @@ public static class CursorNudgePlanner
             return new CursorNudgeResult(false, cursorX, cursorY);
         }
 
-        var step = Math.Min(MaxPixelsPerFrame, movementDistance);
-        var x = cursorX + movementDeltaX / movementDistance * step;
-        var y = cursorY + movementDeltaY / movementDistance * step;
+        var x = cursorX + movementDeltaX / movementDistance * OneShotPushDistance;
+        var y = cursorY + movementDeltaY / movementDistance * OneShotPushDistance;
         var maxX = bounds.Left + Math.Max(0, bounds.Width - 1);
         var maxY = bounds.Top + Math.Max(0, bounds.Height - 1);
 
