@@ -1417,6 +1417,7 @@ public partial class PetWindow : Window
         _turnFrameTimer.Stop();
         if (_movementController.HasTarget && _directionalMovementAnimator.Facing != PetFacingDirection.Front)
         {
+            _movementController.ResumeAfterVisualPause(Left, Top);
             var direction = _directionalMovementAnimator.Facing == PetFacingDirection.Left
                 ? PetHorizontalDirection.Left
                 : PetHorizontalDirection.Right;

@@ -187,6 +187,7 @@ var tests = new (string Name, Action Test)[]
     ("Movement planner detects close targets", MovementPlannerDetectsCloseTargets),
     ("Movement planner detects mouse approach rest position", MovementPlannerDetectsMouseApproachRestPosition),
     ("Movement controller advances logical positions", MovementControllerAdvancesLogicalPositions),
+    ("Movement controller resumes without accumulating visual pause", MovementControllerResumesWithoutAccumulatingVisualPause),
     ("Movement controller schedules bounded wander targets", MovementControllerSchedulesBoundedWanderTargets),
     ("Movement controller advances frames by distance", MovementControllerAdvancesFramesByDistance),
     ("Directional movement turns from front before walking", DirectionalMovementTurnsFromFrontBeforeWalking),
@@ -3482,6 +3483,32 @@ static void MovementControllerAdvancesLogicalPositions()
     Assert.Equal(90d, moved!.Value.NextLeft, "The configured base speed should determine logical movement.");
     Assert.Equal(0d, moved.Value.NextTop, "Horizontal movement should preserve the vertical coordinate.");
     Assert.Equal(90d, moved.Value.Distance, "Movement output should report the traveled distance.");
+}
+
+static void MovementControllerResumesWithoutAccumulatingVisualPause()
+{
+    var controller = new PetMovementController(CreateTestMoveAction(), new Random(7));
+    controller.BeginRendering(left: 0, top: 0);
+    controller.SetTarget(new PetMovementTarget(100, 0));
+
+    controller.Advance(TimeSpan.Zero, currentLeft: 0, currentTop: 0);
+    var beforeTurn = controller.Advance(TimeSpan.FromMilliseconds(100), currentLeft: 0, currentTop: 0);
+    Assert.True(beforeTurn is not null, "Movement should begin before the visual turn pause.");
+
+    controller.ResumeAfterVisualPause(beforeTurn!.Value.NextLeft, beforeTurn.Value.NextTop);
+    var resumed = controller.Advance(
+        TimeSpan.FromMilliseconds(600),
+        beforeTurn.Value.NextLeft,
+        beforeTurn.Value.NextTop);
+    var nextFrame = controller.Advance(
+        TimeSpan.FromMilliseconds(700),
+        beforeTurn.Value.NextLeft,
+        beforeTurn.Value.NextTop);
+
+    Assert.True(resumed is null, "The first sample after a visual pause should only synchronize rendering time.");
+    Assert.True(nextFrame is not null, "Movement should continue on the next rendering sample.");
+    Assert.Equal(18d, nextFrame!.Value.NextLeft, "Only post-resume frame time should contribute to movement.");
+    Assert.Equal(9d, nextFrame.Value.Distance, "The visual pause must not be converted into a large catch-up step.");
 }
 
 static void MovementControllerSchedulesBoundedWanderTargets()

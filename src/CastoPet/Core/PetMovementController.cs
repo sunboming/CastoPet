@@ -49,6 +49,11 @@ public sealed class PetMovementController
         _lastRenderTime = null;
     }
 
+    public void ResumeAfterVisualPause(double left, double top)
+    {
+        BeginRendering(left, top);
+    }
+
     public void SetTarget(PetMovementTarget target)
     {
         Target = target;
