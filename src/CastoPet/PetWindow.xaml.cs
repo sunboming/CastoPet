@@ -171,13 +171,13 @@ public partial class PetWindow : Window
         _expressionTransitionOutAction = assets.Skin.TryGetAction(PetActionKind.ExpressionTransitionOut, out var transitionOutAction)
             ? transitionOutAction
             : null;
-        _idleFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_idleAction, DefaultIdleFrameInterval) };
+        _idleFrameTimer = new DispatcherTimer { Interval = PetFrameTiming.GetDuration(_idleAction, 0, DefaultIdleFrameInterval) };
         _idleFrameTimer.Tick += (_, _) => AdvanceIdleFrame();
         _blinkScheduleTimer = new DispatcherTimer();
         _blinkScheduleTimer.Tick += (_, _) => BeginBlink();
-        _blinkFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_blinkAction, DefaultBlinkFrameInterval) };
+        _blinkFrameTimer = new DispatcherTimer { Interval = PetFrameTiming.GetDuration(_blinkAction, 0, DefaultBlinkFrameInterval) };
         _blinkFrameTimer.Tick += (_, _) => AdvanceBlinkFrame();
-        _pettingFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_pettingAction, DefaultPettingFrameInterval) };
+        _pettingFrameTimer = new DispatcherTimer { Interval = PetFrameTiming.GetDuration(_pettingAction, 0, DefaultPettingFrameInterval) };
         _pettingFrameTimer.Tick += (_, _) => AdvancePettingFrame();
         _dragRestoreTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _dragRestoreTimer.Tick += (_, _) => RestoreAfterDrag();
@@ -185,7 +185,7 @@ public partial class PetWindow : Window
         _radialWheelPointerProbeTimer.Tick += (_, _) => ProbeRadialWheelPointer();
         _temporaryExpressionTimer = new DispatcherTimer { Interval = ExpressionWheelCatalog.ExpressionDuration };
         _temporaryExpressionTimer.Tick += (_, _) => RestoreAfterTemporaryExpression();
-        _expressionTransitionFrameTimer = new DispatcherTimer { Interval = GetActionFrameInterval(_expressionTransitionInAction, DefaultExpressionTransitionFrameInterval) };
+        _expressionTransitionFrameTimer = new DispatcherTimer { Interval = PetFrameTiming.GetDuration(_expressionTransitionInAction, 0, DefaultExpressionTransitionFrameInterval) };
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
         _activeMovementProbeTimer = new DispatcherTimer { Interval = PetAnimationTimings.ActiveMovementProbeInterval };
         _activeMovementProbeTimer.Tick += (_, _) => ProbeActiveMovement();
@@ -896,9 +896,15 @@ public partial class PetWindow : Window
         if (_pettingFrames.Count > 0)
         {
             CharacterImage.Source = _pettingFrames[0];
-            _pettingFrameTimer.Interval = GetActionFrameInterval(_pettingAction, DefaultPettingFrameInterval);
-            AnimatePettingCompression(TimeSpan.FromMilliseconds(
-                _pettingFrameTimer.Interval.TotalMilliseconds * _pettingFrames.Count / 2));
+            _pettingFrameTimer.Interval = PetFrameTiming.GetDuration(
+                _pettingAction,
+                0,
+                DefaultPettingFrameInterval);
+            var totalDuration = PetFrameTiming.GetTotalDuration(
+                _pettingAction,
+                _pettingFrames.Count,
+                DefaultPettingFrameInterval);
+            AnimatePettingCompression(TimeSpan.FromTicks(totalDuration.Ticks / 2));
             _pettingFrameTimer.Start();
             return;
         }
@@ -957,6 +963,10 @@ public partial class PetWindow : Window
         }
 
         CharacterImage.Source = _pettingFrames[advance.FrameIndex];
+        _pettingFrameTimer.Interval = PetFrameTiming.GetDuration(
+            _pettingAction,
+            advance.FrameIndex,
+            DefaultPettingFrameInterval);
     }
 
     private void CompletePetting()
@@ -2205,9 +2215,7 @@ public partial class PetWindow : Window
 
         ResetCharacterTransitionAnimations();
         _animationController.BeginExpressionTransition(PetExpressionTransitionMode.In, _activeExpressionTransitionFrames.Count);
-        _expressionTransitionFrameTimer.Interval = _activeExpressionUsesSpecificTransition
-            ? _pendingExpressionAsset.Definition.TransitionFrameInterval ?? DefaultExpressionTransitionFrameInterval
-            : GetActionFrameInterval(_expressionTransitionInAction, DefaultExpressionTransitionFrameInterval);
+        _expressionTransitionFrameTimer.Interval = GetExpressionTransitionFrameDuration(0);
         CharacterImage.Source = _activeExpressionTransitionFrames[_animationController.ExpressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
@@ -2226,9 +2234,7 @@ public partial class PetWindow : Window
 
         ResetCharacterTransitionAnimations();
         _animationController.BeginExpressionTransition(PetExpressionTransitionMode.Out, _activeExpressionTransitionFrames.Count);
-        _expressionTransitionFrameTimer.Interval = _activeExpressionUsesSpecificTransition
-            ? _activeExpressionAsset?.Definition.TransitionFrameInterval ?? DefaultExpressionTransitionFrameInterval
-            : GetActionFrameInterval(_expressionTransitionOutAction, DefaultExpressionTransitionFrameInterval);
+        _expressionTransitionFrameTimer.Interval = GetExpressionTransitionFrameDuration(0);
         CharacterImage.Source = _activeExpressionTransitionFrames[_animationController.ExpressionTransitionFrameIndex];
         _expressionTransitionFrameTimer.Stop();
         _expressionTransitionFrameTimer.Start();
@@ -2248,6 +2254,7 @@ public partial class PetWindow : Window
         if (!advance.Completed)
         {
             CharacterImage.Source = frames[advance.FrameIndex];
+            _expressionTransitionFrameTimer.Interval = GetExpressionTransitionFrameDuration(advance.FrameIndex);
             return;
         }
 
@@ -2260,6 +2267,23 @@ public partial class PetWindow : Window
         }
 
         CompleteExpressionRestore();
+    }
+
+    private TimeSpan GetExpressionTransitionFrameDuration(int frameIndex)
+    {
+        if (_activeExpressionUsesSpecificTransition)
+        {
+            var expression = _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.In
+                ? _pendingExpressionAsset
+                : _activeExpressionAsset;
+            return expression?.Definition.TransitionFrameInterval
+                ?? DefaultExpressionTransitionFrameInterval;
+        }
+
+        var action = _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.In
+            ? _expressionTransitionInAction
+            : _expressionTransitionOutAction;
+        return PetFrameTiming.GetDuration(action, frameIndex, DefaultExpressionTransitionFrameInterval);
     }
 
     private void ShowPendingExpression()
@@ -2365,6 +2389,10 @@ public partial class PetWindow : Window
         }
 
         StartIdleBreathing();
+        _idleFrameTimer.Interval = PetFrameTiming.GetDuration(
+            _idleAction,
+            _animationController.IdleFrameIndex,
+            DefaultIdleFrameInterval);
         _idleFrameTimer.Start();
     }
 
@@ -2387,6 +2415,11 @@ public partial class PetWindow : Window
         {
             CharacterImage.Source = GetCurrentIdleFrame();
         }
+
+        _idleFrameTimer.Interval = PetFrameTiming.GetDuration(
+            _idleAction,
+            _animationController.IdleFrameIndex,
+            DefaultIdleFrameInterval);
     }
 
     private ImageSource GetCurrentIdleFrame()
@@ -2416,11 +2449,6 @@ public partial class PetWindow : Window
         _blinkScheduleTimer.Start();
     }
 
-    private static TimeSpan GetActionFrameInterval(PetActionDefinition? action, TimeSpan fallback)
-    {
-        return action?.FrameInterval ?? fallback;
-    }
-
     private void BeginBlink()
     {
         _blinkScheduleTimer.Stop();
@@ -2435,6 +2463,10 @@ public partial class PetWindow : Window
         }
 
         CharacterImage.Source = _blinkFrames[_animationController.BlinkFrameIndex];
+        _blinkFrameTimer.Interval = PetFrameTiming.GetDuration(
+            _blinkAction,
+            _animationController.BlinkFrameIndex,
+            DefaultBlinkFrameInterval);
         _blinkFrameTimer.Start();
     }
 
@@ -2462,6 +2494,10 @@ public partial class PetWindow : Window
         }
 
         CharacterImage.Source = _blinkFrames[advance.FrameIndex];
+        _blinkFrameTimer.Interval = PetFrameTiming.GetDuration(
+            _blinkAction,
+            advance.FrameIndex,
+            DefaultBlinkFrameInterval);
     }
 
     private void StopBlinkAnimation()

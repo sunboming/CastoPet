@@ -10,4 +10,5 @@ public sealed record PetActionDefinition(
     TimeSpan? MaxScheduleDelay = null,
     double? BaseSpeedPixelsPerSecond = null,
     double? MinSpeedPixelsPerSecond = null,
-    double? MaxSpeedPixelsPerSecond = null);
+    double? MaxSpeedPixelsPerSecond = null,
+    IReadOnlyList<TimeSpan?>? FrameDurations = null);

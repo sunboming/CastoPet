@@ -76,12 +76,15 @@ var tests = new (string Name, Action Test)[]
     ("Built-in Castorice expressions are ordered skin definitions", BuiltInCastoriceExpressionsAreOrderedSkinDefinitions),
     ("Built-in Castorice loads from embedded manifest", BuiltInCastoriceLoadsFromEmbeddedManifest),
     ("Pet skin manifest loads JSON resource paths", PetSkinManifestLoadsJsonResourcePaths),
+    ("Pet skin manifest loads per-frame action durations", PetSkinManifestLoadsPerFrameActionDurations),
     ("Pet skin manifest loads expression transition metadata", PetSkinManifestLoadsExpressionTransitionMetadata),
     ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
     ("Pet skin manifest rejects duplicate actions", PetSkinManifestRejectsDuplicateActions),
     ("Pet skin manifest rejects invalid action metadata", PetSkinManifestRejectsInvalidActionMetadata),
+    ("Pet skin manifest rejects invalid per-frame durations", PetSkinManifestRejectsInvalidPerFrameDurations),
     ("Pet skin manifest writer emits loadable JSON", PetSkinManifestWriterEmitsLoadableJson),
+    ("Pet skin manifest writer round trips per-frame durations", PetSkinManifestWriterRoundTripsPerFrameDurations),
     ("Pet skin manifest writer stores paths relative to resource root", PetSkinManifestWriterStoresPathsRelativeToResourceRoot),
     ("Pet skin manifest round trips optional petting action", PetSkinManifestRoundTripsOptionalPettingAction),
     ("Pet skin selection defaults to built-in skin", PetSkinSelectionDefaultsToBuiltInSkin),
@@ -151,6 +154,7 @@ var tests = new (string Name, Action Test)[]
     ("Pet window consumes centralized radial wheel styling", PetWindowConsumesCentralizedRadialWheelStyling),
     ("Pet window routes classified pointer gestures", PetWindowRoutesClassifiedPointerGestures),
     ("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
+    ("Pet window applies per-frame action durations", PetWindowAppliesPerFrameActionDurations),
     ("Pet window releases runtime resources on close", PetWindowReleasesRuntimeResourcesOnClose),
     ("Pet window detaches context menu subscriptions", PetWindowDetachesContextMenuSubscriptions),
     ("Pet window routes generic radial actions", PetWindowRoutesGenericRadialActions),
@@ -189,6 +193,7 @@ var tests = new (string Name, Action Test)[]
     ("Cursor nudge planner blocks while mouse button is pressed", CursorNudgePlannerBlocksWhileMouseButtonIsPressed),
     ("Cursor nudge planner limits continuous push duration", CursorNudgePlannerLimitsContinuousPushDuration),
     ("Animation controller loops idle frames", AnimationControllerLoopsIdleFrames),
+    ("Pet frame timing resolves authored overrides", PetFrameTimingResolvesAuthoredOverrides),
     ("Animation controller completes one-shot actions", AnimationControllerCompletesOneShotActions),
     ("Animation controller completes expression transitions", AnimationControllerCompletesExpressionTransitions),
     ("Animation controller centralizes passive blockers", AnimationControllerCentralizesPassiveBlockers),
@@ -1322,6 +1327,35 @@ static void PetSkinManifestLoadsJsonResourcePaths()
     Assert.Equal("Skins/Custom/Expressions/Happy.png", skin.Expressions[0].ResourcePath, "Expression paths should resolve under resource root.");
 }
 
+static void PetSkinManifestLoadsPerFrameActionDurations()
+{
+    var skin = PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "irregular",
+          "displayName": "Irregular",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            {
+              "id": "idle",
+              "kind": "idle",
+              "frameIntervalMs": 100,
+              "frameDurationsMs": [240, null, 60],
+              "frames": ["Idle/00.png", "Idle/01.png", "Idle/02.png"]
+            },
+            { "id": "move", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """);
+
+    var idle = skin.GetRequiredAction(PetActionKind.Idle);
+    Assert.Equal(3, idle.FrameDurations?.Count, "Per-frame durations should align with action frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(240), idle.FrameDurations?[0], "A frame should load its authored duration override.");
+    Assert.Equal(null, idle.FrameDurations?[1], "A null duration should preserve default-interval fallback semantics.");
+    Assert.Equal(TimeSpan.FromMilliseconds(60), idle.FrameDurations?[2], "Later frame overrides should retain their order.");
+}
+
 static void PetSkinManifestLoadsExpressionTransitionMetadata()
 {
     var skin = PetSkinManifestLoader.LoadFromJson("""
@@ -1483,6 +1517,39 @@ static void PetSkinManifestRejectsInvalidActionMetadata()
     Assert.Contains(invalidSchedule.Message, "schedule delay range", "Manifest actions should reject an inverted schedule range.");
 }
 
+static void PetSkinManifestRejectsInvalidPerFrameDurations()
+{
+    var mismatched = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "duration-count",
+          "displayName": "Duration Count",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frameDurationsMs": [100], "frames": ["Idle-0.png", "Idle-1.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """));
+    Assert.Contains(mismatched.Message, "frameDurationsMs", "Duration count validation should identify the action property.");
+
+    var nonPositive = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "invalid-duration",
+          "displayName": "Invalid Duration",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frameDurationsMs": [0], "frames": ["Idle.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """));
+    Assert.Contains(nonPositive.Message, "frameDurationsMs[0]", "Duration validation should identify the invalid frame index.");
+}
+
 static void PetSkinManifestWriterEmitsLoadableJson()
 {
     using var temp = TempDirectory.Create();
@@ -1495,6 +1562,29 @@ static void PetSkinManifestWriterEmitsLoadableJson()
     Assert.Equal(BuiltInPetSkins.Castorice.DisplayName, skin.DisplayName, "Written manifest should preserve display name.");
     Assert.Equal(BuiltInPetSkins.Castorice.DefaultCharacterPath, skin.DefaultCharacterPath, "Written manifest should reload default character path.");
     Assert.Equal(BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle).FramePaths[0], skin.GetRequiredAction(PetActionKind.Idle).FramePaths[0], "Written manifest should reload action frames.");
+}
+
+static void PetSkinManifestWriterRoundTripsPerFrameDurations()
+{
+    var skin = PetSkinManifestLoader.LoadFromJson("""
+        {
+          "schemaVersion": 2,
+          "id": "round-trip-durations",
+          "displayName": "Round Trip Durations",
+          "defaultCharacter": "Default.png",
+          "actions": [
+            { "id": "idle", "kind": "idle", "frameIntervalMs": 100, "frameDurationsMs": [220, null], "frames": ["Idle-0.png", "Idle-1.png"] },
+            { "id": "move", "kind": "move", "frames": ["Move.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink.png"] }
+          ]
+        }
+        """);
+
+    var json = PetSkinManifestWriter.ToJson(skin);
+    Assert.Contains(json, "\"frameDurationsMs\": [", "Manifest writer should emit authored frame durations.");
+    var reloaded = PetSkinManifestLoader.LoadFromJson(json).GetRequiredAction(PetActionKind.Idle);
+    Assert.Equal(TimeSpan.FromMilliseconds(220), reloaded.FrameDurations?[0], "Written override duration should reload.");
+    Assert.Equal(null, reloaded.FrameDurations?[1], "Written null duration should keep fallback semantics.");
 }
 
 static void PetSkinManifestWriterStoresPathsRelativeToResourceRoot()
@@ -2900,6 +2990,18 @@ static void PetWindowDefinesHoldFeedbackAndPettingPlayback()
     Assert.Contains(source, "_animationController.IsPetting", "Passive runtime modes should gate on centralized petting playback state.");
 }
 
+static void PetWindowAppliesPerFrameActionDurations()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+
+    Assert.Contains(source, "PetFrameTiming.GetDuration(_idleAction", "Idle playback should schedule the currently displayed frame duration.");
+    Assert.Contains(source, "PetFrameTiming.GetDuration(_blinkAction", "Blink playback should schedule the currently displayed frame duration.");
+    Assert.Contains(source, "PetFrameTiming.GetDuration(_pettingAction", "Petting playback should schedule the currently displayed frame duration.");
+    Assert.Contains(source, "GetExpressionTransitionFrameDuration", "Generic expression transitions should schedule each displayed frame independently.");
+    Assert.Contains(source, "PetFrameTiming.GetTotalDuration", "Petting compression should follow the authored irregular sequence duration.");
+}
+
 static void PetWindowReleasesRuntimeResourcesOnClose()
 {
     var workspace = FindWorkspaceRoot();
@@ -3475,6 +3577,30 @@ static void AnimationControllerLoopsIdleFrames()
     Assert.Equal(0, controller.AdvanceIdle(3), "Idle should loop to frame 0.");
     controller.ResetIdle();
     Assert.Equal(0, controller.IdleFrameIndex, "Idle reset should restore frame 0.");
+}
+
+static void PetFrameTimingResolvesAuthoredOverrides()
+{
+    var action = new PetActionDefinition(
+        Id: "irregular",
+        Kind: PetActionKind.Idle,
+        FramePaths: ["0.png", "1.png", "2.png"],
+        FrameInterval: TimeSpan.FromMilliseconds(100),
+        FrameDurations:
+        [
+            TimeSpan.FromMilliseconds(240),
+            null,
+            TimeSpan.FromMilliseconds(60),
+        ]);
+    var fallback = TimeSpan.FromMilliseconds(80);
+
+    Assert.Equal(TimeSpan.FromMilliseconds(240), PetFrameTiming.GetDuration(action, 0, fallback), "Frame zero should use its override.");
+    Assert.Equal(TimeSpan.FromMilliseconds(100), PetFrameTiming.GetDuration(action, 1, fallback), "A null override should use frameIntervalMs.");
+    Assert.Equal(TimeSpan.FromMilliseconds(60), PetFrameTiming.GetDuration(action, 2, fallback), "Frame two should use its override.");
+    Assert.Equal(TimeSpan.FromMilliseconds(400), PetFrameTiming.GetTotalDuration(action, 3, fallback), "Total duration should combine overrides and defaults.");
+
+    var noDefault = action with { FrameInterval = null, FrameDurations = [null, null, null] };
+    Assert.Equal(fallback, PetFrameTiming.GetDuration(noDefault, 1, fallback), "A frame without either authored duration should use the runtime fallback.");
 }
 
 static void AnimationControllerCompletesOneShotActions()

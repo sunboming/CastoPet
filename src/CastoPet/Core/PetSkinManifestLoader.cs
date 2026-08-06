@@ -137,6 +137,9 @@ public static class PetSkinManifestLoader
             Kind: kind,
             FramePaths: frames,
             FrameInterval: MillisecondsToTimeSpan(manifest.FrameIntervalMs),
+            FrameDurations: manifest.FrameDurationsMs?
+                .Select(MillisecondsToTimeSpan)
+                .ToArray(),
             DistancePerFrame: manifest.DistancePerFrame,
             MinScheduleDelay: MillisecondsToTimeSpan(manifest.MinScheduleDelayMs),
             MaxScheduleDelay: MillisecondsToTimeSpan(manifest.MaxScheduleDelayMs),
@@ -153,6 +156,20 @@ public static class PetSkinManifestLoader
         }
 
         ValidatePositive(manifest.FrameIntervalMs, $"action {id} frameIntervalMs");
+        if (manifest.FrameDurationsMs is { } frameDurations)
+        {
+            if (frameDurations.Count != manifest.Frames.Count)
+            {
+                throw new InvalidDataException(
+                    $"Action {id} frameDurationsMs must contain one entry per frame.");
+            }
+
+            for (var index = 0; index < frameDurations.Count; index++)
+            {
+                ValidatePositive(frameDurations[index], $"action {id} frameDurationsMs[{index}]");
+            }
+        }
+
         ValidatePositive(manifest.DistancePerFrame, $"action {id} distancePerFrame");
         ValidatePositive(manifest.MinScheduleDelayMs, $"action {id} minScheduleDelayMs");
         ValidatePositive(manifest.MaxScheduleDelayMs, $"action {id} maxScheduleDelayMs");
@@ -331,6 +348,7 @@ public static class PetSkinManifestLoader
         public string? Kind { get; set; }
         public List<string>? Frames { get; set; }
         public double? FrameIntervalMs { get; set; }
+        public List<double?>? FrameDurationsMs { get; set; }
         public double? DistancePerFrame { get; set; }
         public double? MinScheduleDelayMs { get; set; }
         public double? MaxScheduleDelayMs { get; set; }

@@ -39,6 +39,9 @@ public static class PetSkinManifestWriter
                 Kind: ToManifestKind(action.Kind),
                 Frames: action.FramePaths.Select(path => ToManifestPath(path, skin.ResourceRoot)).ToArray(),
                 FrameIntervalMs: ToMilliseconds(action.FrameInterval),
+                FrameDurationsMs: action.FrameDurations is { Count: > 0 }
+                    ? action.FrameDurations.Select(ToMilliseconds).ToArray()
+                    : null,
                 DistancePerFrame: action.DistancePerFrame,
                 MinScheduleDelayMs: ToMilliseconds(action.MinScheduleDelay),
                 MaxScheduleDelayMs: ToMilliseconds(action.MaxScheduleDelay),
@@ -118,6 +121,7 @@ public static class PetSkinManifestWriter
         string Kind,
         IReadOnlyList<string> Frames,
         double? FrameIntervalMs,
+        IReadOnlyList<double?>? FrameDurationsMs,
         double? DistancePerFrame,
         double? MinScheduleDelayMs,
         double? MaxScheduleDelayMs,
