@@ -222,6 +222,7 @@ var tests = new (string Name, Action Test)[]
     ("Stability runner calculates normalized process CPU", StabilityRunnerCalculatesNormalizedProcessCpu),
     ("Stability runner tracks memory trend without retaining samples", StabilityRunnerTracksMemoryTrendWithoutRetainingSamples),
     ("Stability runner isolates memory trends across process restarts", StabilityRunnerIsolatesMemoryTrendsAcrossProcessRestarts),
+    ("Stability runner contains optional metric access failures", StabilityRunnerContainsOptionalMetricAccessFailures),
     ("Stability runner enforces restart limit", StabilityRunnerEnforcesRestartLimit),
 };
 
@@ -4226,6 +4227,14 @@ static ProcessMetricSample RunningProcessSample(int processId, long privateBytes
     ReadBytes: 0,
     WriteBytes: 0,
     IsForeground: false);
+
+static void StabilityRunnerContainsOptionalMetricAccessFailures()
+{
+    Assert.Equal(42L, OptionalMetricReader.TryRead(() => 42L),
+        "Readable optional metrics should retain their value.");
+    Assert.Equal(null, OptionalMetricReader.TryRead<long>(() => throw new UnauthorizedAccessException()),
+        "A protected process metric should degrade to an empty field instead of discarding the sample.");
+}
 
 static class Assert
 {

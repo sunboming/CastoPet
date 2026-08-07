@@ -1,4 +1,22 @@
+using System.ComponentModel;
+
 namespace CastoPet.StabilityRunner;
+
+internal static class OptionalMetricReader
+{
+    public static T? TryRead<T>(Func<T> read) where T : struct
+    {
+        try
+        {
+            return read();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or
+                                   NotSupportedException or Win32Exception)
+        {
+            return null;
+        }
+    }
+}
 
 public static class ProcessCpuCalculator
 {

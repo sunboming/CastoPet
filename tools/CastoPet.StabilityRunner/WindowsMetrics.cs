@@ -34,41 +34,52 @@ internal sealed class ProcessMetricsSampler : IDisposable
 
     public ProcessMetricSample Capture(DateTimeOffset timestamp)
     {
-        _process.Refresh();
-        if (_process.HasExited)
+        var refreshed = OptionalMetricReader.TryRead(() =>
+        {
+            _process.Refresh();
+            return true;
+        });
+        var running = OptionalMetricReader.TryRead(() => !_process.HasExited);
+        if (refreshed != true || running != true)
         {
             return Missing();
         }
 
-        var processorTime = _process.TotalProcessorTime;
+        var processorTime = OptionalMetricReader.TryRead(() => _process.TotalProcessorTime);
         double? cpuPercent = null;
-        if (_previousProcessorTime is TimeSpan previousProcessorTime &&
+        if (processorTime is TimeSpan currentProcessorTime &&
+            _previousProcessorTime is TimeSpan previousProcessorTime &&
             _previousTimestamp is DateTimeOffset previousTimestamp)
         {
             cpuPercent = ProcessCpuCalculator.CalculatePercent(
                 previousProcessorTime,
-                processorTime,
+                currentProcessorTime,
                 timestamp - previousTimestamp,
                 Environment.ProcessorCount);
         }
 
-        _previousProcessorTime = processorTime;
-        _previousTimestamp = timestamp;
-        var io = NativeMethods.TryGetIoCounters(_process.SafeHandle);
+        if (processorTime is not null)
+        {
+            _previousProcessorTime = processorTime;
+            _previousTimestamp = timestamp;
+        }
+
+        var processId = OptionalMetricReader.TryRead(() => _process.Id);
+        var io = OptionalMetricReader.TryRead(() => NativeMethods.ReadIoCounters(_process.SafeHandle));
         return new ProcessMetricSample(
-            _process.Id,
+            processId,
             true,
             cpuPercent,
-            _process.WorkingSet64,
-            _process.PrivateMemorySize64,
-            _process.VirtualMemorySize64,
-            _process.HandleCount,
-            _process.Threads.Count,
-            NativeMethods.GetGuiResources(_process.Handle, 0),
-            NativeMethods.GetGuiResources(_process.Handle, 1),
+            OptionalMetricReader.TryRead(() => _process.WorkingSet64),
+            OptionalMetricReader.TryRead(() => _process.PrivateMemorySize64),
+            OptionalMetricReader.TryRead(() => _process.VirtualMemorySize64),
+            OptionalMetricReader.TryRead(() => _process.HandleCount),
+            OptionalMetricReader.TryRead(() => _process.Threads.Count),
+            OptionalMetricReader.TryRead(() => NativeMethods.GetGuiResources(_process.Handle, 0)),
+            OptionalMetricReader.TryRead(() => NativeMethods.GetGuiResources(_process.Handle, 1)),
             io?.ReadTransferCount,
             io?.WriteTransferCount,
-            NativeMethods.IsForegroundProcess(_process.Id));
+            processId is int id ? NativeMethods.IsForegroundProcess(id) : null);
     }
 
     public static ProcessMetricSample Missing() => new(
@@ -153,7 +164,7 @@ internal static class NativeMethods
         public ulong OtherTransferCount;
     }
 
-    [DllImport("kernel32.dll")]
+    [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetSystemTimes(out FileTime idleTime, out FileTime kernelTime, out FileTime userTime);
 
@@ -174,8 +185,15 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(nint window, out uint processId);
 
-    internal static IoCounters? TryGetIoCounters(SafeProcessHandle processHandle) =>
-        GetProcessIoCounters(processHandle, out var counters) ? counters : null;
+    internal static IoCounters ReadIoCounters(SafeProcessHandle processHandle)
+    {
+        if (!GetProcessIoCounters(processHandle, out var counters))
+        {
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        return counters;
+    }
 
     internal static bool IsForegroundProcess(int processId)
     {
