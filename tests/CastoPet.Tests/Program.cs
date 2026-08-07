@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Resources;
 using CastoPet.Core;
+using CastoPet.StabilityRunner;
 
 var tests = new (string Name, Action Test)[]
 {
@@ -217,6 +218,11 @@ var tests = new (string Name, Action Test)[]
     ("Input reactive asset is packaged", InputReactiveAssetIsPackaged),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
     ("Packaged expression transitions have complete source and runtime endpoints", PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints),
+    ("Stability runner parses bounded options", StabilityRunnerParsesBoundedOptions),
+    ("Stability runner calculates normalized process CPU", StabilityRunnerCalculatesNormalizedProcessCpu),
+    ("Stability runner tracks memory trend without retaining samples", StabilityRunnerTracksMemoryTrendWithoutRetainingSamples),
+    ("Stability runner isolates memory trends across process restarts", StabilityRunnerIsolatesMemoryTrendsAcrossProcessRestarts),
+    ("Stability runner enforces restart limit", StabilityRunnerEnforcesRestartLimit),
 };
 
 var failures = 0;
@@ -871,6 +877,7 @@ static void RepositoryIgnoresLocalWorkingAssets()
     Assert.Contains(gitignore, "/sample/", "Reference expression images should remain untracked.");
     Assert.Contains(gitignore, "/tmp/", "Temporary generated output should remain untracked.");
     Assert.Contains(gitignore, "/Castorice.png", "The root reference character image should remain untracked.");
+    Assert.Contains(gitignore, "artifacts/stability-tests/", "Stability session data should remain untracked.");
 }
 
 static void VelopackRunsAtTheApplicationEntryPoint()
@@ -4116,6 +4123,109 @@ static int ReadBigEndianInt32(ReadOnlySpan<byte> bytes)
 {
     return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
 }
+
+static void StabilityRunnerParsesBoundedOptions()
+{
+    var options = StabilityRunnerOptions.Parse(
+        [
+            "--pet-exe", @"D:\Build\CastoPet.exe",
+            "--duration", "12:30:00",
+            "--interval-seconds", "2.5",
+            "--game-process", "ExampleGame.exe",
+            "--max-restarts", "4",
+            "--restart-delay-seconds", "3",
+            "--stop-pet-on-exit",
+        ],
+        @"D:\Default\CastoPet.exe",
+        @"D:\Results");
+
+    Assert.Equal(@"D:\Build\CastoPet.exe", options.PetExecutablePath, "Explicit pet executable should win over the default.");
+    Assert.Equal(TimeSpan.FromHours(12.5), options.Duration, "Duration should parse as an invariant TimeSpan.");
+    Assert.Equal(TimeSpan.FromSeconds(2.5), options.SampleInterval, "Sample interval should retain fractional seconds.");
+    Assert.Equal("ExampleGame", options.GameProcessName, "Process names should normalize without the .exe suffix.");
+    Assert.Equal(4, options.MaxRestarts, "Restart limit should parse.");
+    Assert.Equal(TimeSpan.FromSeconds(3), options.RestartDelay, "Restart delay should parse.");
+    Assert.True(options.StopPetOnExit, "The explicit cleanup flag should be retained.");
+
+    _ = Assert.Throws<ArgumentException>(() => StabilityRunnerOptions.Parse(
+        ["--interval-seconds", "0"],
+        @"D:\Default\CastoPet.exe",
+        @"D:\Results"));
+    _ = Assert.Throws<ArgumentException>(() => StabilityRunnerOptions.Parse(
+        ["--max-restarts", "-1"],
+        @"D:\Default\CastoPet.exe",
+        @"D:\Results"));
+}
+
+static void StabilityRunnerCalculatesNormalizedProcessCpu()
+{
+    var percent = ProcessCpuCalculator.CalculatePercent(
+        TimeSpan.FromSeconds(10),
+        TimeSpan.FromSeconds(12),
+        TimeSpan.FromSeconds(4),
+        processorCount: 4);
+
+    Assert.Equal(12.5d, percent, "Two CPU seconds over four wall seconds on four processors should be 12.5 percent.");
+    Assert.Equal(0d, ProcessCpuCalculator.CalculatePercent(
+        TimeSpan.FromSeconds(12),
+        TimeSpan.FromSeconds(11),
+        TimeSpan.FromSeconds(1),
+        processorCount: 4), "Counter resets should not produce negative CPU usage.");
+}
+
+static void StabilityRunnerTracksMemoryTrendWithoutRetainingSamples()
+{
+    var trend = new MemoryTrendAccumulator();
+    trend.Add(TimeSpan.Zero, 100 * 1024 * 1024);
+    trend.Add(TimeSpan.FromMinutes(30), 110 * 1024 * 1024);
+    trend.Add(TimeSpan.FromHours(1), 120 * 1024 * 1024);
+
+    var snapshot = trend.Snapshot();
+    Assert.Equal(3L, snapshot.SampleCount, "Trend should count samples without exposing a retained collection.");
+    Assert.Equal(20L * 1024 * 1024, snapshot.GrowthBytes, "Growth should compare the first and latest sample.");
+    Assert.Equal(20d * 1024 * 1024, snapshot.SlopeBytesPerHour, "Linear growth should report bytes per hour.");
+    Assert.Equal(120L * 1024 * 1024, snapshot.PeakBytes, "Peak memory should be tracked online.");
+}
+
+static void StabilityRunnerEnforcesRestartLimit()
+{
+    var policy = new ProcessRestartPolicy(2, TimeSpan.FromSeconds(3));
+
+    Assert.True(policy.TryScheduleRestart(out var firstDelay), "The first restart should be allowed.");
+    Assert.Equal(TimeSpan.FromSeconds(3), firstDelay, "Allowed restarts should use the configured delay.");
+    Assert.True(policy.TryScheduleRestart(out _), "The second restart should be allowed.");
+    Assert.False(policy.TryScheduleRestart(out _), "Restarts beyond the limit should be rejected.");
+    Assert.Equal(2, policy.RestartCount, "Only scheduled restarts should be counted.");
+}
+
+static void StabilityRunnerIsolatesMemoryTrendsAcrossProcessRestarts()
+{
+    var aggregate = new MetricAggregate();
+    aggregate.Add(TimeSpan.Zero, RunningProcessSample(101, 100 * 1024 * 1024));
+    aggregate.Add(TimeSpan.FromHours(1), RunningProcessSample(101, 140 * 1024 * 1024));
+    aggregate.Add(TimeSpan.FromHours(2), RunningProcessSample(202, 60 * 1024 * 1024));
+    aggregate.Add(TimeSpan.FromHours(3), RunningProcessSample(202, 70 * 1024 * 1024));
+
+    var snapshot = aggregate.Snapshot();
+    Assert.Equal(2, snapshot.ObservedProcessCount, "A restarted pet should begin a new process segment.");
+    Assert.Equal(10L * 1024 * 1024, snapshot.CurrentProcessPrivateMemoryTrend.GrowthBytes,
+        "The current trend must not combine memory values from the exited process.");
+}
+
+static ProcessMetricSample RunningProcessSample(int processId, long privateBytes) => new(
+    processId,
+    Running: true,
+    CpuPercent: 1,
+    WorkingSetBytes: privateBytes,
+    PrivateBytes: privateBytes,
+    VirtualBytes: privateBytes,
+    HandleCount: 10,
+    ThreadCount: 5,
+    GdiObjects: 1,
+    UserObjects: 1,
+    ReadBytes: 0,
+    WriteBytes: 0,
+    IsForeground: false);
 
 static class Assert
 {

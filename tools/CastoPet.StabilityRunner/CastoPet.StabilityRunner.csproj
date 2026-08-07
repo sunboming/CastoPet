@@ -5,9 +5,4 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\CastoPet\CastoPet.csproj" />
-    <ProjectReference Include="..\..\tools\CastoPet.StabilityRunner\CastoPet.StabilityRunner.csproj" />
-  </ItemGroup>
 </Project>
