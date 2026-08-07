@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Resources;
 using CastoPet.Core;
+using CastoPet.StabilityReport;
 using CastoPet.StabilityRunner;
 
 var tests = new (string Name, Action Test)[]
@@ -224,6 +225,10 @@ var tests = new (string Name, Action Test)[]
     ("Stability runner isolates memory trends across process restarts", StabilityRunnerIsolatesMemoryTrendsAcrossProcessRestarts),
     ("Stability runner contains optional metric access failures", StabilityRunnerContainsOptionalMetricAccessFailures),
     ("Stability runner enforces restart limit", StabilityRunnerEnforcesRestartLimit),
+    ("Stability report reads optional metrics", StabilityReportReadsOptionalMetrics),
+    ("Stability report calculates steady trends", StabilityReportCalculatesSteadyTrends),
+    ("Stability report downsampling preserves extrema", StabilityReportDownsamplingPreservesExtrema),
+    ("Stability report HTML is self contained", StabilityReportHtmlIsSelfContained),
 };
 
 var failures = 0;
@@ -4197,6 +4202,88 @@ static void StabilityRunnerEnforcesRestartLimit()
     Assert.True(policy.TryScheduleRestart(out _), "The second restart should be allowed.");
     Assert.False(policy.TryScheduleRestart(out _), "Restarts beyond the limit should be rejected.");
     Assert.Equal(2, policy.RestartCount, "Only scheduled restarts should be counted.");
+}
+
+static void StabilityReportReadsOptionalMetrics()
+{
+    var directory = Path.Combine(Path.GetTempPath(), $"castopet-report-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        File.WriteAllText(Path.Combine(directory, "samples.csv"), """
+            timestampUtc,elapsedSeconds,role,pid,running,cpuPercent,workingSetBytes,privateBytes,virtualBytes,handleCount,threadCount,gdiObjects,userObjects,readBytes,writeBytes,isForeground,systemCpuPercent,systemAvailableMemoryBytes
+            2026-08-07T00:00:00.0000000+00:00,0,pet,10,true,0.25,1000,900,2000,20,5,3,4,10,20,true,12.5,8000
+            2026-08-07T00:00:01.0000000+00:00,1,game,20,true,5,5000,7000,9000,200,40,,,,,false,12.5,8000
+            """);
+        File.WriteAllText(Path.Combine(directory, "events.jsonl"),
+            "{\"timestampUtc\":\"2026-08-07T00:00:00Z\",\"type\":\"session-started\",\"message\":\"Started\",\"processId\":10}\n");
+
+        var (samples, events) = StabilityReportReader.ReadSession(directory);
+
+        Assert.Equal(2, samples.Count, "Every sample row should be read.");
+        Assert.Equal(null, samples[1].GdiObjects, "Protected game metrics should remain empty.");
+        Assert.Equal(1, events.Count, "JSONL events should be read.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void StabilityReportCalculatesSteadyTrends()
+{
+    var start = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
+    var samples = new List<ReportSample>();
+    for (var minute = 0; minute <= 20; minute++)
+    {
+        samples.Add(ReportSampleAt(start, minute, "pet", 100 + minute));
+        samples.Add(ReportSampleAt(start, minute, "game", 1000 + minute * 10));
+    }
+
+    var analysis = StabilityReportAnalyzer.Analyze(samples, []);
+
+    Assert.Equal(21, analysis.Pet.RunningSampleCount, "Pet samples should be summarized independently.");
+    Assert.True(analysis.Pet.PrivateSteadySlopeBytesPerHour > 59 * 1024 * 1024,
+        "One MiB per minute should produce an approximately sixty MiB hourly slope.");
+    Assert.True(analysis.Pet.PrivateSteadySlopeBytesPerHour < 61 * 1024 * 1024,
+        "Steady-state trend should retain the authored slope.");
+}
+
+static ReportSample ReportSampleAt(DateTimeOffset start, int minute, string role, int privateMiB) => new(
+    start.AddMinutes(minute), minute * 60, role, role == "pet" ? 10 : 20, true, minute,
+    privateMiB * 1024L * 1024L, privateMiB * 1024L * 1024L, privateMiB * 2L * 1024 * 1024,
+    20 + minute, 5, 3, 4, 100, 50, role == "game", 10, 8UL * 1024 * 1024 * 1024);
+
+static void StabilityReportDownsamplingPreservesExtrema()
+{
+    var points = Enumerable.Range(0, 1000)
+        .Select(index => new ChartPoint(index, index == 501 ? 10_000 : index))
+        .ToArray();
+
+    var result = ChartDownsampler.MinMax(points, maximumPoints: 80);
+
+    Assert.True(result.Count <= 80, "Downsampling should honor the requested point budget.");
+    Assert.Equal(points[0], result[0], "The first point should be retained.");
+    Assert.Equal(points[^1], result[^1], "The last point should be retained.");
+    Assert.True(result.Any(point => point.Y == 10_000), "A short spike should survive downsampling.");
+}
+
+static void StabilityReportHtmlIsSelfContained()
+{
+    var start = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
+    var samples = new[] { ReportSampleAt(start, 0, "pet", 100), ReportSampleAt(start, 1, "game", 1000) };
+    var analysis = StabilityReportAnalyzer.Analyze(samples,
+        [new ReportEvent(start, "session-started", "<img src=x onerror=alert(1)>", 10)]);
+
+    var html = StabilityReportHtml.Render(analysis, samples);
+
+    Assert.Contains(html, "<!doctype html>", "The result should be a complete HTML document.");
+    Assert.Contains(html, "CastoPet 稳定性报告", "The report should identify its purpose.");
+    Assert.Contains(html, "data-report", "The analyzed data should be embedded in the document.");
+    Assert.Contains(html, "esc=(v)=>String(v).replace",
+        "Runtime event text should pass through the HTML escaping helper.");
+    Assert.False(html.Contains("<img src=x", StringComparison.Ordinal), "Event markup must stay encoded in embedded JSON.");
+    Assert.False(html.Contains("https://", StringComparison.OrdinalIgnoreCase), "Offline reports must not load network resources.");
 }
 
 static void StabilityRunnerIsolatesMemoryTrendsAcrossProcessRestarts()

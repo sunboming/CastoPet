@@ -51,3 +51,21 @@ the game owns the foreground window. It does not record FPS or frame times. Reli
 comparison requires a later PresentMon integration and controlled pet-on/pet-off test phases.
 
 No keyboard contents, window titles, screenshots, or network data are collected.
+
+## Generate An Offline Report
+
+Create a self-contained report after a session finishes or is manually stopped:
+
+```powershell
+dotnet run --project tools/CastoPet.StabilityReport/CastoPet.StabilityReport.csproj -c Release -- `
+  --session artifacts/stability-tests/<timestamp>
+```
+
+The command writes `report.html` into the session directory by default. It embeds the analyzed
+summary, lifecycle events, and spike-preserving downsampled chart data, so the report can be
+opened directly without a local server or network connection. Exact cards and tables use every
+raw sample; only chart rendering is downsampled.
+
+The report grades CastoPet resource stability and highlights sampling failures. Game metrics are
+observational only: without a controlled pet-off baseline and frame-time collection, they cannot
+establish whether CastoPet affected game performance.

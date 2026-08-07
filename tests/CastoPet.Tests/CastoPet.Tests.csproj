@@ -9,5 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\CastoPet\CastoPet.csproj" />
     <ProjectReference Include="..\..\tools\CastoPet.StabilityRunner\CastoPet.StabilityRunner.csproj" />
+    <ProjectReference Include="..\..\tools\CastoPet.StabilityReport\CastoPet.StabilityReport.csproj" />
   </ItemGroup>
 </Project>
