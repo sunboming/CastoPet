@@ -11,12 +11,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CastoPet.Tests", "tests\CastoPet.Tests\CastoPet.Tests.csproj", "{EFCE6CB6-B500-422C-9DF9-11C6355E01D6}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{07C2787E-EAC7-C090-1BA3-A61EC2A24D84}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CastoPet.StabilityRunner", "tools\CastoPet.StabilityRunner\CastoPet.StabilityRunner.csproj", "{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CastoPet.StabilityReport", "tools\CastoPet.StabilityReport\CastoPet.StabilityReport.csproj", "{3529D4DD-5B16-46B2-92F5-96D53C4FD487}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,30 +45,6 @@ Global
 		{EFCE6CB6-B500-422C-9DF9-11C6355E01D6}.Release|x64.Build.0 = Release|Any CPU
 		{EFCE6CB6-B500-422C-9DF9-11C6355E01D6}.Release|x86.ActiveCfg = Release|Any CPU
 		{EFCE6CB6-B500-422C-9DF9-11C6355E01D6}.Release|x86.Build.0 = Release|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Debug|x64.Build.0 = Debug|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Debug|x86.Build.0 = Debug|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Release|x64.ActiveCfg = Release|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Release|x64.Build.0 = Release|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Release|x86.ActiveCfg = Release|Any CPU
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C}.Release|x86.Build.0 = Release|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Debug|x64.Build.0 = Debug|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Debug|x86.Build.0 = Debug|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Release|x64.ActiveCfg = Release|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Release|x64.Build.0 = Release|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Release|x86.ActiveCfg = Release|Any CPU
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,7 +52,5 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{99996980-C545-4E37-8ECA-C8D9C80B0D82} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{EFCE6CB6-B500-422C-9DF9-11C6355E01D6} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
-		{96898FB1-5CB6-4F5C-B5ED-4A7D50743C2C} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
-		{3529D4DD-5B16-46B2-92F5-96D53C4FD487} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 EndGlobal

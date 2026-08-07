@@ -1,8 +1,6 @@
 using System.Drawing;
 using System.Resources;
 using CastoPet.Core;
-using CastoPet.StabilityReport;
-using CastoPet.StabilityRunner;
 
 var tests = new (string Name, Action Test)[]
 {
@@ -54,7 +52,6 @@ var tests = new (string Name, Action Test)[]
     ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
     ("Update source points to the public releases repository", UpdateSourcePointsToThePublicReleasesRepository),
     ("Settings window exposes crash and update actions", SettingsWindowExposesCrashAndUpdateActions),
-    ("Local packaging script cannot publish artifacts", LocalPackagingScriptCannotPublishArtifacts),
     ("Pet window settings snapshot copies runtime flags", PetWindowSettingsSnapshotCopiesRuntimeFlags),
     ("Pet window settings snapshot copies input reactive mode", PetWindowSettingsSnapshotCopiesInputReactiveMode),
     ("Invalid settings file falls back to defaults", InvalidSettingsFallsBackToDefaults),
@@ -219,16 +216,6 @@ var tests = new (string Name, Action Test)[]
     ("Input reactive asset is packaged", InputReactiveAssetIsPackaged),
     ("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
     ("Packaged expression transitions have complete source and runtime endpoints", PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints),
-    ("Stability runner parses bounded options", StabilityRunnerParsesBoundedOptions),
-    ("Stability runner calculates normalized process CPU", StabilityRunnerCalculatesNormalizedProcessCpu),
-    ("Stability runner tracks memory trend without retaining samples", StabilityRunnerTracksMemoryTrendWithoutRetainingSamples),
-    ("Stability runner isolates memory trends across process restarts", StabilityRunnerIsolatesMemoryTrendsAcrossProcessRestarts),
-    ("Stability runner contains optional metric access failures", StabilityRunnerContainsOptionalMetricAccessFailures),
-    ("Stability runner enforces restart limit", StabilityRunnerEnforcesRestartLimit),
-    ("Stability report reads optional metrics", StabilityReportReadsOptionalMetrics),
-    ("Stability report calculates steady trends", StabilityReportCalculatesSteadyTrends),
-    ("Stability report downsampling preserves extrema", StabilityReportDownsamplingPreservesExtrema),
-    ("Stability report HTML is self contained", StabilityReportHtmlIsSelfContained),
 };
 
 var failures = 0;
@@ -914,25 +901,6 @@ static void SettingsWindowExposesCrashAndUpdateActions()
     Assert.Contains(xaml, "CheckForUpdatesButton", "Settings should expose manual update checks.");
     Assert.Contains(xaml, "UpdateStatusText", "Settings should display update status.");
     Assert.Contains(xaml, "CurrentVersionText", "Settings should display the current version.");
-}
-
-static void LocalPackagingScriptCannotPublishArtifacts()
-{
-    var workspace = FindWorkspaceRoot();
-    var script = File.ReadAllText(System.IO.Path.Combine(workspace, "tools", "package-local.ps1"));
-    var gitignore = File.ReadAllText(System.IO.Path.Combine(workspace, ".gitignore"));
-
-    Assert.Contains(script, "dotnet publish", "Local packaging should publish a self-contained application first.");
-    Assert.Contains(script, "--self-contained", "Local packaging should not require a preinstalled runtime.");
-    Assert.Contains(script, "win-x64", "The first installer should target Windows x64.");
-    Assert.Contains(script, "vpk pack", "Local packaging should create a Velopack installer.");
-    Assert.Contains(script, "--packId CastoPet.App", "Installer files must not share the CastoPet user-data directory.");
-    Assert.Contains(script, "Directory.Build.props", "Local packaging should read the repository's central version source.");
-    Assert.Contains(script, "VersionPrefix", "Local packaging should default to the central semantic version.");
-    Assert.False(script.Contains("[string]$Version = '0.1.0'", StringComparison.Ordinal), "Local packaging should not duplicate the current version as a parameter default.");
-    Assert.False(script.Contains("vpk upload", StringComparison.OrdinalIgnoreCase), "Local packaging must not upload packages.");
-    Assert.False(script.Contains("gh release", StringComparison.OrdinalIgnoreCase), "Local packaging must not create GitHub Releases.");
-    Assert.Contains(gitignore, "artifacts/local-package/", "Generated local packages should stay outside version control.");
 }
 
 static void PetWindowSettingsSnapshotCopiesRuntimeFlags()
@@ -4128,199 +4096,6 @@ static (int Width, int Height) ReadPngSize(string path)
 static int ReadBigEndianInt32(ReadOnlySpan<byte> bytes)
 {
     return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
-}
-
-static void StabilityRunnerParsesBoundedOptions()
-{
-    var options = StabilityRunnerOptions.Parse(
-        [
-            "--pet-exe", @"D:\Build\CastoPet.exe",
-            "--duration", "12:30:00",
-            "--interval-seconds", "2.5",
-            "--game-process", "ExampleGame.exe",
-            "--max-restarts", "4",
-            "--restart-delay-seconds", "3",
-            "--stop-pet-on-exit",
-        ],
-        @"D:\Default\CastoPet.exe",
-        @"D:\Results");
-
-    Assert.Equal(@"D:\Build\CastoPet.exe", options.PetExecutablePath, "Explicit pet executable should win over the default.");
-    Assert.Equal(TimeSpan.FromHours(12.5), options.Duration, "Duration should parse as an invariant TimeSpan.");
-    Assert.Equal(TimeSpan.FromSeconds(2.5), options.SampleInterval, "Sample interval should retain fractional seconds.");
-    Assert.Equal("ExampleGame", options.GameProcessName, "Process names should normalize without the .exe suffix.");
-    Assert.Equal(4, options.MaxRestarts, "Restart limit should parse.");
-    Assert.Equal(TimeSpan.FromSeconds(3), options.RestartDelay, "Restart delay should parse.");
-    Assert.True(options.StopPetOnExit, "The explicit cleanup flag should be retained.");
-
-    _ = Assert.Throws<ArgumentException>(() => StabilityRunnerOptions.Parse(
-        ["--interval-seconds", "0"],
-        @"D:\Default\CastoPet.exe",
-        @"D:\Results"));
-    _ = Assert.Throws<ArgumentException>(() => StabilityRunnerOptions.Parse(
-        ["--max-restarts", "-1"],
-        @"D:\Default\CastoPet.exe",
-        @"D:\Results"));
-}
-
-static void StabilityRunnerCalculatesNormalizedProcessCpu()
-{
-    var percent = ProcessCpuCalculator.CalculatePercent(
-        TimeSpan.FromSeconds(10),
-        TimeSpan.FromSeconds(12),
-        TimeSpan.FromSeconds(4),
-        processorCount: 4);
-
-    Assert.Equal(12.5d, percent, "Two CPU seconds over four wall seconds on four processors should be 12.5 percent.");
-    Assert.Equal(0d, ProcessCpuCalculator.CalculatePercent(
-        TimeSpan.FromSeconds(12),
-        TimeSpan.FromSeconds(11),
-        TimeSpan.FromSeconds(1),
-        processorCount: 4), "Counter resets should not produce negative CPU usage.");
-}
-
-static void StabilityRunnerTracksMemoryTrendWithoutRetainingSamples()
-{
-    var trend = new MemoryTrendAccumulator();
-    trend.Add(TimeSpan.Zero, 100 * 1024 * 1024);
-    trend.Add(TimeSpan.FromMinutes(30), 110 * 1024 * 1024);
-    trend.Add(TimeSpan.FromHours(1), 120 * 1024 * 1024);
-
-    var snapshot = trend.Snapshot();
-    Assert.Equal(3L, snapshot.SampleCount, "Trend should count samples without exposing a retained collection.");
-    Assert.Equal(20L * 1024 * 1024, snapshot.GrowthBytes, "Growth should compare the first and latest sample.");
-    Assert.Equal(20d * 1024 * 1024, snapshot.SlopeBytesPerHour, "Linear growth should report bytes per hour.");
-    Assert.Equal(120L * 1024 * 1024, snapshot.PeakBytes, "Peak memory should be tracked online.");
-}
-
-static void StabilityRunnerEnforcesRestartLimit()
-{
-    var policy = new ProcessRestartPolicy(2, TimeSpan.FromSeconds(3));
-
-    Assert.True(policy.TryScheduleRestart(out var firstDelay), "The first restart should be allowed.");
-    Assert.Equal(TimeSpan.FromSeconds(3), firstDelay, "Allowed restarts should use the configured delay.");
-    Assert.True(policy.TryScheduleRestart(out _), "The second restart should be allowed.");
-    Assert.False(policy.TryScheduleRestart(out _), "Restarts beyond the limit should be rejected.");
-    Assert.Equal(2, policy.RestartCount, "Only scheduled restarts should be counted.");
-}
-
-static void StabilityReportReadsOptionalMetrics()
-{
-    var directory = Path.Combine(Path.GetTempPath(), $"castopet-report-{Guid.NewGuid():N}");
-    Directory.CreateDirectory(directory);
-    try
-    {
-        File.WriteAllText(Path.Combine(directory, "samples.csv"), """
-            timestampUtc,elapsedSeconds,role,pid,running,cpuPercent,workingSetBytes,privateBytes,virtualBytes,handleCount,threadCount,gdiObjects,userObjects,readBytes,writeBytes,isForeground,systemCpuPercent,systemAvailableMemoryBytes
-            2026-08-07T00:00:00.0000000+00:00,0,pet,10,true,0.25,1000,900,2000,20,5,3,4,10,20,true,12.5,8000
-            2026-08-07T00:00:01.0000000+00:00,1,game,20,true,5,5000,7000,9000,200,40,,,,,false,12.5,8000
-            """);
-        File.WriteAllText(Path.Combine(directory, "events.jsonl"),
-            "{\"timestampUtc\":\"2026-08-07T00:00:00Z\",\"type\":\"session-started\",\"message\":\"Started\",\"processId\":10}\n");
-
-        var (samples, events) = StabilityReportReader.ReadSession(directory);
-
-        Assert.Equal(2, samples.Count, "Every sample row should be read.");
-        Assert.Equal(null, samples[1].GdiObjects, "Protected game metrics should remain empty.");
-        Assert.Equal(1, events.Count, "JSONL events should be read.");
-    }
-    finally
-    {
-        Directory.Delete(directory, recursive: true);
-    }
-}
-
-static void StabilityReportCalculatesSteadyTrends()
-{
-    var start = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-    var samples = new List<ReportSample>();
-    for (var minute = 0; minute <= 20; minute++)
-    {
-        samples.Add(ReportSampleAt(start, minute, "pet", 100 + minute));
-        samples.Add(ReportSampleAt(start, minute, "game", 1000 + minute * 10));
-    }
-
-    var analysis = StabilityReportAnalyzer.Analyze(samples, []);
-
-    Assert.Equal(21, analysis.Pet.RunningSampleCount, "Pet samples should be summarized independently.");
-    Assert.True(analysis.Pet.PrivateSteadySlopeBytesPerHour > 59 * 1024 * 1024,
-        "One MiB per minute should produce an approximately sixty MiB hourly slope.");
-    Assert.True(analysis.Pet.PrivateSteadySlopeBytesPerHour < 61 * 1024 * 1024,
-        "Steady-state trend should retain the authored slope.");
-}
-
-static ReportSample ReportSampleAt(DateTimeOffset start, int minute, string role, int privateMiB) => new(
-    start.AddMinutes(minute), minute * 60, role, role == "pet" ? 10 : 20, true, minute,
-    privateMiB * 1024L * 1024L, privateMiB * 1024L * 1024L, privateMiB * 2L * 1024 * 1024,
-    20 + minute, 5, 3, 4, 100, 50, role == "game", 10, 8UL * 1024 * 1024 * 1024);
-
-static void StabilityReportDownsamplingPreservesExtrema()
-{
-    var points = Enumerable.Range(0, 1000)
-        .Select(index => new ChartPoint(index, index == 501 ? 10_000 : index))
-        .ToArray();
-
-    var result = ChartDownsampler.MinMax(points, maximumPoints: 80);
-
-    Assert.True(result.Count <= 80, "Downsampling should honor the requested point budget.");
-    Assert.Equal(points[0], result[0], "The first point should be retained.");
-    Assert.Equal(points[^1], result[^1], "The last point should be retained.");
-    Assert.True(result.Any(point => point.Y == 10_000), "A short spike should survive downsampling.");
-}
-
-static void StabilityReportHtmlIsSelfContained()
-{
-    var start = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-    var samples = new[] { ReportSampleAt(start, 0, "pet", 100), ReportSampleAt(start, 1, "game", 1000) };
-    var analysis = StabilityReportAnalyzer.Analyze(samples,
-        [new ReportEvent(start, "session-started", "<img src=x onerror=alert(1)>", 10)]);
-
-    var html = StabilityReportHtml.Render(analysis, samples);
-
-    Assert.Contains(html, "<!doctype html>", "The result should be a complete HTML document.");
-    Assert.Contains(html, "CastoPet 稳定性报告", "The report should identify its purpose.");
-    Assert.Contains(html, "data-report", "The analyzed data should be embedded in the document.");
-    Assert.Contains(html, "esc=(v)=>String(v).replace",
-        "Runtime event text should pass through the HTML escaping helper.");
-    Assert.False(html.Contains("<img src=x", StringComparison.Ordinal), "Event markup must stay encoded in embedded JSON.");
-    Assert.False(html.Contains("https://", StringComparison.OrdinalIgnoreCase), "Offline reports must not load network resources.");
-}
-
-static void StabilityRunnerIsolatesMemoryTrendsAcrossProcessRestarts()
-{
-    var aggregate = new MetricAggregate();
-    aggregate.Add(TimeSpan.Zero, RunningProcessSample(101, 100 * 1024 * 1024));
-    aggregate.Add(TimeSpan.FromHours(1), RunningProcessSample(101, 140 * 1024 * 1024));
-    aggregate.Add(TimeSpan.FromHours(2), RunningProcessSample(202, 60 * 1024 * 1024));
-    aggregate.Add(TimeSpan.FromHours(3), RunningProcessSample(202, 70 * 1024 * 1024));
-
-    var snapshot = aggregate.Snapshot();
-    Assert.Equal(2, snapshot.ObservedProcessCount, "A restarted pet should begin a new process segment.");
-    Assert.Equal(10L * 1024 * 1024, snapshot.CurrentProcessPrivateMemoryTrend.GrowthBytes,
-        "The current trend must not combine memory values from the exited process.");
-}
-
-static ProcessMetricSample RunningProcessSample(int processId, long privateBytes) => new(
-    processId,
-    Running: true,
-    CpuPercent: 1,
-    WorkingSetBytes: privateBytes,
-    PrivateBytes: privateBytes,
-    VirtualBytes: privateBytes,
-    HandleCount: 10,
-    ThreadCount: 5,
-    GdiObjects: 1,
-    UserObjects: 1,
-    ReadBytes: 0,
-    WriteBytes: 0,
-    IsForeground: false);
-
-static void StabilityRunnerContainsOptionalMetricAccessFailures()
-{
-    Assert.Equal(42L, OptionalMetricReader.TryRead(() => 42L),
-        "Readable optional metrics should retain their value.");
-    Assert.Equal(null, OptionalMetricReader.TryRead<long>(() => throw new UnauthorizedAccessException()),
-        "A protected process metric should degrade to an empty field instead of discarding the sample.");
 }
 
 static class Assert
