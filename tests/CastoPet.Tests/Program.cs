@@ -1198,8 +1198,20 @@ static void BuiltInCastoriceBlinkActionPreservesSchedule()
 {
     var blink = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Blink);
 
-    Assert.Equal(3, blink.FramePaths.Count, "Blink should keep three frames.");
-    Assert.Equal(TimeSpan.FromMilliseconds(90), blink.FrameInterval, "Blink frame interval should stay compatible.");
+    Assert.Equal(5, blink.FramePaths.Count, "Blink should use a complete five-frame close and reopen sequence.");
+    Assert.Equal(TimeSpan.FromMilliseconds(45), blink.FrameInterval, "Blink should use a short fallback interval.");
+    Assert.True(
+        new TimeSpan?[]
+        {
+            TimeSpan.FromMilliseconds(40),
+            TimeSpan.FromMilliseconds(45),
+            TimeSpan.FromMilliseconds(60),
+            TimeSpan.FromMilliseconds(45),
+            TimeSpan.FromMilliseconds(35),
+        }.SequenceEqual(blink.FrameDurations ?? []),
+        "Blink should preserve its authored close, hold, and reopen timing.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Blink/Castorice.Blink.00.png", blink.FramePaths[0], "Blink should start from frame zero.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Blink/Castorice.Blink.04.png", blink.FramePaths[^1], "Blink should reopen on frame four.");
     Assert.Equal(TimeSpan.FromSeconds(3), blink.MinScheduleDelay, "Blink min schedule should stay compatible.");
     Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink max schedule should stay compatible.");
 }
@@ -1850,12 +1862,12 @@ static void BuiltInBlinkActionDefinesRandomBlinkFrames()
 {
     var blink = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Blink);
 
-    Assert.Equal(3, blink.FramePaths.Count, "Blink should use three frames.");
-    Assert.Equal(TimeSpan.FromMilliseconds(90), blink.FrameInterval, "Blink frames should advance quickly.");
+    Assert.Equal(5, blink.FramePaths.Count, "Blink should use five frames.");
+    Assert.Equal(TimeSpan.FromMilliseconds(45), blink.FrameInterval, "Blink frames should advance quickly.");
     Assert.Equal(TimeSpan.FromSeconds(3), blink.MinScheduleDelay, "Blink should not repeat too frequently.");
     Assert.Equal(TimeSpan.FromSeconds(7), blink.MaxScheduleDelay, "Blink should remain occasional.");
     Assert.Equal("Assets/Runtime/Castorice/States/Blink/Castorice.Blink.00.png", blink.FramePaths[0], "First blink frame path should be zero padded.");
-    Assert.Equal("Assets/Runtime/Castorice/States/Blink/Castorice.Blink.02.png", blink.FramePaths[^1], "Last blink frame path should be zero padded.");
+    Assert.Equal("Assets/Runtime/Castorice/States/Blink/Castorice.Blink.04.png", blink.FramePaths[^1], "Last blink frame path should be zero padded.");
 }
 
 static void BuiltInMoveActionDefinesEightDistanceDrivenPaths()

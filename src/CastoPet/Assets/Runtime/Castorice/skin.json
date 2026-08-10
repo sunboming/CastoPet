@@ -95,13 +95,16 @@
     {
       "id": "blink",
       "kind": "blink",
-      "frameIntervalMs": 90,
+      "frameIntervalMs": 45,
+      "frameDurationsMs": [40, 45, 60, 45, 35],
       "minScheduleDelayMs": 3000,
       "maxScheduleDelayMs": 7000,
       "frames": [
         "States/Blink/Castorice.Blink.00.png",
         "States/Blink/Castorice.Blink.01.png",
-        "States/Blink/Castorice.Blink.02.png"
+        "States/Blink/Castorice.Blink.02.png",
+        "States/Blink/Castorice.Blink.03.png",
+        "States/Blink/Castorice.Blink.04.png"
       ]
     },
     {
