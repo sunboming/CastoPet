@@ -97,6 +97,8 @@ var tests = new (string Name, Action Test)[]
     ("Asset service loads file system skin image paths", AssetServiceLoadsFileSystemSkinImagePaths),
     ("Asset service loads expression images with isolated transitions", AssetServiceLoadsExpressionImagesWithIsolatedTransitions),
     ("Asset service treats missing petting frames as optional", AssetServiceTreatsMissingPettingFramesAsOptional),
+    ("Bounded asset cache evicts least recently used entries", BoundedAssetCacheEvictsLeastRecentlyUsedEntries),
+    ("Pet window defers optional animation assets", PetWindowDefersOptionalAnimationAssets),
     ("Built-in idle action defines eight authored-rate frame paths", BuiltInIdleActionDefinesEightAuthoredRateFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
     ("Built-in blink action defines random blink frames", BuiltInBlinkActionDefinesRandomBlinkFrames),
@@ -1835,6 +1837,45 @@ static void AssetServiceTreatsMissingPettingFramesAsOptional()
     Assert.Equal(0, service.LoadPettingFrames().Count, "Old skins without petting should use the runtime fallback instead of failing.");
 }
 
+static void BoundedAssetCacheEvictsLeastRecentlyUsedEntries()
+{
+    var loads = new List<string>();
+    var cache = new BoundedLruCache<string, string>(2, key =>
+    {
+        loads.Add(key);
+        return $"asset:{key}";
+    });
+
+    Assert.Equal("asset:first", cache.Get("first"), "The first lookup should load its value.");
+    Assert.Equal("asset:second", cache.Get("second"), "A different key should load independently.");
+    Assert.Equal("asset:first", cache.Get("first"), "A cache hit should retain the existing value.");
+    Assert.Equal("asset:third", cache.Get("third"), "A full cache should still admit a new value.");
+    Assert.Equal("asset:second", cache.Get("second"), "The least recently used value should reload after eviction.");
+    Assert.Equal(4, loads.Count, "Only the evicted key should require a second load.");
+    Assert.Equal(2, cache.Count, "The cache must stay within its configured capacity.");
+}
+
+static void PetWindowDefersOptionalAnimationAssets()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+    const string constructorStart = "public PetWindow(\n        AssetService assets,";
+    var start = source.IndexOf(constructorStart, StringComparison.Ordinal);
+    var end = source.IndexOf("\n    private void ShutdownRuntimeResources", start, StringComparison.Ordinal);
+    var constructor = source[start..end];
+
+    Assert.Contains(constructor, "assets.LoadIdleFrames()", "Idle frames should remain eager for smooth startup playback.");
+    Assert.Contains(constructor, "assets.LoadBlinkFrames()", "Blink frames should remain eager for smooth passive playback.");
+    Assert.False(constructor.Contains("assets.LoadExpressionAssets()", StringComparison.Ordinal),
+        "Expression images and transitions should not all decode during startup.");
+    Assert.False(constructor.Contains("assets.LoadPettingFrames()", StringComparison.Ordinal),
+        "Petting frames should wait until the first petting action.");
+    Assert.False(constructor.Contains("assets.LoadMoveLeftFrames()", StringComparison.Ordinal),
+        "Directional movement frames should wait until movement is used.");
+    Assert.Contains(source, "new BoundedLruCache<string, PetExpressionAsset?>",
+        "Expression assets should use a bounded cache instead of permanent bulk retention.");
+}
+
 static void BuiltInIdleActionDefinesEightAuthoredRateFramePaths()
 {
     var idle = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Idle);
@@ -3132,7 +3173,7 @@ static void PetWindowRoutesGenericRadialActions()
     Assert.Contains(source, "WheelReleaseKind.PageChanged", "Page controls should keep the wheel open and refresh its page.");
     Assert.Contains(source, "WheelActionType.Expression", "Expression actions should be dispatched by generic action type.");
     Assert.Contains(source, "WheelActionType.Shortcut", "Shortcut actions should be dispatched by generic action type.");
-    Assert.Contains(source, "_expressionAssetsById.TryGetValue", "Expression actions should resolve assets by expression ID.");
+    Assert.Contains(source, "_expressionAssetCache.Get(expressionId)", "Expression actions should resolve assets lazily by expression ID.");
     Assert.Contains(source, "_shortcutLauncher.Launch", "Shortcut actions should use the injected launcher.");
     Assert.Contains(source, "WpfInput.Key.Escape", "Escape should cancel an open radial wheel.");
 }

@@ -101,18 +101,34 @@ public sealed class AssetService
 
         foreach (var expression in Skin.Expressions)
         {
-            try
+            if (TryLoadExpressionAsset(expression.Id) is { } asset)
             {
-                var image = LoadCharacter(expression.ResourcePath, "Expression wheel images");
-                var transitionFrames = LoadOptionalExpressionTransitionFrames(expression);
-                assets[expression.Id] = new PetExpressionAsset(expression, image, transitionFrames);
-            }
-            catch
-            {
+                assets[expression.Id] = asset;
             }
         }
 
         return assets;
+    }
+
+    public PetExpressionAsset? TryLoadExpressionAsset(string expressionId)
+    {
+        var expression = Skin.Expressions.FirstOrDefault(item =>
+            string.Equals(item.Id, expressionId, StringComparison.OrdinalIgnoreCase));
+        if (expression is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var image = LoadCharacter(expression.ResourcePath, "Expression wheel images");
+            var transitionFrames = LoadOptionalExpressionTransitionFrames(expression);
+            return new PetExpressionAsset(expression, image, transitionFrames);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public static string FormatLoadFailureMessage(string resourceGroup, string resourcePath)

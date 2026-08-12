@@ -31,6 +31,7 @@ public partial class PetWindow : Window
     private const double RightWheelDragThreshold = 14;
     private const double HoldIndicatorSize = 58;
     private const double HoldIndicatorRadius = 22;
+    private const int ExpressionAssetCacheCapacity = 3;
 
     private readonly LoggingService _logger;
     private readonly PetRuntimeState _runtimeState = new();
@@ -38,11 +39,12 @@ public partial class PetWindow : Window
     private readonly PetMovementController _movementController;
     private readonly CursorPushGate _cursorPushGate = new();
     private readonly PetDirectionalMovementAnimator _directionalMovementAnimator = new();
+    private readonly AssetService _assets;
     private readonly ImageSource _defaultCharacter;
-    private readonly ImageSource _draggingCharacter;
+    private ImageSource? _draggingCharacter;
     private readonly IReadOnlyList<ImageSource> _idleFrames;
     private readonly IReadOnlyList<ImageSource> _blinkFrames;
-    private readonly IReadOnlyList<ImageSource> _pettingFrames;
+    private IReadOnlyList<ImageSource>? _pettingFrames;
     private readonly DispatcherTimer _idleFrameTimer;
     private readonly DispatcherTimer _blinkScheduleTimer;
     private readonly DispatcherTimer _blinkFrameTimer;
@@ -53,20 +55,21 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _expressionTransitionFrameTimer;
     private readonly DispatcherTimer _activeMovementProbeTimer;
     private readonly DispatcherTimer _turnFrameTimer;
-    private readonly IReadOnlyList<ImageSource> _expressionTransitionInFrames;
-    private readonly IReadOnlyList<ImageSource> _expressionTransitionOutFrames;
-    private readonly IReadOnlyList<ImageSource> _moveFrames;
-    private readonly IReadOnlyList<ImageSource> _moveLeftFrames;
-    private readonly IReadOnlyList<ImageSource> _moveRightFrames;
-    private readonly IReadOnlyList<ImageSource> _turnLeftFrames;
-    private readonly IReadOnlyList<ImageSource> _turnRightFrames;
-    private readonly IReadOnlyDictionary<string, PetExpressionAsset> _expressionAssetsById;
+    private IReadOnlyList<ImageSource>? _expressionTransitionInFrames;
+    private IReadOnlyList<ImageSource>? _expressionTransitionOutFrames;
+    private IReadOnlyList<ImageSource>? _moveFrames;
+    private IReadOnlyList<ImageSource>? _moveLeftFrames;
+    private IReadOnlyList<ImageSource>? _moveRightFrames;
+    private IReadOnlyList<ImageSource>? _turnLeftFrames;
+    private IReadOnlyList<ImageSource>? _turnRightFrames;
+    private readonly BoundedLruCache<string, PetExpressionAsset?> _expressionAssetCache;
     private readonly WheelCatalogService _wheelCatalogService;
     private readonly PetInteractionCoordinator _interactions;
     private readonly ShortcutService _shortcutService;
     private readonly ShortcutDropHandler _shortcutDrops;
     private readonly ShortcutLauncher _shortcutLauncher;
-    private readonly ImageSource? _inputReactiveBase;
+    private ImageSource? _inputReactiveBase;
+    private bool _inputReactiveBaseLoaded;
     private readonly PetActionDefinition _idleAction;
     private readonly PetActionDefinition _moveAction;
     private readonly PetActionDefinition? _turnLeftAction;
@@ -163,11 +166,16 @@ public partial class PetWindow : Window
         ShortcutLauncher shortcutLauncher)
     {
         InitializeComponent();
+        _assets = assets ?? throw new ArgumentNullException(nameof(assets));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _wheelCatalogService = wheelCatalogService ?? throw new ArgumentNullException(nameof(wheelCatalogService));
         _shortcutService = shortcutService ?? throw new ArgumentNullException(nameof(shortcutService));
         _shortcutDrops = shortcutDrops ?? throw new ArgumentNullException(nameof(shortcutDrops));
         _shortcutLauncher = shortcutLauncher ?? throw new ArgumentNullException(nameof(shortcutLauncher));
+        _expressionAssetCache = new BoundedLruCache<string, PetExpressionAsset?>(
+            ExpressionAssetCacheCapacity,
+            _assets.TryLoadExpressionAsset,
+            StringComparer.OrdinalIgnoreCase);
         _idleAction = assets.Skin.GetRequiredAction(PetActionKind.Idle);
         _moveAction = assets.Skin.GetRequiredAction(PetActionKind.Move);
         _movementController = new PetMovementController(_moveAction);
@@ -221,39 +229,15 @@ public partial class PetWindow : Window
         try
         {
             _defaultCharacter = assets.LoadDefaultCharacter();
-            _draggingCharacter = assets.LoadDraggingCharacter();
             _idleFrames = assets.LoadIdleFrames();
             _blinkFrames = assets.LoadBlinkFrames();
-            _pettingFrames = assets.LoadPettingFrames();
-            _moveFrames = assets.LoadMoveFrames();
-            var moveLeftFrames = assets.LoadMoveLeftFrames();
-            var moveRightFrames = assets.LoadMoveRightFrames();
-            _moveLeftFrames = moveLeftFrames.Count > 0 ? moveLeftFrames : _moveFrames;
-            _moveRightFrames = moveRightFrames.Count > 0 ? moveRightFrames : _moveFrames;
-            _turnLeftFrames = assets.LoadTurnLeftFrames();
-            _turnRightFrames = assets.LoadTurnRightFrames();
-            _inputReactiveBase = assets.TryLoadInputReactiveBase();
-            _expressionTransitionInFrames = assets.LoadExpressionTransitionInFrames();
-            _expressionTransitionOutFrames = assets.LoadExpressionTransitionOutFrames();
-            _expressionAssetsById = assets.LoadExpressionAssets();
             CharacterImage.Source = GetCurrentIdleFrame();
         }
         catch
         {
             _defaultCharacter = CharacterImage.Source;
-            _draggingCharacter = CharacterImage.Source;
             _idleFrames = Array.Empty<ImageSource>();
             _blinkFrames = Array.Empty<ImageSource>();
-            _pettingFrames = Array.Empty<ImageSource>();
-            _moveFrames = Array.Empty<ImageSource>();
-            _moveLeftFrames = Array.Empty<ImageSource>();
-            _moveRightFrames = Array.Empty<ImageSource>();
-            _turnLeftFrames = Array.Empty<ImageSource>();
-            _turnRightFrames = Array.Empty<ImageSource>();
-            _inputReactiveBase = null;
-            _expressionTransitionInFrames = Array.Empty<ImageSource>();
-            _expressionTransitionOutFrames = Array.Empty<ImageSource>();
-            _expressionAssetsById = new Dictionary<string, PetExpressionAsset>(StringComparer.OrdinalIgnoreCase);
             System.Windows.MessageBox.Show(
                 "CastoPet 无法加载内置角色图片 Castorice.png。",
                 "CastoPet",
@@ -329,12 +313,85 @@ public partial class PetWindow : Window
         _inputHookService.InputReceived -= OnInputReactiveInputReceived;
         _inputHookService.Dispose();
         _shortcutIconCache.Clear();
+        _expressionAssetCache.Clear();
+        ReleaseOptionalAnimationAssets();
         _firstRingVisuals.Clear();
         _secondRingVisuals.Clear();
         FirstRingSurface.Children.Clear();
         SecondRingSurface.Children.Clear();
         InputReactiveOverlay.Children.Clear();
         CharacterImage.Source = null;
+    }
+
+    private ImageSource GetDraggingCharacter()
+    {
+        if (_draggingCharacter is not null)
+        {
+            return _draggingCharacter;
+        }
+
+        try
+        {
+            _draggingCharacter = _assets.LoadDraggingCharacter();
+        }
+        catch
+        {
+            _draggingCharacter = _defaultCharacter;
+        }
+
+        return _draggingCharacter;
+    }
+
+    private IReadOnlyList<ImageSource> GetPettingFrames()
+    {
+        return _pettingFrames ??= _assets.LoadPettingFrames();
+    }
+
+    private ImageSource? GetInputReactiveBase()
+    {
+        if (!_inputReactiveBaseLoaded)
+        {
+            _inputReactiveBase = _assets.TryLoadInputReactiveBase();
+            _inputReactiveBaseLoaded = true;
+        }
+
+        return _inputReactiveBase;
+    }
+
+    private IReadOnlyList<ImageSource> GetExpressionTransitionFrames(bool entering)
+    {
+        if (entering)
+        {
+            return _expressionTransitionInFrames ??= _assets.LoadExpressionTransitionInFrames();
+        }
+
+        return _expressionTransitionOutFrames ??= _assets.LoadExpressionTransitionOutFrames();
+    }
+
+    private void ReleaseOptionalAnimationAssets()
+    {
+        _draggingCharacter = null;
+        _pettingFrames = null;
+        ReleaseMovementAnimationAssets();
+        ReleaseInputReactiveAsset();
+        _expressionTransitionInFrames = null;
+        _expressionTransitionOutFrames = null;
+        _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
+    }
+
+    private void ReleaseMovementAnimationAssets()
+    {
+        _moveFrames = null;
+        _moveLeftFrames = null;
+        _moveRightFrames = null;
+        _turnLeftFrames = null;
+        _turnRightFrames = null;
+    }
+
+    private void ReleaseInputReactiveAsset()
+    {
+        _inputReactiveBase = null;
+        _inputReactiveBaseLoaded = false;
     }
 
     private static LegacyWheelDependencies CreateLegacyWheelDependencies(
@@ -367,6 +424,15 @@ public partial class PetWindow : Window
         _inputReactiveModeEnabled = snapshot.InputReactiveMode;
         UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
+        if (!_inputReactiveModeEnabled)
+        {
+            ReleaseInputReactiveAsset();
+        }
+
+        if (!_activeMovementEnabled)
+        {
+            ReleaseMovementAnimationAssets();
+        }
 
         if (new WindowInteropHelper(this).Handle == IntPtr.Zero)
         {
@@ -509,6 +575,11 @@ public partial class PetWindow : Window
 
     private void UpdateInputReactiveMode()
     {
+        if (_inputReactiveModeEnabled)
+        {
+            _ = GetInputReactiveBase();
+        }
+
         if (!CanShowInputReactiveMode())
         {
             StopInputReactiveMode(restoreIdle: !_inputReactiveModeEnabled || _inputReactiveBase is null);
@@ -883,7 +954,7 @@ public partial class PetWindow : Window
         StopBlinkAnimation();
         ResetCharacterTransitionAnimations();
         ApplyDragMovementVisual();
-        CharacterImage.Source = _draggingCharacter;
+        CharacterImage.Source = GetDraggingCharacter();
     }
 
     private void EndDrag()
@@ -915,7 +986,8 @@ public partial class PetWindow : Window
     private void BeginPetting()
     {
         StopPetting(restoreIdle: false);
-        _animationController.BeginPetting(Math.Max(1, _pettingFrames.Count));
+        var pettingFrames = GetPettingFrames();
+        _animationController.BeginPetting(Math.Max(1, pettingFrames.Count));
         CancelTemporaryExpression();
         StopInputReactiveMode(restoreIdle: false);
         StopActiveMovementProbe();
@@ -928,16 +1000,16 @@ public partial class PetWindow : Window
         ResetActiveMovementVisual();
         ResetCharacterTransitionAnimations();
 
-        if (_pettingFrames.Count > 0)
+        if (pettingFrames.Count > 0)
         {
-            CharacterImage.Source = _pettingFrames[0];
+            CharacterImage.Source = pettingFrames[0];
             _pettingFrameTimer.Interval = PetFrameTiming.GetDuration(
                 _pettingAction,
                 0,
                 DefaultPettingFrameInterval);
             var totalDuration = PetFrameTiming.GetTotalDuration(
                 _pettingAction,
-                _pettingFrames.Count,
+                pettingFrames.Count,
                 DefaultPettingFrameInterval);
             AnimatePettingCompression(TimeSpan.FromTicks(totalDuration.Ticks / 2));
             _pettingFrameTimer.Start();
@@ -984,20 +1056,21 @@ public partial class PetWindow : Window
             return;
         }
 
-        if (_pettingFrames.Count == 0)
+        var pettingFrames = _pettingFrames ?? Array.Empty<ImageSource>();
+        if (pettingFrames.Count == 0)
         {
             CompletePetting();
             return;
         }
 
-        var advance = _animationController.AdvancePetting(_pettingFrames.Count);
+        var advance = _animationController.AdvancePetting(pettingFrames.Count);
         if (advance.Completed)
         {
             CompletePetting();
             return;
         }
 
-        CharacterImage.Source = _pettingFrames[advance.FrameIndex];
+        CharacterImage.Source = pettingFrames[advance.FrameIndex];
         _pettingFrameTimer.Interval = PetFrameTiming.GetDuration(
             _pettingAction,
             advance.FrameIndex,
@@ -1504,12 +1577,34 @@ public partial class PetWindow : Window
 
     private IReadOnlyList<ImageSource> GetMoveFrames(PetHorizontalDirection direction)
     {
-        return direction == PetHorizontalDirection.Left ? _moveLeftFrames : _moveRightFrames;
+        var directionalFrames = direction == PetHorizontalDirection.Left
+            ? _moveLeftFrames ??= _assets.LoadMoveLeftFrames()
+            : _moveRightFrames ??= _assets.LoadMoveRightFrames();
+        if (directionalFrames.Count > 0)
+        {
+            return directionalFrames;
+        }
+
+        return _moveFrames ??= TryLoadRequiredMoveFrames();
     }
 
     private IReadOnlyList<ImageSource> GetTurnFrames(PetHorizontalDirection direction)
     {
-        return direction == PetHorizontalDirection.Left ? _turnLeftFrames : _turnRightFrames;
+        return direction == PetHorizontalDirection.Left
+            ? _turnLeftFrames ??= _assets.LoadTurnLeftFrames()
+            : _turnRightFrames ??= _assets.LoadTurnRightFrames();
+    }
+
+    private IReadOnlyList<ImageSource> TryLoadRequiredMoveFrames()
+    {
+        try
+        {
+            return _assets.LoadMoveFrames();
+        }
+        catch
+        {
+            return Array.Empty<ImageSource>();
+        }
     }
 
     private PetHorizontalDirection ResolveMovementDirection(double deltaX)
@@ -2359,8 +2454,10 @@ public partial class PetWindow : Window
 
     private void ApplyTemporaryExpression(string? expressionId)
     {
-        if (string.IsNullOrWhiteSpace(expressionId) ||
-            !_expressionAssetsById.TryGetValue(expressionId, out var asset))
+        var asset = string.IsNullOrWhiteSpace(expressionId)
+            ? null
+            : _expressionAssetCache.Get(expressionId);
+        if (asset is null)
         {
             TryLogInfo($"Expression wheel reference '{expressionId ?? "<missing>"}' was not found.");
             return;
@@ -2417,7 +2514,10 @@ public partial class PetWindow : Window
 
         var specificFrames = _pendingExpressionAsset.TransitionFrames;
         _activeExpressionUsesSpecificTransition = specificFrames.Count > 0;
-        _activeExpressionTransitionFrames = ExpressionTransitionPlanner.EnterFrames(specificFrames, _expressionTransitionInFrames);
+        var fallbackFrames = specificFrames.Count > 0
+            ? Array.Empty<ImageSource>()
+            : GetExpressionTransitionFrames(entering: true);
+        _activeExpressionTransitionFrames = ExpressionTransitionPlanner.EnterFrames(specificFrames, fallbackFrames);
         if (_activeExpressionTransitionFrames.Count == 0)
         {
             ShowPendingExpression();
@@ -2436,7 +2536,10 @@ public partial class PetWindow : Window
     {
         var specificFrames = _activeExpressionAsset?.TransitionFrames ?? Array.Empty<ImageSource>();
         _activeExpressionUsesSpecificTransition = specificFrames.Count > 0;
-        _activeExpressionTransitionFrames = ExpressionTransitionPlanner.ExitFrames(specificFrames, _expressionTransitionOutFrames);
+        var fallbackFrames = specificFrames.Count > 0
+            ? Array.Empty<ImageSource>()
+            : GetExpressionTransitionFrames(entering: false);
+        _activeExpressionTransitionFrames = ExpressionTransitionPlanner.ExitFrames(specificFrames, fallbackFrames);
         if (_activeExpressionTransitionFrames.Count == 0)
         {
             CompleteExpressionRestore();
