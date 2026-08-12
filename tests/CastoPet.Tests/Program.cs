@@ -25,6 +25,7 @@ var tests = new (string Name, Action Test)[]
     ("Settings clone includes theme mode", SettingsCloneIncludesThemeMode),
     ("Theme mode resolves system preference", ThemeModeResolvesSystemPreference),
     ("Settings theme palette defines light and dark contrast", SettingsThemePaletteDefinesLightAndDarkContrast),
+    ("Settings theme palette replaces frozen brushes", SettingsThemePaletteReplacesFrozenBrushes),
     ("Windows system theme reader handles app preference", WindowsSystemThemeReaderHandlesAppPreference),
     ("Settings backdrop targets supported Windows versions", SettingsBackdropTargetsSupportedWindowsVersions),
     ("Crash reports sanitize user paths and include exception chains", CrashReportsSanitizeUserPathsAndIncludeExceptionChains),
@@ -538,6 +539,32 @@ static void SettingsThemePaletteDefinesLightAndDarkContrast()
     Assert.True(light["WindowTintBrush"].A < 255 && dark["WindowTintBrush"].A < 255, "Both themes should retain translucent fallback tinting.");
     Assert.Equal((byte)255, fallback["WindowTintBrush"].A, "Unsupported systems should receive an opaque window tint.");
     Assert.Equal((byte)255, fallback["SurfaceBrush"].A, "Unsupported systems should not expose a black native window background.");
+}
+
+static void SettingsThemePaletteReplacesFrozenBrushes()
+{
+    var resources = new System.Windows.ResourceDictionary();
+    var frozen = new Dictionary<string, System.Windows.Media.SolidColorBrush>(StringComparer.Ordinal);
+    foreach (var key in SettingsThemePalette.RequiredBrushKeys)
+    {
+        var brush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.White);
+        brush.Freeze();
+        resources[key] = brush;
+        frozen[key] = brush;
+    }
+
+    SettingsThemePalette.Apply(resources, AppThemeMode.Light);
+    SettingsThemePalette.Apply(resources, AppThemeMode.Dark);
+    SettingsThemePalette.Apply(resources, AppThemeMode.Light);
+
+    var expected = SettingsThemePalette.Create(AppThemeMode.Light);
+    foreach (var key in SettingsThemePalette.RequiredBrushKeys)
+    {
+        var current = resources[key] as System.Windows.Media.SolidColorBrush;
+        Assert.True(current is not null, $"Theme resource {key} should remain a solid color brush.");
+        Assert.False(ReferenceEquals(frozen[key], current), $"Theme resource {key} should replace the frozen brush instead of mutating it.");
+        Assert.Equal(expected[key], current!.Color, $"Theme resource {key} should use the requested color after repeated application.");
+    }
 }
 
 static void WindowsSystemThemeReaderHandlesAppPreference()
