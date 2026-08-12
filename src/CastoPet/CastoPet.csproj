@@ -8,6 +8,10 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <StartupObject>CastoPet.Program</StartupObject>
+    <CastoPetEdition Condition="'$(CastoPetEdition)' == ''">Preview</CastoPetEdition>
+    <DefineConstants Condition="'$(CastoPetEdition)' == 'Preview'">$(DefineConstants);CASTOPET_PREVIEW</DefineConstants>
+    <DefineConstants Condition="'$(CastoPetEdition)' == 'Stable'">$(DefineConstants);CASTOPET_STABLE</DefineConstants>
+    <OutputPath Condition="'$(CastoPetEdition)' == 'Stable'">bin\Stable\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,9 +20,25 @@
 
   <ItemGroup>
     <Resource Include="Assets\AppIcon.ico" />
-    <Resource Include="Assets\Runtime\Castorice\**\*.png" />
     <EmbeddedResource
       Include="Assets\Runtime\Castorice\skin.json"
       LogicalName="CastoPet.Assets.Runtime.Castorice.skin.json" />
   </ItemGroup>
+
+  <ItemGroup Condition="'$(CastoPetEdition)' == 'Preview'">
+    <Resource Include="Assets\Runtime\Castorice\**\*.png" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(CastoPetEdition)' == 'Stable'">
+    <Resource Include="Assets\Runtime\Castorice\Castorice.png" />
+    <Resource Include="Assets\Runtime\Castorice\States\Castorice.Dragging.png" />
+    <Resource Include="Assets\Runtime\Castorice\States\Idle\*.png" />
+    <Resource Include="Assets\Runtime\Castorice\States\Blink\*.png" />
+  </ItemGroup>
+
+  <Target Name="ValidateCastoPetEdition" BeforeTargets="PrepareForBuild">
+    <Error
+      Condition="'$(CastoPetEdition)' != 'Preview' and '$(CastoPetEdition)' != 'Stable'"
+      Text="CastoPetEdition must be Preview or Stable, but was '$(CastoPetEdition)'." />
+  </Target>
 </Project>

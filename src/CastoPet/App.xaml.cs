@@ -9,6 +9,7 @@ public partial class App : System.Windows.Application
     private readonly AppPaths _paths;
     private readonly CrashReportService _crashReports;
     private readonly LoggingService _logger;
+    private readonly CastoPetFeatureProfile _features = CastoPetFeatureProfile.Current;
     private readonly CancellationTokenSource _applicationLifetime = new();
     private SingleInstanceService? _singleInstance;
     private TrayService? _tray;
@@ -52,15 +53,26 @@ public partial class App : System.Windows.Application
         var startupService = new StartupService(_logger);
         settings.StartWithWindows = startupService.IsEnabled(executablePath);
 
-        var skinSelectionService = new PetSkinSelectionService(_logger);
-        var skin = skinSelectionService.LoadCurrentSkin(settings);
+        var skin = _features.ExternalSkins
+            ? new PetSkinSelectionService(_logger).LoadCurrentSkin(settings)
+            : BuiltInPetSkins.Castorice;
         var assets = new AssetService(_logger, skin);
         _shortcutService = new ShortcutService(_paths, _logger);
-        _shortcutService.Load();
+        if (_features.ShortcutLauncher)
+        {
+            _shortcutService.Load();
+        }
         _wheelCatalogService = new WheelCatalogService(skin.Expressions, _shortcutService);
         _shortcutDropHandler = new ShortcutDropHandler(_shortcutService);
         _shortcutLauncher = new ShortcutLauncher(_logger);
-        _window = new PetWindow(assets, _logger, _wheelCatalogService, _shortcutService, _shortcutDropHandler, _shortcutLauncher);
+        _window = new PetWindow(
+            assets,
+            _logger,
+            _wheelCatalogService,
+            _shortcutService,
+            _shortcutDropHandler,
+            _shortcutLauncher,
+            _features);
         var commands = new MenuCommandService(
             _window,
             settings,
@@ -79,7 +91,8 @@ public partial class App : System.Windows.Application
                 _updates,
                 _shortcutService,
                 _shortcutDropHandler,
-                _shortcutLauncher)
+                _shortcutLauncher,
+                _features)
             {
                 Owner = _window,
             };
@@ -88,7 +101,7 @@ public partial class App : System.Windows.Application
         commands.SettingsRequested += _settingsWindow.ShowOrActivate;
 
         _window.AttachContextMenu(commands);
-        _tray = new TrayService(commands);
+        _tray = new TrayService(commands, _features);
         _singleInstance.StartRestoreServer(() => Dispatcher.Invoke(commands.ShowOrRestore));
 
         _window.Show();

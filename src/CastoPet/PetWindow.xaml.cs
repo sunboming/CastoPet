@@ -34,6 +34,7 @@ public partial class PetWindow : Window
     private const int ExpressionAssetCacheCapacity = 3;
 
     private readonly LoggingService _logger;
+    private readonly CastoPetFeatureProfile _features;
     private readonly PetRuntimeState _runtimeState = new();
     private readonly PetAnimationController _animationController = new();
     private readonly PetMovementController _movementController;
@@ -163,7 +164,8 @@ public partial class PetWindow : Window
         WheelCatalogService wheelCatalogService,
         ShortcutService shortcutService,
         ShortcutDropHandler shortcutDrops,
-        ShortcutLauncher shortcutLauncher)
+        ShortcutLauncher shortcutLauncher,
+        CastoPetFeatureProfile? features = null)
     {
         InitializeComponent();
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
@@ -172,6 +174,7 @@ public partial class PetWindow : Window
         _shortcutService = shortcutService ?? throw new ArgumentNullException(nameof(shortcutService));
         _shortcutDrops = shortcutDrops ?? throw new ArgumentNullException(nameof(shortcutDrops));
         _shortcutLauncher = shortcutLauncher ?? throw new ArgumentNullException(nameof(shortcutLauncher));
+        _features = features ?? CastoPetFeatureProfile.Current;
         _expressionAssetCache = new BoundedLruCache<string, PetExpressionAsset?>(
             ExpressionAssetCacheCapacity,
             _assets.TryLoadExpressionAsset,
@@ -224,7 +227,8 @@ public partial class PetWindow : Window
                 Math.Max(MinimumLeftDragThreshold, SystemParameters.MinimumHorizontalDragDistance),
                 Math.Max(MinimumLeftDragThreshold, SystemParameters.MinimumVerticalDragDistance),
                 RightWheelDragThreshold,
-                WheelCatalog.HoldDelay));
+                WheelCatalog.HoldDelay,
+                _features.RadialWheel));
 
         try
         {
@@ -245,8 +249,12 @@ public partial class PetWindow : Window
                 MessageBoxImage.Error);
         }
 
-        _wheelCatalogService.Changed += OnWheelCatalogChanged;
-        BuildFirstRadialWheelRing();
+        AllowDrop = _features.ShortcutLauncher;
+        if (_features.RadialWheel)
+        {
+            _wheelCatalogService.Changed += OnWheelCatalogChanged;
+            BuildFirstRadialWheelRing();
+        }
 
         Loaded += (_, _) =>
         {
@@ -414,14 +422,14 @@ public partial class PetWindow : Window
         Topmost = snapshot.Topmost;
         ShowInTaskbar = snapshot.ShowInTaskbar;
         _isClickThrough = snapshot.ClickThrough;
-        _activeMovementEnabled = snapshot.ActiveMovement;
-        _pushCursorEnabled = snapshot.PushCursor;
+        _activeMovementEnabled = _features.ActiveMovement && snapshot.ActiveMovement;
+        _pushCursorEnabled = _features.PushCursor && snapshot.PushCursor;
         if (!_activeMovementEnabled || !_pushCursorEnabled)
         {
             _cursorPushGate.Reset();
         }
 
-        _inputReactiveModeEnabled = snapshot.InputReactiveMode;
+        _inputReactiveModeEnabled = _features.InputReactiveMode && snapshot.InputReactiveMode;
         UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
         if (!_inputReactiveModeEnabled)
@@ -454,7 +462,7 @@ public partial class PetWindow : Window
         ArgumentNullException.ThrowIfNull(commands);
         DetachContextMenuSubscriptions();
         var menu = new WpfControls.ContextMenu();
-        var directSettings = SettingCatalog.Create(commands)
+        var directSettings = SettingCatalog.Create(commands, _features)
             .Where(definition => definition.ShowInDirectMenu)
             .ToArray();
 
@@ -747,7 +755,7 @@ public partial class PetWindow : Window
             position.Y,
             DateTimeOffset.UtcNow);
         ReleasePendingMouseCapture();
-        if (intent == PetPointerIntent.Petting)
+        if (_features.Petting && intent == PetPointerIntent.Petting)
         {
             BeginPetting();
         }
@@ -801,7 +809,7 @@ public partial class PetWindow : Window
         _requestedRadialWheelOrigin = FromDevicePoint(_requestedRadialWheelOriginDevice);
         CaptureMouse();
         StopRadialWheelHoldRendering();
-        if (_interactions.HasWheelCategories)
+        if (_features.RadialWheel && _interactions.HasWheelCategories)
         {
             StartRadialWheelHoldRendering();
         }
@@ -844,7 +852,7 @@ public partial class PetWindow : Window
             return;
         }
 
-        if (!_interactions.HasWheelCategories)
+        if (!_features.RadialWheel || !_interactions.HasWheelCategories)
         {
             return;
         }
@@ -2169,7 +2177,9 @@ public partial class PetWindow : Window
     {
         StopRadialWheelHoldRendering();
         HideRadialWheelHoldFeedback();
-        if (!_interactions.HasWheelCategories || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
+        if (!_features.RadialWheel
+            || !_interactions.HasWheelCategories
+            || WpfInput.Mouse.RightButton != WpfInput.MouseButtonState.Pressed)
         {
             CancelPendingPointerGesture();
             return;
@@ -2341,6 +2351,11 @@ public partial class PetWindow : Window
 
     private void LaunchShortcut(string? shortcutId)
     {
+        if (!_features.ShortcutLauncher)
+        {
+            return;
+        }
+
         var shortcut = _shortcutService.GetAll()
             .FirstOrDefault(candidate => string.Equals(candidate.Id, shortcutId, StringComparison.Ordinal));
         if (shortcut is null)
@@ -2359,6 +2374,13 @@ public partial class PetWindow : Window
 
     private void OnPetDragOver(object sender, WpfDragEventArgs e)
     {
+        if (!_features.ShortcutLauncher)
+        {
+            e.Effects = WpfDragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
         try
         {
             e.Effects = ShortcutDropDataReader.ContainsSupportedFormat(e.Data)
@@ -2377,6 +2399,12 @@ public partial class PetWindow : Window
     private void OnPetDrop(object sender, WpfDragEventArgs e)
     {
         e.Handled = true;
+        if (!_features.ShortcutLauncher)
+        {
+            e.Effects = WpfDragDropEffects.None;
+            return;
+        }
+
         try
         {
             var paths = ShortcutDropDataReader.ExtractPaths(e.Data);
@@ -2454,6 +2482,11 @@ public partial class PetWindow : Window
 
     private void ApplyTemporaryExpression(string? expressionId)
     {
+        if (!_features.RadialWheel)
+        {
+            return;
+        }
+
         var asset = string.IsNullOrWhiteSpace(expressionId)
             ? null
             : _expressionAssetCache.Get(expressionId);

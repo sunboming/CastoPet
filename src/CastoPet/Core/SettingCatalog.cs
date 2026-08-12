@@ -2,9 +2,13 @@ namespace CastoPet.Core;
 
 public static class SettingCatalog
 {
-    public static IReadOnlyList<SettingDefinition> Create(AppSettings settings, SettingActions actions)
+    public static IReadOnlyList<SettingDefinition> Create(
+        AppSettings settings,
+        SettingActions actions,
+        CastoPetFeatureProfile? features = null)
     {
-        return
+        features ??= CastoPetFeatureProfile.Current;
+        List<SettingDefinition> definitions =
         [
             new(
                 "topmost",
@@ -63,9 +67,15 @@ public static class SettingCatalog
                 () => settings.StartWithWindows,
                 actions.ToggleStartWithWindows),
         ];
+
+        return definitions
+            .Where(definition => IsAvailable(definition.Id, features))
+            .ToArray();
     }
 
-    public static IReadOnlyList<SettingDefinition> Create(MenuCommandService commands)
+    public static IReadOnlyList<SettingDefinition> Create(
+        MenuCommandService commands,
+        CastoPetFeatureProfile? features = null)
     {
         return Create(
             commands.Settings,
@@ -76,6 +86,15 @@ public static class SettingCatalog
                 commands.TogglePushCursor,
                 commands.ToggleInputReactiveMode,
                 commands.ToggleShowInTaskbar,
-                commands.ToggleStartWithWindows));
+                commands.ToggleStartWithWindows),
+            features);
     }
+
+    private static bool IsAvailable(string id, CastoPetFeatureProfile features) => id switch
+    {
+        "active-movement" => features.ActiveMovement,
+        "push-cursor" => features.PushCursor,
+        "input-reactive-mode" => features.InputReactiveMode,
+        _ => true,
+    };
 }

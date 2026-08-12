@@ -49,6 +49,7 @@ var tests = new (string Name, Action Test)[]
     ("Tray service disposes owned menu resources", TrayServiceDisposesOwnedMenuResources),
     ("Settings window avoids a duplicate taskbar entry", SettingsWindowAvoidsDuplicateTaskbarEntry),
     ("Continuous integration builds both configurations", ContinuousIntegrationBuildsBothConfigurations),
+    ("Project supports stable and preview resource profiles", ProjectSupportsStableAndPreviewResourceProfiles),
     ("Repository ignores local working assets", RepositoryIgnoresLocalWorkingAssets),
     ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
     ("Update source points to the public releases repository", UpdateSourcePointsToThePublicReleasesRepository),
@@ -118,6 +119,7 @@ var tests = new (string Name, Action Test)[]
     ("Shortcut wheel loads shell icons", ShortcutWheelLoadsShellIcons),
     ("Pointer gestures classify left click and drag", PointerGesturesClassifyLeftClickAndDrag),
     ("Pointer gestures classify right click movement and hold", PointerGesturesClassifyRightClickMovementAndHold),
+    ("Stable pointer gestures keep the traditional context menu", StablePointerGesturesKeepTraditionalContextMenu),
     ("Pointer gestures cancel conflicts and commit once", PointerGesturesCancelConflictsAndCommitOnce),
     ("Interaction coordinator preserves short-click intent", InteractionCoordinatorPreservesShortClickIntent),
     ("Interaction coordinator owns wheel lifecycle", InteractionCoordinatorOwnsWheelLifecycle),
@@ -168,6 +170,8 @@ var tests = new (string Name, Action Test)[]
     ("Pet window extracts neutral shortcut drop data", PetWindowExtractsNeutralShortcutDropData),
     ("Pet window retires expression-only wheel integration", PetWindowRetiresExpressionOnlyWheelIntegration),
     ("Setting catalog defines every boolean setting once", SettingCatalogDefinesEveryBooleanSettingOnce),
+    ("Build feature profiles define stable and preview boundaries", BuildFeatureProfilesDefineStableAndPreviewBoundaries),
+    ("Stable setting catalog excludes preview behavior", StableSettingCatalogExcludesPreviewBehavior),
     ("Setting catalog exposes only common direct menu settings", SettingCatalogExposesOnlyCommonDirectMenuSettings),
     ("Setting catalog reads shared settings live", SettingCatalogReadsSharedSettingsLive),
     ("Settings window service reuses the open window", SettingsWindowServiceReusesTheOpenWindow),
@@ -889,6 +893,23 @@ static void ContinuousIntegrationBuildsBothConfigurations()
     Assert.False(workflow.Contains("dotnet publish", StringComparison.OrdinalIgnoreCase), "Build CI should not publish release artifacts.");
 }
 
+static void ProjectSupportsStableAndPreviewResourceProfiles()
+{
+    var workspace = FindWorkspaceRoot();
+    var project = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "CastoPet.csproj"));
+    var workflow = File.ReadAllText(System.IO.Path.Combine(workspace, ".github", "workflows", "build.yml"));
+
+    Assert.Contains(project, "<CastoPetEdition Condition=", "The app project should define a default edition.");
+    Assert.Contains(project, "CASTOPET_STABLE", "Stable builds should expose one centralized compilation symbol.");
+    Assert.Contains(project, "'$(CastoPetEdition)' == 'Stable'", "Stable resources should be selected through the edition property.");
+    Assert.Contains(project, @"States\Idle\*.png", "Stable builds should package idle frames.");
+    Assert.Contains(project, @"States\Blink\*.png", "Stable builds should package blink frames.");
+    Assert.Contains(project, @"States\Castorice.Dragging.png", "Stable builds should retain the dragging visual.");
+    Assert.Contains(project, @"Assets\Runtime\Castorice\**\*.png", "Preview builds should retain the complete runtime asset set.");
+    Assert.Contains(workflow, "edition: [Preview, Stable]", "CI should verify both product editions.");
+    Assert.Contains(workflow, "-p:CastoPetEdition=${{ matrix.edition }}", "CI should pass the edition explicitly to tests and builds.");
+}
+
 static void RepositoryIgnoresLocalWorkingAssets()
 {
     var workspace = FindWorkspaceRoot();
@@ -1210,16 +1231,34 @@ static void BuiltInDirectionalFramesAreEmbeddedWpfResources()
         .Select(entry => entry.Key?.ToString() ?? string.Empty)
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-    var expected = new[]
+    var previewOnly = new[]
     {
         "assets/runtime/castorice/states/moveleft/castorice.moveleft.00.png",
         "assets/runtime/castorice/states/moveright/castorice.moveright.00.png",
         "assets/runtime/castorice/states/turnleft/castorice.turnleft.00.png",
         "assets/runtime/castorice/states/turnright/castorice.turnright.00.png",
+        "assets/runtime/castorice/states/petting/castorice.petting.00.png",
+        "assets/runtime/castorice/states/inputreactive/castorice.inputreactive.base.png",
     };
-    foreach (var path in expected)
+
+    if (CastoPetFeatureProfile.Current.Edition == CastoPetEdition.Stable)
     {
-        Assert.True(resourcePaths.Contains(path), $"Debug output should embed directional WPF resource {path}.");
+        Assert.True(resourcePaths.Contains("assets/runtime/castorice/castorice.png"), "Stable output should embed the default character.");
+        Assert.True(resourcePaths.Contains("assets/runtime/castorice/states/castorice.dragging.png"), "Stable output should embed the dragging visual.");
+        Assert.True(resourcePaths.Contains("assets/runtime/castorice/states/idle/castorice.idle.00.png"), "Stable output should embed idle frames.");
+        Assert.True(resourcePaths.Contains("assets/runtime/castorice/states/blink/castorice.blink.00.png"), "Stable output should embed blink frames.");
+        foreach (var path in previewOnly)
+        {
+            Assert.False(resourcePaths.Contains(path), $"Stable output should exclude preview resource {path}.");
+        }
+
+        Assert.False(resourcePaths.Any(path => path.StartsWith("assets/runtime/castorice/expressions/", StringComparison.OrdinalIgnoreCase)), "Stable output should exclude expression resources.");
+        return;
+    }
+
+    foreach (var path in previewOnly.Take(4))
+    {
+        Assert.True(resourcePaths.Contains(path), $"Preview output should embed directional WPF resource {path}.");
     }
 }
 
@@ -2149,6 +2188,22 @@ static void PointerGesturesClassifyRightClickMovementAndHold()
     Assert.Equal(PetPointerIntent.RadialWheel, classifier.UpdateHold(now.AddMilliseconds(400)), "Hold should open the wheel at four hundred milliseconds.");
 }
 
+static void StablePointerGesturesKeepTraditionalContextMenu()
+{
+    var classifier = new PetPointerGestureClassifier(
+        6,
+        6,
+        14,
+        TimeSpan.FromMilliseconds(400),
+        radialWheelEnabled: false);
+    var now = DateTimeOffset.Parse("2026-07-17T08:00:00Z");
+
+    classifier.Press(PetPointerButton.Right, 50, 50, now);
+    Assert.Equal(PetPointerIntent.None, classifier.Move(100, 50, now), "Stable right movement should not commit the radial wheel.");
+    Assert.Equal(PetPointerIntent.None, classifier.UpdateHold(now.AddSeconds(1)), "Stable right hold should not commit the radial wheel.");
+    Assert.Equal(PetPointerIntent.ContextMenu, classifier.Release(PetPointerButton.Right, 100, 50, now.AddSeconds(1)), "Stable right release should open the traditional menu.");
+}
+
 static void PointerGesturesCancelConflictsAndCommitOnce()
 {
     var classifier = new PetPointerGestureClassifier(6, 6, 14, TimeSpan.FromMilliseconds(400));
@@ -2305,13 +2360,14 @@ static void ApplicationComposesOneSharedShortcutWheelGraph()
 {
     var workspace = FindWorkspaceRoot();
     var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+    var compactSource = string.Concat(source.Where(character => !char.IsWhiteSpace(character)));
 
     Assert.Equal(1, source.Split("new ShortcutService(_paths, _logger)", StringSplitOptions.None).Length - 1, "App startup should construct exactly one shortcut service from shared paths and logging.");
     Assert.Equal(1, source.Split("_shortcutService.Load();", StringSplitOptions.None).Length - 1, "App startup should load the shared shortcut service exactly once.");
     Assert.Contains(source, "new WheelCatalogService(skin.Expressions, _shortcutService)", "The live catalog should observe the shared shortcut service.");
     Assert.Equal(1, source.Split("new ShortcutDropHandler(_shortcutService)", StringSplitOptions.None).Length - 1, "App startup should construct one shared drop handler.");
     Assert.Equal(1, source.Split("new ShortcutLauncher(_logger)", StringSplitOptions.None).Length - 1, "App startup should construct one shared launcher.");
-    Assert.Contains(source, "new PetWindow(assets, _logger, _wheelCatalogService, _shortcutService, _shortcutDropHandler, _shortcutLauncher)", "The production window should receive the shared service graph.");
+    Assert.Contains(compactSource, "newPetWindow(assets,_logger,_wheelCatalogService,_shortcutService,_shortcutDropHandler,_shortcutLauncher,_features)", "The production window should receive the shared service graph and product profile.");
     Assert.Contains(source, "_wheelCatalogService?.Dispose();", "Application shutdown should release the catalog subscription.");
 }
 
@@ -3237,7 +3293,10 @@ static void PetWindowRetiresExpressionOnlyWheelIntegration()
 
 static void SettingCatalogDefinesEveryBooleanSettingOnce()
 {
-    var definitions = SettingCatalog.Create(AppSettings.Default, SettingActions.None);
+    var definitions = SettingCatalog.Create(
+        AppSettings.Default,
+        SettingActions.None,
+        CastoPetFeatureProfile.Preview);
 
     Assert.Equal(
         "topmost,active-movement,click-through,push-cursor,input-reactive-mode,show-in-taskbar,start-with-windows",
@@ -3247,6 +3306,39 @@ static void SettingCatalogDefinesEveryBooleanSettingOnce()
         "Behavior,Behavior,Interaction,Interaction,Interaction,System,System",
         string.Join(',', definitions.Select(item => item.Group)),
         "Settings should remain in stable behavior, interaction, and system groups.");
+}
+
+static void BuildFeatureProfilesDefineStableAndPreviewBoundaries()
+{
+    var stable = CastoPetFeatureProfile.Stable;
+    var preview = CastoPetFeatureProfile.Preview;
+
+    Assert.Equal(CastoPetEdition.Stable, stable.Edition, "The stable profile should identify its edition.");
+    Assert.False(stable.Petting, "Stable should not include left-click petting.");
+    Assert.False(stable.RadialWheel, "Stable should not include the radial wheel.");
+    Assert.False(stable.ShortcutLauncher, "Stable should not include shortcut launching.");
+    Assert.False(stable.ActiveMovement, "Stable should not include autonomous movement.");
+    Assert.False(stable.PushCursor, "Stable should not include cursor pushing.");
+    Assert.False(stable.InputReactiveMode, "Stable should not include input-reactive mode.");
+    Assert.False(stable.ExternalSkins, "Stable should use only the built-in skin.");
+
+    Assert.Equal(CastoPetEdition.Preview, preview.Edition, "The preview profile should identify its edition.");
+    Assert.True(preview.Petting && preview.RadialWheel && preview.ShortcutLauncher, "Preview should retain interaction experiments.");
+    Assert.True(preview.ActiveMovement && preview.PushCursor && preview.InputReactiveMode, "Preview should retain movement and input experiments.");
+    Assert.True(preview.ExternalSkins, "Preview should retain external skin loading.");
+}
+
+static void StableSettingCatalogExcludesPreviewBehavior()
+{
+    var definitions = SettingCatalog.Create(
+        AppSettings.Default,
+        SettingActions.None,
+        CastoPetFeatureProfile.Stable);
+
+    Assert.Equal(
+        "topmost,click-through,show-in-taskbar,start-with-windows",
+        string.Join(',', definitions.Select(item => item.Id)),
+        "Stable settings should expose only the supported basic desktop behavior.");
 }
 
 static void SettingCatalogExposesOnlyCommonDirectMenuSettings()
@@ -3262,7 +3354,10 @@ static void SettingCatalogExposesOnlyCommonDirectMenuSettings()
 static void SettingCatalogReadsSharedSettingsLive()
 {
     var settings = AppSettings.Default;
-    var definitions = SettingCatalog.Create(settings, SettingActions.None);
+    var definitions = SettingCatalog.Create(
+        settings,
+        SettingActions.None,
+        CastoPetFeatureProfile.Preview);
     var activeMovement = definitions.Single(item => item.Id == "active-movement");
 
     Assert.False(activeMovement.GetValue(), "Active movement should initially read false.");
@@ -3393,7 +3488,7 @@ static void SettingsWindowSharesShortcutServicesAndLiveUpdates()
     Assert.Contains(windowSource, "_shortcutService.Move", "Reorder actions should persist through the shortcut service.");
     Assert.Contains(windowSource, "_shortcutService.Delete", "Delete actions should persist through the shortcut service.");
     Assert.Contains(windowSource, "_shortcutService.UpdateLaunchOptions", "Program launch options should persist through the shortcut service.");
-    Assert.Contains(compactAppSource, "newSettingsWindow(commands,_crashReports,_updates,_shortcutService,_shortcutDropHandler,_shortcutLauncher)", "App should pass the same composed shortcut dependencies to settings.");
+    Assert.Contains(compactAppSource, "newSettingsWindow(commands,_crashReports,_updates,_shortcutService,_shortcutDropHandler,_shortcutLauncher,_features)", "App should pass the same composed shortcut dependencies and product profile to settings.");
 }
 
 static void SettingsShortcutListAcceptsSharedDropData()

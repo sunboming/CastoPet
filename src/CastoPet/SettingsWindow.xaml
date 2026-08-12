@@ -158,7 +158,7 @@
                     <StackPanel x:Name="SettingsNavigation" Margin="14,18">
                         <TextBlock Margin="10,0,0,8" Text="设置分类" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                         <RadioButton GroupName="SettingsView" Style="{StaticResource NavigationItemStyle}" Content="常规" Tag="General" IsChecked="True" Checked="ViewNavigation_Checked" />
-                        <RadioButton GroupName="SettingsView" Style="{StaticResource NavigationItemStyle}" Content="快捷启动" Tag="Shortcuts" Checked="ViewNavigation_Checked" />
+                        <RadioButton x:Name="ShortcutNavigationButton" GroupName="SettingsView" Style="{StaticResource NavigationItemStyle}" Content="快捷启动" Tag="Shortcuts" Checked="ViewNavigation_Checked" />
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0">
@@ -210,7 +210,7 @@
                     </Grid>
                 </Border>
             </Grid>
-            <Border Grid.Row="2" Background="{DynamicResource LavenderBrush}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,10,10"><TextBlock Margin="24,0" VerticalAlignment="Center" Text="常规设置立即生效；快捷项编辑后请保存" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" /></Border>
+            <Border Grid.Row="2" Background="{DynamicResource LavenderBrush}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0" CornerRadius="0,0,10,10"><TextBlock x:Name="SettingsFooterText" Margin="24,0" VerticalAlignment="Center" Text="常规设置立即生效；快捷项编辑后请保存" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" /></Border>
             <Rectangle Grid.RowSpan="3" Fill="{StaticResource FrostedTextureBrush}" Opacity="0.3" IsHitTestVisible="False" />
         </Grid>
     </Border>

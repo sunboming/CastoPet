@@ -13,6 +13,7 @@ public partial class SettingsWindow : Window, ISettingsWindow
     private readonly ShortcutService _shortcutService;
     private readonly ShortcutDropHandler _shortcutDropHandler;
     private readonly ShortcutLauncher _shortcutLauncher;
+    private readonly CastoPetFeatureProfile _features;
     private readonly IReadOnlyList<SettingDefinition> _definitions;
     private readonly Dictionary<string, WpfControls.CheckBox> _switches = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _lifetimeCancellation = new();
@@ -25,7 +26,8 @@ public partial class SettingsWindow : Window, ISettingsWindow
         UpdateCoordinator updates,
         ShortcutService shortcutService,
         ShortcutDropHandler shortcutDropHandler,
-        ShortcutLauncher shortcutLauncher)
+        ShortcutLauncher shortcutLauncher,
+        CastoPetFeatureProfile? features = null)
     {
         InitializeComponent();
         _commands = commands;
@@ -34,21 +36,39 @@ public partial class SettingsWindow : Window, ISettingsWindow
         _shortcutService = shortcutService;
         _shortcutDropHandler = shortcutDropHandler;
         _shortcutLauncher = shortcutLauncher;
-        _definitions = SettingCatalog.Create(commands);
+        _features = features ?? CastoPetFeatureProfile.Current;
+        _definitions = SettingCatalog.Create(commands, _features);
         ApplyTheme();
         RefreshThemeChoice();
         BuildSettingsRows();
         RefreshValues();
-        RefreshShortcutRows();
+        ApplyFeatureProfile();
         CurrentVersionText.Text = $"当前版本 {_updates.CurrentVersion}";
         UpdateStatusText.Text = _updates.IsInstalled
             ? "每天启动时检查一次"
             : "开发版本不支持自动更新";
         _commands.SettingsChanged += OnSettingsChanged;
-        _shortcutService.Changed += OnShortcutsChanged;
+        if (_features.ShortcutLauncher)
+        {
+            RefreshShortcutRows();
+            _shortcutService.Changed += OnShortcutsChanged;
+        }
         SourceInitialized += OnSourceInitialized;
         Activated += OnSettingsWindowActivated;
         Closed += OnSettingsWindowClosed;
+    }
+
+    private void ApplyFeatureProfile()
+    {
+        if (_features.ShortcutLauncher)
+        {
+            return;
+        }
+
+        ShortcutNavigationButton.Visibility = Visibility.Collapsed;
+        ShortcutLauncherView.Visibility = Visibility.Collapsed;
+        ShortcutList.AllowDrop = false;
+        SettingsFooterText.Text = "设置更改立即生效";
     }
 
     private void BuildSettingsRows()

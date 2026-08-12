@@ -28,12 +28,14 @@ internal sealed class PetPointerGestureClassifier(
     double leftHorizontalThreshold,
     double leftVerticalThreshold,
     double rightRadialThreshold,
-    TimeSpan rightHoldDelay)
+    TimeSpan rightHoldDelay,
+    bool radialWheelEnabled = true)
 {
     private readonly double _leftHorizontalThreshold = Positive(leftHorizontalThreshold, nameof(leftHorizontalThreshold));
     private readonly double _leftVerticalThreshold = Positive(leftVerticalThreshold, nameof(leftVerticalThreshold));
     private readonly double _rightRadialThreshold = Positive(rightRadialThreshold, nameof(rightRadialThreshold));
     private readonly TimeSpan _rightHoldDelay = Positive(rightHoldDelay, nameof(rightHoldDelay));
+    private readonly bool _radialWheelEnabled = radialWheelEnabled;
 
     public PetPointerGestureState State { get; private set; }
     public double OriginX { get; private set; }
@@ -74,7 +76,8 @@ internal sealed class PetPointerGestureClassifier(
             return PetPointerIntent.Drag;
         }
 
-        if (State == PetPointerGestureState.RightPending
+        if (_radialWheelEnabled
+            && State == PetPointerGestureState.RightPending
             && Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY)) >= _rightRadialThreshold)
         {
             State = PetPointerGestureState.RadialWheel;
@@ -86,7 +89,8 @@ internal sealed class PetPointerGestureClassifier(
 
     public PetPointerIntent UpdateHold(DateTimeOffset now)
     {
-        if (State != PetPointerGestureState.RightPending
+        if (!_radialWheelEnabled
+            || State != PetPointerGestureState.RightPending
             || now - PressedAt < _rightHoldDelay)
         {
             return PetPointerIntent.None;
@@ -98,7 +102,7 @@ internal sealed class PetPointerGestureClassifier(
 
     public double GetRightHoldProgress(DateTimeOffset now, TimeSpan revealDelay)
     {
-        if (State != PetPointerGestureState.RightPending)
+        if (!_radialWheelEnabled || State != PetPointerGestureState.RightPending)
         {
             return 0;
         }

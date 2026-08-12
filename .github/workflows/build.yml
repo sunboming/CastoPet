@@ -14,6 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         configuration: [Debug, Release]
+        edition: [Preview, Stable]
 
     steps:
       - name: Check out repository
@@ -25,10 +26,10 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore dependencies
-        run: dotnet restore CastoPet.sln
+        run: dotnet restore CastoPet.sln -p:CastoPetEdition=${{ matrix.edition }}
 
       - name: Run tests
-        run: dotnet run --project tests/CastoPet.Tests/CastoPet.Tests.csproj -c ${{ matrix.configuration }} --no-restore
+        run: dotnet run --project tests/CastoPet.Tests/CastoPet.Tests.csproj -c ${{ matrix.configuration }} --no-restore -p:CastoPetEdition=${{ matrix.edition }}
 
       - name: Build solution
-        run: dotnet build CastoPet.sln -c ${{ matrix.configuration }} --no-restore
+        run: dotnet build CastoPet.sln -c ${{ matrix.configuration }} --no-restore -p:CastoPetEdition=${{ matrix.edition }}

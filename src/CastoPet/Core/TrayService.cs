@@ -16,10 +16,10 @@ public sealed class TrayService : IDisposable
     private readonly IReadOnlyList<(SettingDefinition Definition, Forms.ToolStripMenuItem Item)> _settingItems;
     private bool _disposed;
 
-    public TrayService(MenuCommandService commands)
+    public TrayService(MenuCommandService commands, CastoPetFeatureProfile? features = null)
     {
         _commands = commands;
-        _settingItems = SettingCatalog.Create(commands)
+        _settingItems = SettingCatalog.Create(commands, features)
             .Where(definition => definition.ShowInDirectMenu)
             .Select(definition => (definition, CreateCheckedItem(definition.Label, definition.Toggle)))
             .ToArray();
