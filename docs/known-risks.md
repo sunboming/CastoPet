@@ -1,19 +1,9 @@
 # Known Risks
 
 The following issues were identified during the 2026-08-07 security and stability review.
-They are recorded for planned hardening and are not resolved by the stability runner.
+Resolved items remain recorded so the implemented boundary is explicit.
 
 ## High Priority
-
-### External skin paths are not contained
-
-External skin manifests can currently use rooted paths, UNC paths, or `..` segments that
-resolve outside the manifest directory. Loading an untrusted manifest can therefore read
-unexpected local images, contact an SMB location, block startup, or expand the image-decoder
-attack surface.
-
-Planned direction: require canonical local PNG paths contained beneath the selected skin
-root, reject UNC and rooted paths, and account for reparse-point escape.
 
 ### Public updates are unsigned
 
@@ -36,11 +26,21 @@ other registered executable containers.
 Planned direction: replace the incomplete blocklist with an explicit policy for intended
 document and media types, while treating programs and Windows shortcuts as executable content.
 
-### External inputs have no resource budget
+### Some external inputs still need resource budgets
 
-Skin manifests, shortcut storage, internet shortcuts, drag text, frame counts, and image
-dimensions do not have comprehensive size limits. Malformed or hostile local input can cause
-long UI stalls or excessive memory use.
+Skin manifests and their PNG resources now have byte, item-count, frame-count, file-size,
+decoded-pixel, path-containment, and reparse-point limits. Shortcut storage, internet
+shortcuts, and drag text do not yet have equally comprehensive byte limits. Malformed or
+hostile local input can still cause avoidable UI work in those remaining surfaces.
 
-Planned direction: add byte, item-count, frame-count, file-size, and decoded-pixel limits before
-expanding skin import UI.
+Planned direction: add byte and item-size limits before expanding shortcut import surfaces.
+
+## Resolved
+
+### External skin paths and resources are bounded
+
+Resolved on 2026-08-13. External skin loading now accepts only canonical local PNG paths
+contained beneath the declared skin resource root. Rooted paths, UNC paths, traversal escapes,
+symbolic links, and directory junctions are rejected before WPF image decoding. Manifest,
+frame, file-size, dimension, decoded-pixel, and aspect-ratio budgets are enforced at the same
+boundary. See `docs/skin-manifest.md` for the current limits.

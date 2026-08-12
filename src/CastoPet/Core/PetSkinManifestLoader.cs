@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace CastoPet.Core;
@@ -8,6 +9,7 @@ public static class PetSkinManifestLoader
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
+        MaxDepth = 16,
     };
 
     public static PetSkinDefinition LoadFromJson(string json)
@@ -18,10 +20,23 @@ public static class PetSkinManifestLoader
 
     public static PetSkinDefinition LoadFromFile(string manifestPath)
     {
-        var fullManifestPath = Path.GetFullPath(manifestPath);
-        var manifest = Deserialize(File.ReadAllText(fullManifestPath));
+        var fullManifestPath = GetExternalManifestPath(manifestPath);
         var manifestDirectory = Path.GetDirectoryName(fullManifestPath)
             ?? throw new InvalidDataException("Manifest path must have a directory.");
+        if (!File.Exists(fullManifestPath))
+        {
+            throw new InvalidDataException($"External skin manifest does not exist: {fullManifestPath}.");
+        }
+
+        var volumeRoot = Path.GetPathRoot(fullManifestPath)
+            ?? throw new InvalidDataException("External skin manifest path must have a volume root.");
+        if (ExternalSkinPathPolicy.ContainsReparsePoint(volumeRoot, fullManifestPath))
+        {
+            throw new InvalidDataException(
+                "External skin manifest path cannot contain a symbolic link or junction.");
+        }
+
+        var manifest = Deserialize(ReadExternalManifest(fullManifestPath));
 
         return BuildSkin(manifest, PathResolver.ForFilePaths(manifestDirectory, manifest.ResourceRoot));
     }
@@ -54,7 +69,7 @@ public static class PetSkinManifestLoader
             Id: RequiredText(manifest.Id, "id"),
             DisplayName: RequiredText(manifest.DisplayName, "displayName"),
             ResourceRoot: manifest.ResourceRoot ?? string.Empty,
-            DefaultCharacterPath: resolver.Resolve(RequiredText(manifest.DefaultCharacter, "defaultCharacter")),
+            DefaultCharacterPath: resolver.Resolve(RequiredPath(manifest.DefaultCharacter, "defaultCharacter")),
             DraggingCharacterPath: resolver.ResolveOptional(manifest.DraggingCharacter),
             InputReactiveBasePath: resolver.ResolveOptional(manifest.InputReactiveBase),
             Actions: actions,
@@ -63,6 +78,17 @@ public static class PetSkinManifestLoader
 
     private static SkinManifest Deserialize(string json)
     {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            throw new InvalidDataException("Manifest is empty.");
+        }
+
+        if (Encoding.UTF8.GetByteCount(json) > ExternalSkinResourceLimits.MaxManifestBytes)
+        {
+            throw new InvalidDataException(
+                $"Skin manifest exceeds the {ExternalSkinResourceLimits.MaxManifestBytes}-byte limit.");
+        }
+
         try
         {
             return JsonSerializer.Deserialize<SkinManifest>(json, JsonOptions)
@@ -83,22 +109,42 @@ public static class PetSkinManifestLoader
 
         _ = RequiredText(manifest.Id, "id");
         _ = RequiredText(manifest.DisplayName, "displayName");
-        _ = RequiredText(manifest.DefaultCharacter, "defaultCharacter");
+        _ = RequiredPath(manifest.DefaultCharacter, "defaultCharacter");
+
+        if (manifest.ResourceRoot is { Length: > ExternalSkinResourceLimits.MaxPathCharacters })
+        {
+            throw new InvalidDataException("Manifest resourceRoot is too long.");
+        }
 
         if (manifest.Actions is null || manifest.Actions.Count == 0)
         {
             throw new InvalidDataException("Manifest must define actions.");
         }
+
+        if (manifest.Actions.Count > ExternalSkinResourceLimits.MaxActions)
+        {
+            throw new InvalidDataException(
+                $"Manifest actions exceed the {ExternalSkinResourceLimits.MaxActions}-action limit.");
+        }
+
+        if (manifest.Expressions?.Count > ExternalSkinResourceLimits.MaxExpressions)
+        {
+            throw new InvalidDataException(
+                $"Manifest expressions exceed the {ExternalSkinResourceLimits.MaxExpressions}-expression limit.");
+        }
+
+        ValidateResourceReferenceBudget(manifest);
     }
 
     private static PetExpressionDefinition BuildExpression(string label, JsonElement value, PathResolver resolver)
     {
+        _ = RequiredText(label, "expression label");
         if (value.ValueKind == JsonValueKind.String)
         {
             return new PetExpressionDefinition(
                 Id: ToExpressionId(label),
                 Label: label,
-                ResourcePath: resolver.Resolve(RequiredText(value.GetString(), $"expression.{label}")));
+                ResourcePath: resolver.Resolve(RequiredPath(value.GetString(), $"expression.{label}")));
         }
 
         if (value.ValueKind != JsonValueKind.Object)
@@ -106,17 +152,23 @@ public static class PetSkinManifestLoader
             throw new InvalidDataException($"Expression {label} must be a path string or object.");
         }
 
-        var manifest = value.Deserialize<ExpressionManifest>(JsonOptions)
-            ?? throw new InvalidDataException($"Expression {label} is invalid.");
+        var manifest = DeserializeExpression(label, value);
+        if (manifest.TransitionFrames?.Count > ExternalSkinResourceLimits.MaxExpressionTransitionFrames)
+        {
+            throw new InvalidDataException(
+                $"Expression {label} transitionFrames exceed the "
+                + $"{ExternalSkinResourceLimits.MaxExpressionTransitionFrames}-frame limit.");
+        }
+
         ValidatePositive(
             manifest.TransitionFrameIntervalMs,
             $"expression {label} transitionFrameIntervalMs");
         return new PetExpressionDefinition(
             Id: ToExpressionId(label),
             Label: label,
-            ResourcePath: resolver.Resolve(RequiredText(manifest.Image, $"expression.{label}.image")),
+            ResourcePath: resolver.Resolve(RequiredPath(manifest.Image, $"expression.{label}.image")),
             TransitionFramePaths: manifest.TransitionFrames?
-                .Select((path, index) => resolver.Resolve(RequiredText(
+                .Select((path, index) => resolver.Resolve(RequiredPath(
                     path,
                     $"expression.{label}.transitionFrames[{index}]")))
                 .ToArray(),
@@ -129,7 +181,7 @@ public static class PetSkinManifestLoader
         var kind = ParseActionKind(RequiredText(manifest.Kind, $"action {id}.kind"));
         ValidateActionMetadata(manifest, id);
         var frames = manifest.Frames!
-            .Select((path, index) => resolver.Resolve(RequiredText(path, $"action {id}.frames[{index}]")))
+            .Select((path, index) => resolver.Resolve(RequiredPath(path, $"action {id}.frames[{index}]")))
             .ToArray();
 
         return new PetActionDefinition(
@@ -153,6 +205,12 @@ public static class PetSkinManifestLoader
         if (manifest.Frames is null || manifest.Frames.Count == 0)
         {
             throw new InvalidDataException($"Action {id} must define at least one frame.");
+        }
+
+        if (manifest.Frames.Count > ExternalSkinResourceLimits.MaxFramesPerAction)
+        {
+            throw new InvalidDataException(
+                $"Action {id} frames exceed the {ExternalSkinResourceLimits.MaxFramesPerAction}-frame limit.");
         }
 
         ValidatePositive(manifest.FrameIntervalMs, $"action {id} frameIntervalMs");
@@ -263,15 +321,26 @@ public static class PetSkinManifestLoader
         };
     }
 
-    private static string RequiredText(string? value, string name)
+    private static string RequiredText(
+        string? value,
+        string name,
+        int maxCharacters = ExternalSkinResourceLimits.MaxTextCharacters)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new InvalidDataException($"Manifest must define {name}.");
         }
 
+        if (value.Length > maxCharacters)
+        {
+            throw new InvalidDataException($"Manifest {name} is too long.");
+        }
+
         return value;
     }
+
+    private static string RequiredPath(string? value, string name) =>
+        RequiredText(value, name, ExternalSkinResourceLimits.MaxPathCharacters);
 
     private static void RequireAction(IReadOnlyList<PetActionDefinition> actions, PetActionKind kind)
     {
@@ -289,6 +358,107 @@ public static class PetSkinManifestLoader
     private static string ToExpressionId(string label)
     {
         return label.Trim().Replace(' ', '-').ToLowerInvariant();
+    }
+
+    private static void ValidateResourceReferenceBudget(SkinManifest manifest)
+    {
+        var references = 1;
+        if (!string.IsNullOrWhiteSpace(manifest.DraggingCharacter))
+        {
+            references++;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.InputReactiveBase))
+        {
+            references++;
+        }
+
+        foreach (var action in manifest.Actions!)
+        {
+            references += action.Frames?.Count ?? 0;
+        }
+
+        if (manifest.Expressions is not null)
+        {
+            foreach (var item in manifest.Expressions)
+            {
+                references++;
+                if (item.Value.ValueKind == JsonValueKind.Object)
+                {
+                    references += DeserializeExpression(item.Key, item.Value).TransitionFrames?.Count ?? 0;
+                }
+            }
+        }
+
+        if (references > ExternalSkinResourceLimits.MaxTotalFrameReferences)
+        {
+            throw new InvalidDataException(
+                $"Manifest image references exceed the "
+                + $"{ExternalSkinResourceLimits.MaxTotalFrameReferences}-resource limit.");
+        }
+    }
+
+    private static ExpressionManifest DeserializeExpression(string label, JsonElement value)
+    {
+        try
+        {
+            return value.Deserialize<ExpressionManifest>(JsonOptions)
+                ?? throw new InvalidDataException($"Expression {label} is invalid.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"Expression {label} is invalid.", ex);
+        }
+    }
+
+    private static string GetExternalManifestPath(string manifestPath)
+    {
+        if (string.IsNullOrWhiteSpace(manifestPath))
+        {
+            throw new InvalidDataException("External skin manifest path is required.");
+        }
+
+        if (ExternalSkinPathPolicy.IsUncPath(manifestPath))
+        {
+            throw new InvalidDataException("External skin manifest cannot use a UNC path.");
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(manifestPath);
+            if (ExternalSkinPathPolicy.IsUncPath(fullPath))
+            {
+                throw new InvalidDataException("External skin manifest cannot use a UNC path.");
+            }
+
+            return fullPath;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new InvalidDataException("External skin manifest path is invalid.", ex);
+        }
+    }
+
+    private static string ReadExternalManifest(string manifestPath)
+    {
+        using var stream = new FileStream(
+            manifestPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+        if (stream.Length <= 0 || stream.Length > ExternalSkinResourceLimits.MaxManifestBytes)
+        {
+            throw new InvalidDataException(
+                $"External skin manifest must contain 1 to "
+                + $"{ExternalSkinResourceLimits.MaxManifestBytes} bytes.");
+        }
+
+        using var reader = new StreamReader(
+            stream,
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: true,
+            leaveOpen: false);
+        return reader.ReadToEnd();
     }
 
     private sealed class PathResolver
@@ -309,7 +479,7 @@ public static class PetSkinManifestLoader
 
         public static PathResolver ForFilePaths(string manifestDirectory, string? resourceRoot)
         {
-            var root = Path.GetFullPath(Path.Combine(manifestDirectory, resourceRoot ?? string.Empty));
+            var root = ExternalSkinPathPolicy.ResolveResourceRoot(manifestDirectory, resourceRoot);
             return new PathResolver(root, fileSystemPaths: true);
         }
 
@@ -322,7 +492,7 @@ public static class PetSkinManifestLoader
         {
             if (_fileSystemPaths)
             {
-                return Path.GetFullPath(Path.Combine(_root, relativePath));
+                return ExternalSkinPathPolicy.ResolvePng(_root, relativePath);
             }
 
             var path = NormalizeResourcePath(relativePath);

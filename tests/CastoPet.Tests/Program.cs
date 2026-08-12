@@ -91,6 +91,10 @@ var tests = new (string Name, Action Test)[]
     ("Pet skin manifest loads per-frame action durations", PetSkinManifestLoadsPerFrameActionDurations),
     ("Pet skin manifest loads expression transition metadata", PetSkinManifestLoadsExpressionTransitionMetadata),
     ("Pet skin manifest loads file paths relative to manifest", PetSkinManifestLoadsFilePathsRelativeToManifest),
+    ("External skin rejects paths outside its resource root", ExternalSkinRejectsPathsOutsideItsResourceRoot),
+    ("External skin rejects reparse point escapes", ExternalSkinRejectsReparsePointEscapes),
+    ("External skin enforces manifest and frame budgets", ExternalSkinEnforcesManifestAndFrameBudgets),
+    ("External skin validates PNG files and dimensions", ExternalSkinValidatesPngFilesAndDimensions),
     ("Pet skin manifest requires core actions", PetSkinManifestRequiresCoreActions),
     ("Pet skin manifest rejects duplicate actions", PetSkinManifestRejectsDuplicateActions),
     ("Pet skin manifest rejects invalid action metadata", PetSkinManifestRejectsInvalidActionMetadata),
@@ -1651,6 +1655,10 @@ static void PetSkinManifestLoadsFilePathsRelativeToManifest()
     using var temp = TempDirectory.Create();
     var manifestDirectory = System.IO.Path.Combine(temp.Path, "Pack");
     Directory.CreateDirectory(manifestDirectory);
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Default.png"));
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Idle", "00.png"));
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Move", "00.png"));
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Blink", "00.png"));
     var manifestPath = System.IO.Path.Combine(manifestDirectory, "skin.json");
     File.WriteAllText(manifestPath, """
         {
@@ -1672,6 +1680,107 @@ static void PetSkinManifestLoadsFilePathsRelativeToManifest()
 
     Assert.Equal(System.IO.Path.Combine(expectedRoot, "Default.png"), skin.DefaultCharacterPath, "File manifest paths should resolve relative to manifest directory.");
     Assert.Equal(System.IO.Path.Combine(expectedRoot, "Idle", "00.png"), skin.GetRequiredAction(PetActionKind.Idle).FramePaths[0], "File action paths should resolve relative to manifest directory.");
+}
+
+static void ExternalSkinRejectsPathsOutsideItsResourceRoot()
+{
+    using var temp = TempDirectory.Create();
+    var manifestDirectory = System.IO.Path.Combine(temp.Path, "Skin");
+    CreateExternalSkinResources(manifestDirectory);
+    var outsidePath = System.IO.Path.Combine(temp.Path, "outside.png");
+    WriteTestPng(outsidePath);
+
+    var traversalManifest = WriteExternalSkinManifest(manifestDirectory, idleFrame: "../../outside.png");
+    var traversal = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(traversalManifest));
+    Assert.Contains(traversal.Message, "resource root", "Parent traversal should identify the containment boundary.");
+
+    var resourceRootManifest = WriteExternalSkinManifest(manifestDirectory, resourceRoot: "..");
+    var resourceRootEscape = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(resourceRootManifest));
+    Assert.Contains(resourceRootEscape.Message, "resource root", "The declared resource root must remain below the manifest directory.");
+
+    var rootedManifest = WriteExternalSkinManifest(
+        manifestDirectory,
+        idleFrame: outsidePath);
+    var rooted = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(rootedManifest));
+    Assert.Contains(rooted.Message, "relative", "Rooted image paths should be rejected explicitly.");
+
+    var uncManifest = WriteExternalSkinManifest(manifestDirectory, idleFrame: @"\\server\share\frame.png");
+    var unc = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(uncManifest));
+    Assert.Contains(unc.Message, "relative", "UNC image paths should never trigger network access.");
+
+    var uncManifestPath = Assert.Throws<InvalidDataException>(() =>
+        PetSkinManifestLoader.LoadFromFile(@"\\server\share\skin.json"));
+    Assert.Contains(uncManifestPath.Message, "UNC", "UNC manifest paths should fail before any file access.");
+}
+
+static void ExternalSkinRejectsReparsePointEscapes()
+{
+    var root = System.IO.Path.GetFullPath(@"C:\Skin\Resources");
+    var candidate = System.IO.Path.Combine(root, "Linked", "frame.png");
+    var containsReparsePoint = ExternalSkinPathPolicy.ContainsReparsePoint(
+        root,
+        candidate,
+        path => path.EndsWith("Linked", StringComparison.OrdinalIgnoreCase)
+            ? FileAttributes.Directory | FileAttributes.ReparsePoint
+            : FileAttributes.Normal);
+
+    Assert.True(containsReparsePoint, "A junction or symbolic-link segment should invalidate the resource path.");
+}
+
+static void ExternalSkinEnforcesManifestAndFrameBudgets()
+{
+    using var temp = TempDirectory.Create();
+    var manifestDirectory = System.IO.Path.Combine(temp.Path, "Skin");
+    CreateExternalSkinResources(manifestDirectory);
+    var manifestPath = WriteExternalSkinManifest(manifestDirectory);
+    var currentLength = new FileInfo(manifestPath).Length;
+    File.AppendAllText(
+        manifestPath,
+        new string(' ', checked((int)(ExternalSkinResourceLimits.MaxManifestBytes - currentLength + 1))));
+
+    var oversized = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(manifestPath));
+    Assert.Contains(oversized.Message, "manifest", "Oversized manifest files should fail before JSON parsing.");
+
+    var frameList = string.Join(",", Enumerable
+        .Range(0, ExternalSkinResourceLimits.MaxFramesPerAction + 1)
+        .Select(_ => "\"Idle/00.png\""));
+    File.WriteAllText(manifestPath, CreateExternalSkinJson(frameList));
+    var tooManyFrames = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(manifestPath));
+    Assert.Contains(tooManyFrames.Message, "frames", "An action should have a bounded frame count.");
+}
+
+static void ExternalSkinValidatesPngFilesAndDimensions()
+{
+    using var temp = TempDirectory.Create();
+    var manifestDirectory = System.IO.Path.Combine(temp.Path, "Skin");
+    CreateExternalSkinResources(manifestDirectory);
+
+    var jpgPath = System.IO.Path.Combine(manifestDirectory, "Resources", "Default.jpg");
+    File.WriteAllText(jpgPath, "not an image");
+    var wrongExtensionManifest = WriteExternalSkinManifest(manifestDirectory, defaultCharacter: "Default.jpg");
+    var wrongExtension = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(wrongExtensionManifest));
+    Assert.Contains(wrongExtension.Message, "PNG", "External skin images should use the supported PNG format only.");
+
+    var invalidPngPath = System.IO.Path.Combine(manifestDirectory, "Resources", "Invalid.png");
+    File.WriteAllText(invalidPngPath, "not a PNG");
+    var invalidPngManifest = WriteExternalSkinManifest(manifestDirectory, defaultCharacter: "Invalid.png");
+    var invalidPng = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(invalidPngManifest));
+    Assert.Contains(invalidPng.Message, "valid PNG", "A PNG extension alone should not bypass header validation.");
+
+    var largePath = System.IO.Path.Combine(manifestDirectory, "Resources", "Large.png");
+    using (var stream = new FileStream(largePath, FileMode.Create, FileAccess.Write, FileShare.None))
+    {
+        stream.SetLength(ExternalSkinResourceLimits.MaxImageFileBytes + 1);
+    }
+    var largeManifest = WriteExternalSkinManifest(manifestDirectory, defaultCharacter: "Large.png");
+    var tooLarge = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(largeManifest));
+    Assert.Contains(tooLarge.Message, "bytes", "External PNG files should have a compressed-size budget.");
+
+    var dimensionsPath = System.IO.Path.Combine(manifestDirectory, "Resources", "Dimensions.png");
+    WritePngHeader(dimensionsPath, ExternalSkinResourceLimits.MaxImageDimension + 1, 1);
+    var dimensionsManifest = WriteExternalSkinManifest(manifestDirectory, defaultCharacter: "Dimensions.png");
+    var dimensions = Assert.Throws<InvalidDataException>(() => PetSkinManifestLoader.LoadFromFile(dimensionsManifest));
+    Assert.Contains(dimensions.Message, "dimensions", "External PNG dimensions should be validated before WPF decoding.");
 }
 
 static void PetSkinManifestRequiresCoreActions()
@@ -1901,6 +2010,10 @@ static void PetSkinSelectionLoadsConfiguredManifest()
     using var temp = TempDirectory.Create();
     var manifestDirectory = System.IO.Path.Combine(temp.Path, "CustomSkin");
     Directory.CreateDirectory(manifestDirectory);
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Default.png"));
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Idle", "00.png"));
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Move", "00.png"));
+    WriteTestPng(System.IO.Path.Combine(manifestDirectory, "Resources", "Blink", "00.png"));
     var manifestPath = System.IO.Path.Combine(manifestDirectory, "skin.json");
     File.WriteAllText(manifestPath, """
         {
@@ -4390,6 +4503,77 @@ static string FindWorkspaceRoot()
     }
 
     throw new InvalidOperationException("Could not find workspace root.");
+}
+
+static void CreateExternalSkinResources(string manifestDirectory)
+{
+    var root = System.IO.Path.Combine(manifestDirectory, "Resources");
+    WriteTestPng(System.IO.Path.Combine(root, "Default.png"));
+    WriteTestPng(System.IO.Path.Combine(root, "Idle", "00.png"));
+    WriteTestPng(System.IO.Path.Combine(root, "Move", "00.png"));
+    WriteTestPng(System.IO.Path.Combine(root, "Blink", "00.png"));
+}
+
+static string WriteExternalSkinManifest(
+    string manifestDirectory,
+    string idleFrame = "Idle/00.png",
+    string defaultCharacter = "Default.png",
+    string resourceRoot = "Resources")
+{
+    Directory.CreateDirectory(manifestDirectory);
+    var manifestPath = System.IO.Path.Combine(manifestDirectory, "skin.json");
+    var frameList = System.Text.Json.JsonSerializer.Serialize(idleFrame);
+    File.WriteAllText(manifestPath, CreateExternalSkinJson(frameList, defaultCharacter, resourceRoot));
+    return manifestPath;
+}
+
+static string CreateExternalSkinJson(
+    string idleFrameList,
+    string defaultCharacter = "Default.png",
+    string resourceRoot = "Resources")
+{
+    var encodedDefault = System.Text.Json.JsonSerializer.Serialize(defaultCharacter);
+    var encodedResourceRoot = System.Text.Json.JsonSerializer.Serialize(resourceRoot);
+    return $$"""
+        {
+          "schemaVersion": 2,
+          "id": "external-test",
+          "displayName": "External Test",
+          "resourceRoot": {{encodedResourceRoot}},
+          "defaultCharacter": {{encodedDefault}},
+          "actions": [
+            { "id": "idle", "kind": "idle", "frames": [{{idleFrameList}}] },
+            { "id": "move", "kind": "move", "frames": ["Move/00.png"] },
+            { "id": "blink", "kind": "blink", "frames": ["Blink/00.png"] }
+          ]
+        }
+        """;
+}
+
+static void WriteTestPng(string path)
+{
+    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)
+        ?? throw new InvalidOperationException("Test PNG path must have a directory."));
+    using var bitmap = new Bitmap(2, 2);
+    bitmap.SetPixel(0, 0, Color.White);
+    bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+}
+
+static void WritePngHeader(string path, int width, int height)
+{
+    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)
+        ?? throw new InvalidOperationException("Test PNG path must have a directory."));
+    Span<byte> header = stackalloc byte[24];
+    new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a }.CopyTo(header);
+    header[11] = 13;
+    header[12] = (byte)'I';
+    header[13] = (byte)'H';
+    header[14] = (byte)'D';
+    header[15] = (byte)'R';
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(header[16..20], width);
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(header[20..24], height);
+    using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+    stream.Write(header);
 }
 
 static (int Width, int Height) ReadPngSize(string path)

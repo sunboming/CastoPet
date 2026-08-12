@@ -1,4 +1,6 @@
-# Skin Manifest Timing
+# Skin Manifest
+
+## Frame Timing
 
 Each action can define a default frame duration with `frameIntervalMs` and optional
 per-frame overrides with `frameDurationsMs`.
@@ -23,3 +25,20 @@ per-frame overrides with `frameDurationsMs`.
 Per-frame timing is applied to time-driven idle, blink, petting, and generic expression
 transition actions. Move animation remains distance-driven so its frames stay synchronized
 with desktop movement.
+
+## External Skin Safety
+
+External manifests loaded from disk keep the existing schema, but every image reference must
+now meet the following rules:
+
+- `resourceRoot` must be a local path relative to the manifest directory.
+- Image paths must be relative to `resourceRoot` and remain inside it after canonicalization.
+- UNC paths, rooted paths, URIs, symbolic links, and directory junctions are rejected.
+- Referenced files must exist and use the `.png` extension with a valid PNG header.
+- A manifest is limited to 512 KiB, 32 actions, 120 frames per action, 32 expressions,
+  30 transition frames per expression, and 512 total image references.
+- Each PNG is limited to 16 MiB, 4096 pixels per dimension, 16 megapixels, and a 4:1
+  maximum aspect ratio.
+
+Existing manifests do not need a schema-version change. A previous manifest remains compatible
+when its resources already use local, contained PNG paths and stay within these budgets.
