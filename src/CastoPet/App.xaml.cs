@@ -9,6 +9,7 @@ public partial class App : System.Windows.Application
     private readonly CastoPetProductIdentity _identity;
     private readonly AppPaths _paths;
     private readonly CrashReportService _crashReports;
+    private readonly CrashCaptureCoordinator _crashCapture;
     private readonly LoggingService _logger;
     private readonly CastoPetFeatureProfile _features = CastoPetFeatureProfile.Current;
     private readonly CancellationTokenSource _applicationLifetime = new();
@@ -21,7 +22,6 @@ public partial class App : System.Windows.Application
     private WheelCatalogService? _wheelCatalogService;
     private ShortcutDropHandler? _shortcutDropHandler;
     private ShortcutLauncher? _shortcutLauncher;
-    private int _crashRecorded;
 
     public App()
     {
@@ -29,7 +29,12 @@ public partial class App : System.Windows.Application
         _paths = AppPaths.ForProduct(_identity);
         _logger = new LoggingService(_paths);
         _ = PreviewDataMigrationService.TryMigrate(_identity, null, _paths, _logger);
-        _crashReports = new CrashReportService(_paths, _logger);
+        _crashReports = new CrashReportService(
+            _paths,
+            _logger,
+            buildInfo: CastoPetBuildInfo.Current(_identity.Edition));
+        _crashCapture = new CrashCaptureCoordinator((exception, kind) =>
+            _crashReports.TryWriteReport(exception, kind, out _));
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
@@ -157,32 +162,19 @@ public partial class App : System.Windows.Application
         object sender,
         System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
-        RecordCrashOnce(e.Exception);
+        _crashCapture.TryRecordFatal(e.Exception);
     }
 
     private void OnDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
     {
         var exception = e.ExceptionObject as Exception
             ?? new InvalidOperationException($"Unhandled non-Exception object: {e.ExceptionObject}");
-        RecordCrashOnce(exception);
+        _crashCapture.TryRecordFatal(exception);
     }
 
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        if (RecordCrashOnce(e.Exception))
-        {
-            e.SetObserved();
-        }
-    }
-
-    private bool RecordCrashOnce(Exception exception)
-    {
-        if (Interlocked.Exchange(ref _crashRecorded, 1) != 0)
-        {
-            return false;
-        }
-
-        return _crashReports.TryWriteReport(exception, out _);
+        _crashCapture.HandleUnobservedTaskException(e);
     }
 
     private async Task CheckForUpdatesAfterStartupAsync(CancellationToken cancellationToken)

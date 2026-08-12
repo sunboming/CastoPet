@@ -1,5 +1,4 @@
 using System.IO;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Diagnostics;
@@ -16,21 +15,32 @@ public sealed class CrashReportService
     private readonly LoggingService _logger;
     private readonly int _maxReports;
     private readonly Func<DateTimeOffset> _nowProvider;
+    private readonly CastoPetBuildInfo _buildInfo;
 
     public CrashReportService(
         AppPaths paths,
         LoggingService logger,
         int maxReports = DefaultMaxReports,
-        Func<DateTimeOffset>? nowProvider = null)
+        Func<DateTimeOffset>? nowProvider = null,
+        CastoPetBuildInfo? buildInfo = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxReports, 1);
         _paths = paths;
         _logger = logger;
         _maxReports = maxReports;
         _nowProvider = nowProvider ?? (() => DateTimeOffset.UtcNow);
+        _buildInfo = buildInfo ?? CastoPetBuildInfo.Current(CastoPetFeatureProfile.Current.Edition);
     }
 
     public bool TryWriteReport(Exception exception, out CrashReportInfo? report)
+    {
+        return TryWriteReport(exception, CrashReportKind.Fatal, out report);
+    }
+
+    public bool TryWriteReport(
+        Exception exception,
+        CrashReportKind kind,
+        out CrashReportInfo? report)
     {
         report = null;
         string? temporaryPath = null;
@@ -39,10 +49,11 @@ public sealed class CrashReportService
         {
             Directory.CreateDirectory(_paths.CrashesDirectory);
             var now = _nowProvider();
-            var id = $"crash-{now:yyyyMMdd-HHmmssfff}-{Guid.NewGuid():N}";
+            var prefix = kind == CrashReportKind.Fatal ? "crash" : "diagnostic";
+            var id = $"{prefix}-{now:yyyyMMdd-HHmmssfff}-{Guid.NewGuid():N}";
             var finalPath = System.IO.Path.Combine(_paths.CrashesDirectory, $"{id}.txt");
             temporaryPath = finalPath + ".tmp";
-            var context = CreateContext(now);
+            var context = CreateContext(now, kind);
             var content = CrashReportFormatter.Format(context, exception, ReadLogTail());
 
             File.WriteAllText(temporaryPath, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
@@ -112,16 +123,18 @@ public sealed class CrashReportService
         }
     }
 
-    private static CrashReportContext CreateContext(DateTimeOffset timestampUtc)
+    private CrashReportContext CreateContext(DateTimeOffset timestampUtc, CrashReportKind kind)
     {
-        var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "unknown";
         return new CrashReportContext(
             timestampUtc,
-            version,
+            _buildInfo.Version,
             RuntimeInformation.OSDescription,
             RuntimeInformation.ProcessArchitecture.ToString(),
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Environment.UserName);
+            Environment.UserName,
+            _buildInfo.Edition.ToString(),
+            _buildInfo.SourceCommit,
+            kind);
     }
 
     private IReadOnlyList<string> ReadLogTail()
@@ -155,8 +168,14 @@ public sealed class CrashReportService
         try
         {
             var oldReports = Directory
-                .EnumerateFiles(_paths.CrashesDirectory, "crash-*.txt", SearchOption.TopDirectoryOnly)
-                .OrderByDescending(System.IO.Path.GetFileName, StringComparer.Ordinal)
+                .EnumerateFiles(_paths.CrashesDirectory, "*.txt", SearchOption.TopDirectoryOnly)
+                .Where(path =>
+                {
+                    var name = System.IO.Path.GetFileName(path);
+                    return name.StartsWith("crash-", StringComparison.Ordinal)
+                        || name.StartsWith("diagnostic-", StringComparison.Ordinal);
+                })
+                .OrderByDescending(GetChronologicalReportKey, StringComparer.Ordinal)
                 .Skip(_maxReports);
             foreach (var path in oldReports)
             {
@@ -183,5 +202,12 @@ public sealed class CrashReportService
         catch
         {
         }
+    }
+
+    private static string GetChronologicalReportKey(string path)
+    {
+        var name = System.IO.Path.GetFileNameWithoutExtension(path);
+        var prefixSeparator = name.IndexOf('-');
+        return prefixSeparator >= 0 ? name[(prefixSeparator + 1)..] : name;
     }
 }

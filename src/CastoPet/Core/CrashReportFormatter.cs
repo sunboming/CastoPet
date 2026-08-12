@@ -2,13 +2,22 @@ using System.Text;
 
 namespace CastoPet.Core;
 
+public enum CrashReportKind
+{
+    Fatal,
+    UnobservedTask,
+}
+
 public sealed record CrashReportContext(
     DateTimeOffset TimestampUtc,
     string AppVersion,
     string OperatingSystem,
     string ProcessArchitecture,
     string UserProfilePath,
-    string UserName);
+    string UserName,
+    string ProductEdition = CastoPetBuildInfo.UnknownValue,
+    string SourceCommit = CastoPetBuildInfo.UnknownValue,
+    CrashReportKind ReportKind = CrashReportKind.Fatal);
 
 public static class CrashReportFormatter
 {
@@ -23,6 +32,9 @@ public static class CrashReportFormatter
         builder.AppendLine("CastoPet local crash report");
         builder.AppendLine($"Timestamp UTC: {context.TimestampUtc:O}");
         builder.AppendLine($"CastoPet version: {context.AppVersion}");
+        builder.AppendLine($"CastoPet edition: {context.ProductEdition}");
+        builder.AppendLine($"Source commit: {context.SourceCommit}");
+        builder.AppendLine($"Report kind: {context.ReportKind}");
         builder.AppendLine($"Operating system: {context.OperatingSystem}");
         builder.AppendLine($"Process architecture: {context.ProcessArchitecture}");
         builder.AppendLine();
