@@ -54,6 +54,8 @@ var tests = new (string Name, Action Test)[]
     ("Settings window avoids a duplicate taskbar entry", SettingsWindowAvoidsDuplicateTaskbarEntry),
     ("Continuous integration builds both configurations", ContinuousIntegrationBuildsBothConfigurations),
     ("Project supports stable and preview resource profiles", ProjectSupportsStableAndPreviewResourceProfiles),
+    ("Packaging script builds traceable edition-specific installers", PackagingScriptBuildsTraceableEditionSpecificInstallers),
+    ("Packaging workflow produces manual artifacts without publishing", PackagingWorkflowProducesManualArtifactsWithoutPublishing),
     ("Repository ignores local working assets", RepositoryIgnoresLocalWorkingAssets),
     ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
     ("Update source points to the public releases repository", UpdateSourcePointsToThePublicReleasesRepository),
@@ -979,6 +981,49 @@ static void ProjectSupportsStableAndPreviewResourceProfiles()
     Assert.Contains(project, @"Assets\Runtime\Castorice\**\*.png", "Preview builds should retain the complete runtime asset set.");
     Assert.Contains(workflow, "edition: [Preview, Stable]", "CI should verify both product editions.");
     Assert.Contains(workflow, "-p:CastoPetEdition=${{ matrix.edition }}", "CI should pass the edition explicitly to tests and builds.");
+}
+
+static void PackagingScriptBuildsTraceableEditionSpecificInstallers()
+{
+    var workspace = FindWorkspaceRoot();
+    var scriptPath = System.IO.Path.Combine(workspace, "eng", "package.ps1");
+    var toolManifestPath = System.IO.Path.Combine(workspace, ".config", "dotnet-tools.json");
+    var ignore = File.ReadAllText(System.IO.Path.Combine(workspace, ".gitignore"));
+
+    Assert.True(File.Exists(scriptPath), "The repository should own its packaging entry point.");
+    Assert.True(File.Exists(toolManifestPath), "Packaging should use the pinned local vpk tool manifest.");
+    var script = File.ReadAllText(scriptPath);
+    Assert.Contains(script, "[ValidateSet(\"Stable\", \"Preview\")]", "The script should require an explicit edition.");
+    Assert.Contains(script, "CastoPet.Preview", "Preview packages should use a distinct package identity.");
+    Assert.Contains(script, "git status --porcelain", "Release packaging should reject uncommitted inputs by default.");
+    Assert.Contains(script, "AllowDirty", "Local smoke tests should be able to opt into a clearly marked dirty build.");
+    Assert.Contains(script, "dotnet", "Packaging should run through the pinned .NET SDK.");
+    Assert.Contains(script, "publish", "Packaging should publish the application before invoking Velopack.");
+    Assert.Contains(script, "tests/CastoPet.Tests/CastoPet.Tests.csproj", "Packaging should run the edition's Release tests before publishing.");
+    Assert.Contains(script, "--self-contained", "Installer payloads should include the required .NET runtime.");
+    Assert.Contains(script, "CastoPetEdition=$Edition", "Publishing should select the same Stable/Preview feature profile.");
+    Assert.Contains(script, "tool", "Packaging should restore and invoke the local vpk tool.");
+    Assert.Contains(script, "vpk", "Packaging should create a Velopack installer and update packages.");
+    Assert.Contains(script, "build-metadata.json", "Every package should retain edition, source commit, and file hashes.");
+    Assert.False(script.Contains("vpk upload", StringComparison.OrdinalIgnoreCase), "The local packaging script must not publish releases.");
+    Assert.False(script.Contains("gh release", StringComparison.OrdinalIgnoreCase), "The local packaging script must not create GitHub releases.");
+    Assert.Contains(ignore, "artifacts/packages/", "Generated installer payloads should remain outside source control.");
+}
+
+static void PackagingWorkflowProducesManualArtifactsWithoutPublishing()
+{
+    var workspace = FindWorkspaceRoot();
+    var workflowPath = System.IO.Path.Combine(workspace, ".github", "workflows", "package.yml");
+
+    Assert.True(File.Exists(workflowPath), "Packaging should have a manually controlled CI workflow.");
+    var workflow = File.ReadAllText(workflowPath);
+    Assert.Contains(workflow, "workflow_dispatch:", "Installer generation should require an explicit manual dispatch.");
+    Assert.Contains(workflow, "type: choice", "The workflow should make Stable/Preview selection explicit.");
+    Assert.Contains(workflow, "eng/package.ps1", "CI and local packaging should share one implementation.");
+    Assert.Contains(workflow, "actions/upload-artifact@v7", "The verified package should be exposed only as a short-lived workflow artifact.");
+    Assert.Contains(workflow, "retention-days: 7", "Unsigned test packages should not be retained indefinitely.");
+    Assert.False(workflow.Contains("gh release", StringComparison.OrdinalIgnoreCase), "The validation workflow must not publish a GitHub release.");
+    Assert.False(workflow.Contains("vpk upload", StringComparison.OrdinalIgnoreCase), "The validation workflow must not upload to the release repository.");
 }
 
 static void RepositoryIgnoresLocalWorkingAssets()

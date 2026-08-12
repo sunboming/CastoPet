@@ -4,6 +4,7 @@ obj/
 *.suo
 .vs/
 artifacts/local-package/
+artifacts/packages/
 artifacts/stability-tests/
 /.codex/
 /.task6-artifacts/

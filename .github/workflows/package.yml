@@ -1,0 +1,48 @@
+name: Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: Product edition to package
+        required: true
+        default: Stable
+        type: choice
+        options:
+          - Stable
+          - Preview
+      version:
+        description: Semantic version, for example 0.1.0 or 0.2.0-preview.1
+        required: true
+        default: 0.1.0
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build installer and update packages
+        shell: pwsh
+        env:
+          PACKAGE_EDITION: ${{ inputs.edition }}
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: ./eng/package.ps1 -Edition $env:PACKAGE_EDITION -Version $env:PACKAGE_VERSION
+
+      - name: Upload unsigned validation package
+        uses: actions/upload-artifact@v7
+        with:
+          name: CastoPet-${{ inputs.edition }}-${{ inputs.version }}
+          path: artifacts/packages/${{ inputs.edition }}/${{ inputs.version }}/
+          if-no-files-found: error
+          retention-days: 7

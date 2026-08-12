@@ -49,6 +49,24 @@ The Stable executable is written to:
 src/CastoPet/bin/Stable/Release/net10.0-windows/CastoPet.exe
 ```
 
+Create a self-contained installer and Velopack update payload from a clean commit:
+
+```powershell
+./eng/package.ps1 -Edition Stable -Version 0.1.0
+```
+
+Preview uses a separate package id and should use a prerelease version for clarity:
+
+```powershell
+./eng/package.ps1 -Edition Preview -Version 0.2.0-preview.1
+```
+
+Packages and `build-metadata.json` are written below
+`artifacts/packages/<Edition>/<Version>`. The metadata records the edition, package id,
+source commit, dirty-state flag, and SHA-256 for every package file. Packaging rejects a
+dirty worktree unless `-AllowDirty` is supplied for a local smoke test. The manual Package
+workflow creates only a seven-day Actions artifact; it does not publish a GitHub Release.
+
 Do not publish the default `src/CastoPet/bin/Release` output as the minimal first
 release; that path contains the Preview edition.
 
