@@ -16,9 +16,13 @@ public sealed class TrayService : IDisposable
     private readonly IReadOnlyList<(SettingDefinition Definition, Forms.ToolStripMenuItem Item)> _settingItems;
     private bool _disposed;
 
-    public TrayService(MenuCommandService commands, CastoPetFeatureProfile? features = null)
+    public TrayService(
+        MenuCommandService commands,
+        CastoPetFeatureProfile? features = null,
+        CastoPetProductIdentity? identity = null)
     {
         _commands = commands;
+        identity ??= CastoPetProductIdentity.Current;
         _settingItems = SettingCatalog.Create(commands, features)
             .Where(definition => definition.ShowInDirectMenu)
             .Select(definition => (definition, CreateCheckedItem(definition.Label, definition.Toggle)))
@@ -38,7 +42,7 @@ public sealed class TrayService : IDisposable
         _applicationIcon = ApplicationIconService.LoadTrayIcon();
         _notifyIcon = new Forms.NotifyIcon
         {
-            Text = "CastoPet",
+            Text = identity.DisplayName,
             Icon = _applicationIcon,
             ContextMenuStrip = _contextMenu,
             Visible = true,

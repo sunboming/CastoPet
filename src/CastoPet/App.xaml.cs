@@ -6,6 +6,7 @@ namespace CastoPet;
 
 public partial class App : System.Windows.Application
 {
+    private readonly CastoPetProductIdentity _identity;
     private readonly AppPaths _paths;
     private readonly CrashReportService _crashReports;
     private readonly LoggingService _logger;
@@ -24,8 +25,10 @@ public partial class App : System.Windows.Application
 
     public App()
     {
-        _paths = new AppPaths();
+        _identity = CastoPetProductIdentity.Current;
+        _paths = AppPaths.ForProduct(_identity);
         _logger = new LoggingService(_paths);
+        _ = PreviewDataMigrationService.TryMigrate(_identity, null, _paths, _logger);
         _crashReports = new CrashReportService(_paths, _logger);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
@@ -36,9 +39,9 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        _logger.Info("CastoPet starting.");
+        _logger.Info($"{_identity.DisplayName} starting.");
 
-        _singleInstance = new SingleInstanceService(_logger);
+        _singleInstance = new SingleInstanceService(_logger, _identity.InstanceName);
         if (!_singleInstance.IsPrimaryInstance)
         {
             await _singleInstance.SignalRestoreAsync();
@@ -50,7 +53,7 @@ public partial class App : System.Windows.Application
         var settings = settingsService.Load();
         var executablePath = Environment.ProcessPath
             ?? Assembly.GetExecutingAssembly().Location;
-        var startupService = new StartupService(_logger);
+        var startupService = new StartupService(_logger, _identity.StartupValueName);
         settings.StartWithWindows = startupService.IsEnabled(executablePath);
 
         var skin = _features.ExternalSkins
@@ -73,6 +76,7 @@ public partial class App : System.Windows.Application
             _shortcutDropHandler,
             _shortcutLauncher,
             _features);
+        _window.Title = _identity.DisplayName;
         var commands = new MenuCommandService(
             _window,
             settings,
@@ -81,7 +85,9 @@ public partial class App : System.Windows.Application
             _logger,
             executablePath);
 
-        var updateService = new VelopackUpdateService();
+        IUpdateService updateService = _identity.UpdatesEnabled
+            ? new VelopackUpdateService()
+            : new DisabledUpdateService();
         _updates = new UpdateCoordinator(updateService, settings, settingsService.Save, logger: _logger);
         _settingsWindow = new SettingsWindowService(() =>
         {
@@ -95,25 +101,29 @@ public partial class App : System.Windows.Application
                 _features)
             {
                 Owner = _window,
+                Title = $"{_identity.DisplayName} 设置",
             };
             return settingsWindow;
         });
         commands.SettingsRequested += _settingsWindow.ShowOrActivate;
 
         _window.AttachContextMenu(commands);
-        _tray = new TrayService(commands, _features);
+        _tray = new TrayService(commands, _features, _identity);
         _singleInstance.StartRestoreServer(() => Dispatcher.Invoke(commands.ShowOrRestore));
 
         _window.Show();
         _window.ApplySettings(settings);
         ShowPendingCrashNotification(settings, settingsService);
-        _ = CheckForUpdatesAfterStartupAsync(_applicationLifetime.Token);
+        if (_identity.UpdatesEnabled)
+        {
+            _ = CheckForUpdatesAfterStartupAsync(_applicationLifetime.Token);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _applicationLifetime.Cancel();
-        _logger.Info("CastoPet shutdown.");
+        _logger.Info($"{_identity.DisplayName} shutdown.");
         _tray?.Dispose();
         _settingsWindow?.Dispose();
         _wheelCatalogService?.Dispose();

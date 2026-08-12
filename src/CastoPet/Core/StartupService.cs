@@ -8,18 +8,24 @@ public sealed class StartupService
     public const string ValueName = "CastoPet";
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private readonly LoggingService _logger;
+    private readonly string _registrationValueName;
 
-    public StartupService(LoggingService logger)
+    public StartupService(LoggingService logger, string registrationValueName = ValueName)
     {
         _logger = logger;
+        _registrationValueName = string.IsNullOrWhiteSpace(registrationValueName)
+            ? throw new ArgumentException("Startup registration value name is required.", nameof(registrationValueName))
+            : registrationValueName;
     }
+
+    public string RegistrationValueName => _registrationValueName;
 
     public bool IsEnabled(string? executablePath = null)
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: false);
-            if (key?.GetValue(ValueName) is not string value || string.IsNullOrWhiteSpace(value))
+            if (key?.GetValue(_registrationValueName) is not string value || string.IsNullOrWhiteSpace(value))
             {
                 return false;
             }
@@ -43,11 +49,11 @@ public sealed class StartupService
 
             if (enabled)
             {
-                key.SetValue(ValueName, $"\"{executablePath}\"");
+                key.SetValue(_registrationValueName, $"\"{executablePath}\"");
             }
             else
             {
-                key.DeleteValue(ValueName, throwOnMissingValue: false);
+                key.DeleteValue(_registrationValueName, throwOnMissingValue: false);
             }
 
             return true;

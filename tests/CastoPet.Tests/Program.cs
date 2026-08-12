@@ -20,6 +20,9 @@ var tests = new (string Name, Action Test)[]
     ("Settings load migrates legacy schema", SettingsLoadMigratesLegacySchema),
     ("Settings transaction rolls back failed persistence", SettingsTransactionRollsBackFailedPersistence),
     ("App paths include local crash reports", AppPathsIncludeLocalCrashReports),
+    ("Product identities isolate stable and preview", ProductIdentitiesIsolateStableAndPreview),
+    ("App paths follow product identity", AppPathsFollowProductIdentity),
+    ("Preview data migration copies user configuration once", PreviewDataMigrationCopiesUserConfigurationOnce),
     ("Settings round trip includes crash and update state", SettingsRoundTripIncludesCrashAndUpdateState),
     ("Settings clone includes crash and update state", SettingsCloneIncludesCrashAndUpdateState),
     ("Settings clone includes theme mode", SettingsCloneIncludesThemeMode),
@@ -39,6 +42,7 @@ var tests = new (string Name, Action Test)[]
     ("Update policy checks at most once per local day", UpdatePolicyChecksAtMostOncePerLocalDay),
     ("Manual update checks bypass the daily gate", ManualUpdateChecksBypassTheDailyGate),
     ("Update coordinator skips development builds", UpdateCoordinatorSkipsDevelopmentBuilds),
+    ("Preview update service stays disabled", PreviewUpdateServiceStaysDisabled),
     ("Update coordinator records automatic attempts before network", UpdateCoordinatorRecordsAutomaticAttemptsBeforeNetwork),
     ("Update coordinator maps network failures", UpdateCoordinatorMapsNetworkFailures),
     ("Update coordinator logs network failures", UpdateCoordinatorLogsNetworkFailures),
@@ -61,9 +65,11 @@ var tests = new (string Name, Action Test)[]
     ("Logging rotates bounded archive files", LoggingRotatesBoundedArchiveFiles),
     ("Bottom-right placement uses work area margin", BottomRightPlacementUsesWorkAreaMargin),
     ("Startup value name is CastoPet", StartupValueNameIsCastoPet),
+    ("Startup service accepts product registration identity", StartupServiceAcceptsProductRegistrationIdentity),
     ("Startup registration matches current executable path", StartupRegistrationMatchesCurrentExecutablePath),
     ("Project does not keep template MainWindow", ProjectDoesNotKeepTemplateMainWindow),
     ("Single instance rejects a second owner", SingleInstanceRejectsSecondOwner),
+    ("Application composes the current product identity", ApplicationComposesTheCurrentProductIdentity),
     ("Single instance restore signal reaches primary", SingleInstanceRestoreSignalReachesPrimary),
     ("Runtime position starts at default", RuntimePositionStartsAtDefault),
     ("Runtime position tracks drag for current run only", RuntimePositionTracksDragForCurrentRunOnly),
@@ -481,6 +487,62 @@ static void AppPathsIncludeLocalCrashReports()
         "Crash reports should live beside settings and logs in the application data directory.");
 }
 
+static void ProductIdentitiesIsolateStableAndPreview()
+{
+    var stable = CastoPetProductIdentity.Stable;
+    var preview = CastoPetProductIdentity.Preview;
+
+    Assert.Equal("CastoPet", stable.ApplicationId, "Stable should retain the public application identity.");
+    Assert.Equal("CastoPet", stable.DataDirectoryName, "Stable should retain the public data directory.");
+    Assert.Equal("CastoPet", stable.PackageId, "Stable should retain the public package id.");
+    Assert.True(stable.UpdatesEnabled, "Stable installed builds should use the public update feed.");
+
+    Assert.Equal("CastoPet.Preview", preview.ApplicationId, "Preview should have a distinct application identity.");
+    Assert.Equal("CastoPet-Preview", preview.DataDirectoryName, "Preview should have a distinct data directory.");
+    Assert.Equal("CastoPet.Preview", preview.PackageId, "Preview should have a distinct package id.");
+    Assert.False(preview.UpdatesEnabled, "Preview should not consume Stable updates without a dedicated feed.");
+    Assert.False(stable.InstanceName == preview.InstanceName, "Both editions should be able to run concurrently.");
+    Assert.False(stable.StartupValueName == preview.StartupValueName, "Both editions should own separate startup registrations.");
+}
+
+static void AppPathsFollowProductIdentity()
+{
+    using var temp = TempDirectory.Create();
+    var stable = AppPaths.ForProduct(CastoPetProductIdentity.Stable, temp.Path);
+    var preview = AppPaths.ForProduct(CastoPetProductIdentity.Preview, temp.Path);
+
+    Assert.Equal(System.IO.Path.Combine(temp.Path, "CastoPet"), stable.DataDirectory, "Stable data should use its identity directory.");
+    Assert.Equal(System.IO.Path.Combine(temp.Path, "CastoPet-Preview"), preview.DataDirectory, "Preview data should use its identity directory.");
+    Assert.False(stable.SettingsFile == preview.SettingsFile, "Settings files must not be shared across editions.");
+    Assert.False(stable.ShortcutsFile == preview.ShortcutsFile, "Shortcut catalogs must not be shared across editions.");
+    Assert.False(stable.CrashesDirectory == preview.CrashesDirectory, "Crash reports must identify their edition by directory.");
+}
+
+static void PreviewDataMigrationCopiesUserConfigurationOnce()
+{
+    using var temp = TempDirectory.Create();
+    var legacy = AppPaths.ForProduct(CastoPetProductIdentity.Stable, temp.Path);
+    var preview = AppPaths.ForProduct(CastoPetProductIdentity.Preview, temp.Path);
+    Directory.CreateDirectory(legacy.ShortcutsDirectory);
+    File.WriteAllText(legacy.SettingsFile, "legacy-settings");
+    File.WriteAllText(legacy.SettingsBackupFile, "legacy-backup");
+    File.WriteAllText(legacy.ShortcutsFile, "legacy-shortcuts");
+    Directory.CreateDirectory(legacy.LogsDirectory);
+    File.WriteAllText(legacy.LogFile, "legacy-log");
+
+    var logger = new LoggingService(preview);
+    Assert.True(PreviewDataMigrationService.TryMigrate(CastoPetProductIdentity.Preview, temp.Path, preview, logger), "The first Preview run should complete migration.");
+    Assert.Equal("legacy-settings", File.ReadAllText(preview.SettingsFile), "Settings should be copied without changing the legacy file.");
+    Assert.Equal("legacy-shortcuts", File.ReadAllText(preview.ShortcutsFile), "Shortcut configuration should be copied.");
+    Assert.False(File.Exists(System.IO.Path.Combine(preview.LogsDirectory, System.IO.Path.GetFileName(legacy.LogFile))), "Logs should remain isolated instead of being migrated.");
+
+    File.WriteAllText(preview.SettingsFile, "preview-settings");
+    File.WriteAllText(legacy.SettingsFile, "changed-legacy-settings");
+    Assert.True(PreviewDataMigrationService.TryMigrate(CastoPetProductIdentity.Preview, temp.Path, preview, logger), "Repeated migration checks should remain successful.");
+    Assert.Equal("preview-settings", File.ReadAllText(preview.SettingsFile), "A later Stable change must not overwrite Preview settings.");
+    Assert.True(File.Exists(PreviewDataMigrationService.GetMarkerPath(preview)), "A durable marker should prevent repeated imports.");
+}
+
 static void SettingsRoundTripIncludesCrashAndUpdateState()
 {
     using var temp = TempDirectory.Create();
@@ -739,6 +801,15 @@ static void UpdateCoordinatorSkipsDevelopmentBuilds()
 
     Assert.Equal(UpdateCheckStatus.DevelopmentBuild, result.Status, "Direct builds should not invoke installed update operations.");
     Assert.Equal(0, service.CheckCount, "Development builds should not contact the update source.");
+}
+
+static void PreviewUpdateServiceStaysDisabled()
+{
+    var service = new DisabledUpdateService("0.1.0-preview");
+
+    Assert.False(service.IsInstalled, "A disabled update service should never present Preview as updater-managed.");
+    Assert.Equal("0.1.0-preview", service.CurrentVersion, "Preview should still expose its build version.");
+    Assert.True(service.CheckForUpdatesAsync(CancellationToken.None).GetAwaiter().GetResult() is null, "Disabled updates should never return a Stable release.");
 }
 
 static void UpdateCoordinatorRecordsAutomaticAttemptsBeforeNetwork()
@@ -1054,6 +1125,16 @@ static void StartupValueNameIsCastoPet()
     Assert.Equal("CastoPet", StartupService.ValueName, "Startup registry value should use app name.");
 }
 
+static void StartupServiceAcceptsProductRegistrationIdentity()
+{
+    using var temp = TempDirectory.Create();
+    var service = new StartupService(
+        new LoggingService(new AppPaths(temp.Path)),
+        CastoPetProductIdentity.Preview.StartupValueName);
+
+    Assert.Equal("CastoPet Preview", service.RegistrationValueName, "Preview should use its own Windows startup value.");
+}
+
 static void StartupRegistrationMatchesCurrentExecutablePath()
 {
     Assert.True(
@@ -1097,6 +1178,18 @@ static void SingleInstanceRejectsSecondOwner()
 
     Assert.True(first.IsPrimaryInstance, "First service should own the instance mutex.");
     Assert.False(second.IsPrimaryInstance, "Second service should not own the same instance mutex.");
+}
+
+static void ApplicationComposesTheCurrentProductIdentity()
+{
+    var workspace = FindWorkspaceRoot();
+    var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+
+    Assert.Contains(source, "CastoPetProductIdentity.Current", "App startup should select one centralized product identity.");
+    Assert.Contains(source, "AppPaths.ForProduct(_identity)", "Application data should follow the product identity.");
+    Assert.Contains(source, "_identity.InstanceName", "Single-instance ownership should be edition-specific.");
+    Assert.Contains(source, "_identity.StartupValueName", "Startup registration should be edition-specific.");
+    Assert.Contains(source, "_identity.UpdatesEnabled", "Update composition should explicitly enforce the edition policy.");
 }
 
 static void SingleInstanceRestoreSignalReachesPrimary()

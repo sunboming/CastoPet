@@ -406,7 +406,9 @@ public partial class PetWindow : Window
         AssetService assets,
         LoggingService logger)
     {
-        var shortcutService = new ShortcutService(new AppPaths(), logger);
+        var shortcutService = new ShortcutService(
+            AppPaths.ForProduct(CastoPetProductIdentity.Current),
+            logger);
         shortcutService.Load();
         var catalogService = new WheelCatalogService(assets.Skin.Expressions, shortcutService);
         return new LegacyWheelDependencies(

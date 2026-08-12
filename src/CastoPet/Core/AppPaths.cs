@@ -8,7 +8,7 @@ public sealed class AppPaths
     {
         DataDirectory = baseDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CastoPet");
+            CastoPetProductIdentity.Current.DataDirectoryName);
         LogsDirectory = Path.Combine(DataDirectory, "logs");
         CrashesDirectory = Path.Combine(DataDirectory, "Crashes");
         ShortcutsDirectory = Path.Combine(DataDirectory, "Shortcuts");
@@ -28,4 +28,14 @@ public sealed class AppPaths
     public string SettingsTemporaryFile { get; }
     public string ShortcutsFile { get; }
     public string LogFile { get; }
+
+    public static AppPaths ForProduct(
+        CastoPetProductIdentity identity,
+        string? localAppDataRoot = null)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        var root = localAppDataRoot
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return new AppPaths(Path.Combine(root, identity.DataDirectoryName));
+    }
 }

@@ -22,6 +22,12 @@ default for local development. Stable is the minimal public release profile.
 Stable ignores persisted Preview-only settings without deleting them. Returning to
 Preview restores their saved values.
 
+The editions also use separate Windows identities. Stable owns `%LocalAppData%\CastoPet`,
+the `CastoPet` startup entry, package id, and update feed. Preview owns
+`%LocalAppData%\CastoPet-Preview`, a separate startup entry and package id, and does not
+consume Stable updates. On its first run, Preview copies legacy settings and shortcuts
+from the old shared directory without moving logs, crash reports, or deleting source data.
+
 ## Build commands
 
 Preview remains compatible with the normal build command:
