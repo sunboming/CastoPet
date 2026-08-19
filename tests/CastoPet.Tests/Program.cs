@@ -1144,11 +1144,11 @@ static void RepositoryIgnoresLocalWorkingAssets()
     var gitignore = File.ReadAllText(System.IO.Path.Combine(workspace, ".gitignore"));
 
     Assert.Contains(gitignore, "/.codex/", "Repository-local Codex state should remain untracked.");
-    Assert.Contains(gitignore, "/.task6-artifacts/", "Repository-local task artifacts should remain untracked.");
-    Assert.Contains(gitignore, "/sample/", "Reference expression images should remain untracked.");
-    Assert.Contains(gitignore, "/tmp/", "Temporary generated output should remain untracked.");
-    Assert.Contains(gitignore, "/Castorice.png", "The root reference character image should remain untracked.");
-    Assert.Contains(gitignore, "artifacts/stability-tests/", "Stability session data should remain untracked.");
+    Assert.Contains(gitignore, "/assets/references/", "Reference images should remain untracked outside the source tree.");
+    Assert.Contains(gitignore, "artifacts/builds/", "Repository-local build artifacts should remain untracked.");
+    Assert.Contains(gitignore, "artifacts/reports/", "Stability and archived task reports should remain untracked.");
+    Assert.Contains(gitignore, "artifacts/temp/", "Temporary generated output should remain untracked.");
+    Assert.Contains(gitignore, "artifacts/generation/*/runs/", "Large image-generation runs should remain untracked.");
 }
 
 static void VelopackRunsAtTheApplicationEntryPoint()

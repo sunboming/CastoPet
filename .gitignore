@@ -3,11 +3,11 @@ obj/
 *.user
 *.suo
 .vs/
-artifacts/local-package/
+artifacts/builds/
 artifacts/packages/
-artifacts/stability-tests/
+artifacts/reports/
+artifacts/temp/
+artifacts/generation/*/runs/
+/assets/candidates/
+/assets/references/
 /.codex/
-/.task6-artifacts/
-/sample/
-/tmp/
-/Castorice.png
