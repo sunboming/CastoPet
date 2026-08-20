@@ -117,6 +117,7 @@ var tests = new (string Name, Action Test)[]
     ("Asset service loads expression images with isolated transitions", AssetServiceLoadsExpressionImagesWithIsolatedTransitions),
     ("Asset service treats missing petting frames as optional", AssetServiceTreatsMissingPettingFramesAsOptional),
     ("Bounded asset cache evicts least recently used entries", BoundedAssetCacheEvictsLeastRecentlyUsedEntries),
+    ("Source section extraction handles line endings", SourceSectionExtractionHandlesLineEndings),
     ("Pet window defers optional animation assets", PetWindowDefersOptionalAnimationAssets),
     ("Built-in idle action defines eight authored-rate frame paths", BuiltInIdleActionDefinesEightAuthoredRateFramePaths),
     ("Idle frame diagnostics read all packaged frames", IdleFrameDiagnosticsReadAllPackagedFrames),
@@ -2285,9 +2286,10 @@ static void PetWindowDefersOptionalAnimationAssets()
     var workspace = FindWorkspaceRoot();
     var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
     const string constructorStart = "public PetWindow(\n        AssetService assets,";
-    var start = source.IndexOf(constructorStart, StringComparison.Ordinal);
-    var end = source.IndexOf("\n    private void ShutdownRuntimeResources", start, StringComparison.Ordinal);
-    var constructor = source[start..end];
+    var constructor = ExtractSourceSection(
+        source,
+        constructorStart,
+        "\n    private void ShutdownRuntimeResources");
 
     Assert.Contains(constructor, "assets.LoadIdleFrames()", "Idle frames should remain eager for smooth startup playback.");
     Assert.Contains(constructor, "assets.LoadBlinkFrames()", "Blink frames should remain eager for smooth passive playback.");
@@ -2299,6 +2301,53 @@ static void PetWindowDefersOptionalAnimationAssets()
         "Directional movement frames should wait until movement is used.");
     Assert.Contains(source, "new BoundedLruCache<string, PetExpressionAsset?>",
         "Expression assets should use a bounded cache instead of permanent bulk retention.");
+}
+
+static void SourceSectionExtractionHandlesLineEndings()
+{
+    const string lfSource = "before\npublic PetWindow(\n    body\n    private void Next";
+    var crlfSource = lfSource.ReplaceLineEndings("\r\n");
+    const string expected = "public PetWindow(\n    body";
+
+    Assert.Equal(
+        expected,
+        ExtractSourceSection(lfSource, "public PetWindow(\n", "\n    private void Next"),
+        "Source extraction should support LF files.");
+    Assert.Equal(
+        expected,
+        ExtractSourceSection(crlfSource, "public PetWindow(\n", "\n    private void Next"),
+        "Source extraction should support CRLF files.");
+
+    var missingStart = Assert.Throws<InvalidOperationException>(() =>
+        ExtractSourceSection(lfSource, "missing start", "\n    private void Next"));
+    Assert.Contains(missingStart.Message, "start marker", "A missing start marker should produce a useful failure.");
+
+    var missingEnd = Assert.Throws<InvalidOperationException>(() =>
+        ExtractSourceSection(lfSource, "public PetWindow(\n", "missing end"));
+    Assert.Contains(missingEnd.Message, "end marker", "A missing end marker should produce a useful failure.");
+}
+
+static string ExtractSourceSection(string source, string startMarker, string endMarker)
+{
+    var normalizedSource = source.ReplaceLineEndings("\n");
+    var normalizedStartMarker = startMarker.ReplaceLineEndings("\n");
+    var normalizedEndMarker = endMarker.ReplaceLineEndings("\n");
+    var start = normalizedSource.IndexOf(normalizedStartMarker, StringComparison.Ordinal);
+    if (start < 0)
+    {
+        throw new InvalidOperationException($"Source start marker was not found: {normalizedStartMarker}");
+    }
+
+    var end = normalizedSource.IndexOf(
+        normalizedEndMarker,
+        start + normalizedStartMarker.Length,
+        StringComparison.Ordinal);
+    if (end < 0)
+    {
+        throw new InvalidOperationException($"Source end marker was not found: {normalizedEndMarker}");
+    }
+
+    return normalizedSource[start..end];
 }
 
 static void BuiltInIdleActionDefinesEightAuthoredRateFramePaths()
@@ -3551,9 +3600,7 @@ static void PetWindowCompletesActiveMovementAfterOneCursorPush()
     var workspace = FindWorkspaceRoot();
     var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
     const string advanceSignature = "private void AdvanceActiveMovement(TimeSpan renderingTime)";
-    var advanceStart = source.IndexOf(advanceSignature, StringComparison.Ordinal);
-    var advanceEnd = source.IndexOf("\n    private ", advanceStart + advanceSignature.Length, StringComparison.Ordinal);
-    var advance = source[advanceStart..advanceEnd];
+    var advance = ExtractSourceSection(source, advanceSignature, "\n    private ");
 
     Assert.Contains(source, "private bool TryPushCursor", "Cursor pushing should report whether the single push happened.");
     Assert.Contains(advance, "if (TryPushCursor(renderingTime", "Active movement should branch immediately after the first cursor push.");
@@ -3571,10 +3618,7 @@ static void PetWindowReleasesRuntimeResourcesOnClose()
     var workspace = FindWorkspaceRoot();
     var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
     const string signature = "private void ShutdownRuntimeResources()";
-    var start = source.IndexOf(signature, StringComparison.Ordinal);
-    Assert.True(start >= 0, "PetWindow should expose one explicit runtime cleanup path.");
-    var end = source.IndexOf("\n    private ", start + signature.Length, StringComparison.Ordinal);
-    var cleanup = source[start..(end >= 0 ? end : source.Length)];
+    var cleanup = ExtractSourceSection(source, signature, "\n    private ");
 
     foreach (var timer in new[]
     {
