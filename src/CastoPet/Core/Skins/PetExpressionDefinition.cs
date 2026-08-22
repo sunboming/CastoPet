@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Skins;
 
 public sealed record PetExpressionDefinition(
     string Id,

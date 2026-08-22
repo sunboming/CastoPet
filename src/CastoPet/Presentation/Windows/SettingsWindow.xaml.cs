@@ -3,7 +3,20 @@ using System.Windows.Input;
 using CastoPet.Core;
 using WpfControls = System.Windows.Controls;
 
-namespace CastoPet;
+using CastoPet;
+using CastoPet.Application.Menus;
+using CastoPet.Application.Settings;
+using CastoPet.Application.Shortcuts;
+using CastoPet.Application.Updates;
+using CastoPet.Core.Product;
+using CastoPet.Core.Settings;
+using CastoPet.Core.Shortcuts;
+using CastoPet.Infrastructure.Diagnostics;
+using CastoPet.Infrastructure.Platform;
+using CastoPet.Infrastructure.Presentation;
+using CastoPet.Infrastructure.Shortcuts;
+
+namespace CastoPet.Presentation.Windows;
 
 public partial class SettingsWindow : Window, ISettingsWindow
 {

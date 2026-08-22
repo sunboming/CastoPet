@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using WpfPoint = System.Windows.Point;
 
-namespace CastoPet.Core;
+namespace CastoPet.Infrastructure.Platform;
 
 public sealed class WindowsCursorService
 {

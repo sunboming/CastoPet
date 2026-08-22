@@ -1,7 +1,9 @@
 using System.IO;
 using Microsoft.Win32;
 
-namespace CastoPet.Core;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Infrastructure.Platform;
 
 public sealed class StartupService
 {

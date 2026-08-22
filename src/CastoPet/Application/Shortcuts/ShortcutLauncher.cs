@@ -1,7 +1,11 @@
 using System.Diagnostics;
 using System.IO;
 
-namespace CastoPet.Core;
+using CastoPet;
+using CastoPet.Core.Shortcuts;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Application.Shortcuts;
 
 public sealed record ShortcutLaunchResult(
     bool Succeeded,

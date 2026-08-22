@@ -1,4 +1,6 @@
-namespace CastoPet.Core;
+using CastoPet.Core.Diagnostics;
+
+namespace CastoPet.Application.Diagnostics;
 
 public sealed class CrashCaptureCoordinator
 {

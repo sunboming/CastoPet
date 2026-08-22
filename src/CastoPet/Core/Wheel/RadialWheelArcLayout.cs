@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Wheel;
 
 public readonly record struct RadialWheelArc(double StartAngle, double SweepAngle)
 {

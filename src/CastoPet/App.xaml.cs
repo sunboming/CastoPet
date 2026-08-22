@@ -2,6 +2,22 @@ using System.Reflection;
 using System.Windows;
 using CastoPet.Core;
 
+using CastoPet.Application.Diagnostics;
+using CastoPet.Application.Menus;
+using CastoPet.Application.Settings;
+using CastoPet.Application.Shortcuts;
+using CastoPet.Application.Skins;
+using CastoPet.Application.Updates;
+using CastoPet.Application.Wheel;
+using CastoPet.Core.Product;
+using CastoPet.Core.Settings;
+using CastoPet.Infrastructure.Assets;
+using CastoPet.Infrastructure.Diagnostics;
+using CastoPet.Infrastructure.Persistence;
+using CastoPet.Infrastructure.Platform;
+using CastoPet.Infrastructure.Updates;
+using CastoPet.Presentation.Windows;
+
 namespace CastoPet;
 
 public partial class App : System.Windows.Application

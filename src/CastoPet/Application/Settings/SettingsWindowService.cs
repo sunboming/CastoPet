@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Application.Settings;
 
 public interface ISettingsWindow
 {

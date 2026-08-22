@@ -1,4 +1,8 @@
-namespace CastoPet.Core;
+using CastoPet.Application.Shortcuts;
+using CastoPet.Core.Skins;
+using CastoPet.Core.Wheel;
+
+namespace CastoPet.Application.Wheel;
 
 public sealed class WheelCatalogService : IDisposable
 {

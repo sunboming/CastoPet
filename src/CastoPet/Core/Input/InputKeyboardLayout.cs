@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace CastoPet.Core;
+namespace CastoPet.Core.Input;
 
 public static class InputKeyboardLayout
 {

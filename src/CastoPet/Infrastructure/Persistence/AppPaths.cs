@@ -1,6 +1,8 @@
 using System.IO;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Product;
+
+namespace CastoPet.Infrastructure.Persistence;
 
 public sealed class AppPaths
 {

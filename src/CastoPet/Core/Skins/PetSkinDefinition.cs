@@ -1,4 +1,6 @@
-namespace CastoPet.Core;
+using CastoPet.Core.Animation;
+
+namespace CastoPet.Core.Skins;
 
 public sealed record PetSkinDefinition(
     string Id,

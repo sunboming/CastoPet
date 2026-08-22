@@ -1,4 +1,7 @@
-namespace CastoPet.Core;
+using CastoPet.Core.Input;
+using CastoPet.Core.Wheel;
+
+namespace CastoPet.Application.Interaction;
 
 internal sealed class PetInteractionCoordinator
 {

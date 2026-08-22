@@ -3,7 +3,7 @@ using System.Text;
 using System.Windows;
 using WpfDataFormats = System.Windows.DataFormats;
 
-namespace CastoPet.Core;
+namespace CastoPet.Infrastructure.Shortcuts;
 
 internal static class ShortcutDropDataReader
 {

@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace CastoPet.Core;
+namespace CastoPet.Infrastructure.Platform;
 
 public static class WindowPlacementService
 {

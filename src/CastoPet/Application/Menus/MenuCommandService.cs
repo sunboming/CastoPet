@@ -1,7 +1,14 @@
 using CastoPet;
 using Wpf = System.Windows;
 
-namespace CastoPet.Core;
+using CastoPet.Application.Settings;
+using CastoPet.Core.Settings;
+using CastoPet.Infrastructure.Diagnostics;
+using CastoPet.Infrastructure.Persistence;
+using CastoPet.Infrastructure.Platform;
+using CastoPet.Presentation.Windows;
+
+namespace CastoPet.Application.Menus;
 
 public sealed class MenuCommandService
 {

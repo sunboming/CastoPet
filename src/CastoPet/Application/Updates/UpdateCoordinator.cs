@@ -1,4 +1,7 @@
-namespace CastoPet.Core;
+using CastoPet.Core.Settings;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Application.Updates;
 
 public sealed class UpdateCoordinator
 {

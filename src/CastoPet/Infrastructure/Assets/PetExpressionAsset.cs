@@ -1,6 +1,8 @@
 using System.Windows.Media;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Skins;
+
+namespace CastoPet.Infrastructure.Assets;
 
 public sealed record PetExpressionAsset(
     PetExpressionDefinition Definition,

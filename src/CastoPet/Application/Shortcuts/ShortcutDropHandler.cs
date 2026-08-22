@@ -1,6 +1,9 @@
 using System.IO;
 
-namespace CastoPet.Core;
+using CastoPet;
+using CastoPet.Core.Shortcuts;
+
+namespace CastoPet.Application.Shortcuts;
 
 public sealed class ShortcutDropHandler
 {

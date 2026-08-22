@@ -1,4 +1,6 @@
-namespace CastoPet.Core;
+using CastoPet;
+
+namespace CastoPet.Core.Shortcuts;
 
 public enum ShortcutType
 {

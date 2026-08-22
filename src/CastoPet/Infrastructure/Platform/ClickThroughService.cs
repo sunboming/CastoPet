@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
-namespace CastoPet.Core;
+namespace CastoPet.Infrastructure.Platform;
 
 public static class ClickThroughService
 {

@@ -13,7 +13,26 @@ using WpfPoint = System.Windows.Point;
 using WpfShapes = System.Windows.Shapes;
 using WpfSize = System.Windows.Size;
 
-namespace CastoPet;
+using CastoPet.Application.Interaction;
+using CastoPet.Application.Menus;
+using CastoPet.Application.Settings;
+using CastoPet.Application.Shortcuts;
+using CastoPet.Application.Wheel;
+using CastoPet.Core.Animation;
+using CastoPet.Core.Input;
+using CastoPet.Core.Movement;
+using CastoPet.Core.Product;
+using CastoPet.Core.Settings;
+using CastoPet.Core.Shortcuts;
+using CastoPet.Core.Wheel;
+using CastoPet.Infrastructure.Assets;
+using CastoPet.Infrastructure.Diagnostics;
+using CastoPet.Infrastructure.Persistence;
+using CastoPet.Infrastructure.Platform;
+using CastoPet.Infrastructure.Presentation;
+using CastoPet.Infrastructure.Shortcuts;
+
+namespace CastoPet.Presentation.Windows;
 
 public partial class PetWindow : Window
 {

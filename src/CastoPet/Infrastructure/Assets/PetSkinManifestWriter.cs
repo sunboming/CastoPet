@@ -2,7 +2,10 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Animation;
+using CastoPet.Core.Skins;
+
+namespace CastoPet.Infrastructure.Assets;
 
 public static class PetSkinManifestWriter
 {

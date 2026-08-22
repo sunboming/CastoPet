@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Animation;
 
 public sealed record PetActionDefinition(
     string Id,

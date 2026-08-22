@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Wheel;
 
 public sealed record WheelCatalog(IReadOnlyList<WheelCategory> Categories)
 {

@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Input;
+
+namespace CastoPet.Infrastructure.Platform;
 
 public sealed class WindowsInputHookService : IDisposable
 {

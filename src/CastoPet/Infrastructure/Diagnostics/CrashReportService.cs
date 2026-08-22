@@ -3,7 +3,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Diagnostics;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Diagnostics;
+using CastoPet.Core.Product;
+using CastoPet.Infrastructure.Persistence;
+
+namespace CastoPet.Infrastructure.Diagnostics;
 
 public sealed record CrashReportInfo(string Id, string Path, DateTimeOffset CreatedUtc);
 

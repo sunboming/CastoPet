@@ -2,7 +2,10 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Settings;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Infrastructure.Persistence;
 
 public sealed class SettingsService
 {

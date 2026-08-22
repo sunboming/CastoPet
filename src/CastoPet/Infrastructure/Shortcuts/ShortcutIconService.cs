@@ -6,7 +6,9 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Shortcuts;
+
+namespace CastoPet.Infrastructure.Shortcuts;
 
 internal static class ShortcutIconService
 {

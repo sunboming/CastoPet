@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace CastoPet.Core;
+namespace CastoPet.Core.Product;
 
 public sealed record CastoPetBuildInfo(
     string Version,

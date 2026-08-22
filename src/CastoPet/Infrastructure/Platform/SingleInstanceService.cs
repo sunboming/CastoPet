@@ -1,7 +1,9 @@
 using System.IO.Pipes;
 using System.Text;
 
-namespace CastoPet.Core;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Infrastructure.Platform;
 
 public sealed class SingleInstanceService : IDisposable
 {

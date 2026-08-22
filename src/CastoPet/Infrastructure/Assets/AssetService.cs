@@ -2,7 +2,11 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media;
 using System.IO;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Animation;
+using CastoPet.Core.Skins;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Infrastructure.Assets;
 
 public sealed class AssetService
 {

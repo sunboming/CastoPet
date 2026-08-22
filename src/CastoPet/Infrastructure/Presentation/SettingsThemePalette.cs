@@ -2,7 +2,9 @@ using System.Windows;
 using System.Windows.Media;
 using MediaColor = System.Windows.Media.Color;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Settings;
+
+namespace CastoPet.Infrastructure.Presentation;
 
 public static class SettingsThemePalette
 {

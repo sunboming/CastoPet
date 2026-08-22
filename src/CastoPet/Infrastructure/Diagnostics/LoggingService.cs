@@ -1,7 +1,9 @@
 using System.IO;
 using System.Text;
 
-namespace CastoPet.Core;
+using CastoPet.Infrastructure.Persistence;
+
+namespace CastoPet.Infrastructure.Diagnostics;
 
 public sealed class LoggingService
 {

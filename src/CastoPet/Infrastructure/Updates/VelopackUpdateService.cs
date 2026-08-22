@@ -2,7 +2,9 @@ using System.Reflection;
 using Velopack;
 using Velopack.Sources;
 
-namespace CastoPet.Core;
+using CastoPet.Application.Updates;
+
+namespace CastoPet.Infrastructure.Updates;
 
 public sealed class VelopackUpdateService : IUpdateService
 {

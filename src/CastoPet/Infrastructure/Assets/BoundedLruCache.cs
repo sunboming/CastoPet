@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Infrastructure.Assets;
 
 public sealed class BoundedLruCache<TKey, TValue> where TKey : notnull
 {

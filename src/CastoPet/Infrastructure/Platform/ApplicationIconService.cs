@@ -2,7 +2,7 @@ using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
 using Wpf = System.Windows;
 
-namespace CastoPet.Core;
+namespace CastoPet.Infrastructure.Platform;
 
 public static class ApplicationIconService
 {

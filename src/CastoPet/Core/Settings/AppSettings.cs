@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Settings;
 
 public sealed class AppSettings
 {

@@ -1,4 +1,8 @@
-namespace CastoPet.Core;
+using CastoPet.Application.Menus;
+using CastoPet.Core.Product;
+using CastoPet.Core.Settings;
+
+namespace CastoPet.Application.Settings;
 
 public static class SettingCatalog
 {

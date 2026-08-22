@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Input;
 
 internal enum PetPointerButton
 {

@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Application.Updates;
 
 public sealed record UpdateAvailability(
     string Version,

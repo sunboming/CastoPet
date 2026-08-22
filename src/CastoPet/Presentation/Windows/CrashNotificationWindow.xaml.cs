@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace CastoPet;
+namespace CastoPet.Presentation.Windows;
 
 public partial class CrashNotificationWindow : Window
 {

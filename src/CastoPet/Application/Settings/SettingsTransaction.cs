@@ -1,4 +1,6 @@
-namespace CastoPet.Core;
+using CastoPet.Core.Settings;
+
+namespace CastoPet.Application.Settings;
 
 public static class SettingsTransaction
 {

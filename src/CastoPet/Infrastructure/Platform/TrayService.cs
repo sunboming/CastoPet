@@ -1,7 +1,12 @@
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
-namespace CastoPet.Core;
+using CastoPet.Application.Menus;
+using CastoPet.Application.Settings;
+using CastoPet.Core.Product;
+using CastoPet.Core.Settings;
+
+namespace CastoPet.Infrastructure.Platform;
 
 public sealed class TrayService : IDisposable
 {

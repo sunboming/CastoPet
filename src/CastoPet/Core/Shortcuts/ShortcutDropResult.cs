@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Shortcuts;
 
 public sealed record ShortcutDropResult(
     int AddedCount,

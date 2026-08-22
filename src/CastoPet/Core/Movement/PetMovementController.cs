@@ -1,4 +1,6 @@
-namespace CastoPet.Core;
+using CastoPet.Core.Animation;
+
+namespace CastoPet.Core.Movement;
 
 public readonly record struct PetMovementStep(
     double NextLeft,

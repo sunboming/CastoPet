@@ -1,6 +1,8 @@
 using System.Text;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Product;
+
+namespace CastoPet.Core.Diagnostics;
 
 public enum CrashReportKind
 {

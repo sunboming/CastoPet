@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Animation;
 
 public enum PetExpressionTransitionMode
 {

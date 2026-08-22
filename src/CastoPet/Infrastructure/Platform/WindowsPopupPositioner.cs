@@ -3,7 +3,9 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Wheel;
+
+namespace CastoPet.Infrastructure.Platform;
 
 public static class WindowsPopupPositioner
 {

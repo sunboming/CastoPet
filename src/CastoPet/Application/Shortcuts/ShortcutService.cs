@@ -2,7 +2,12 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace CastoPet.Core;
+using CastoPet;
+using CastoPet.Core.Shortcuts;
+using CastoPet.Infrastructure.Diagnostics;
+using CastoPet.Infrastructure.Persistence;
+
+namespace CastoPet.Application.Shortcuts;
 
 public sealed class ShortcutService
 {

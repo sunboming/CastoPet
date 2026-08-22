@@ -1,4 +1,4 @@
-<Window x:Class="CastoPet.SettingsWindow"
+<Window x:Class="CastoPet.Presentation.Windows.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="CastoPet 设置" Icon="/CastoPet;component/Assets/AppIcon.ico" Width="840" Height="680" MinWidth="760" MaxWidth="920" MinHeight="600"

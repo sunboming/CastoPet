@@ -1,7 +1,10 @@
 using System.IO;
 using System.Text;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Product;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Infrastructure.Persistence;
 
 public static class PreviewDataMigrationService
 {

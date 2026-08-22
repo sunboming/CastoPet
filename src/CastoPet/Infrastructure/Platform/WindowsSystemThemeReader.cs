@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace CastoPet.Core;
+namespace CastoPet.Infrastructure.Platform;
 
 public static class WindowsSystemThemeReader
 {

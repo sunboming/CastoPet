@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Movement;
 
 public readonly record struct PetMovementBounds(double Left, double Top, double Width, double Height);
 

@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace CastoPet.Core;
+namespace CastoPet.Application.Updates;
 
 public sealed class DisabledUpdateService(string? currentVersion = null) : IUpdateService
 {

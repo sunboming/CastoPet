@@ -1,4 +1,9 @@
-namespace CastoPet.Core;
+using CastoPet.Core.Settings;
+using CastoPet.Core.Skins;
+using CastoPet.Infrastructure.Assets;
+using CastoPet.Infrastructure.Diagnostics;
+
+namespace CastoPet.Application.Skins;
 
 public sealed class PetSkinSelectionService
 {

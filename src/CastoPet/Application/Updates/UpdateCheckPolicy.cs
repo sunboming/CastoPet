@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace CastoPet.Core;
+namespace CastoPet.Application.Updates;
 
 public static class UpdateCheckPolicy
 {

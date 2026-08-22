@@ -922,6 +922,18 @@ internal static partial class TestSuite
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "CrashNotificationWindow.xaml")), "Crash notification markup should live under Presentation/Windows.");
         Assert.False(File.Exists(System.IO.Path.Combine(projectRoot, "PetWindow.xaml")), "Window markup should not remain loose at the project root.");
         Assert.Equal(0, Directory.EnumerateFiles(coreRoot, "*.cs", SearchOption.TopDirectoryOnly).Count(), "Core should not retain ungrouped source files.");
+
+        foreach (var layer in new[] { "Application", "Core", "Infrastructure", "Presentation" })
+        {
+            var layerRoot = System.IO.Path.Combine(projectRoot, layer);
+            foreach (var sourcePath in Directory.EnumerateFiles(layerRoot, "*.cs", SearchOption.AllDirectories))
+            {
+                var relativeDirectory = System.IO.Path.GetRelativePath(projectRoot, System.IO.Path.GetDirectoryName(sourcePath)!);
+                var expectedNamespace = $"namespace CastoPet.{relativeDirectory.Replace(System.IO.Path.DirectorySeparatorChar, '.')};";
+                var source = File.ReadAllText(sourcePath);
+                Assert.Contains(source, expectedNamespace, $"{System.IO.Path.GetRelativePath(projectRoot, sourcePath)} should match its architecture directory namespace.");
+            }
+        }
     }
 
     static void VelopackRunsAtTheApplicationEntryPoint()

@@ -1,6 +1,8 @@
 using System.IO;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Skins;
+
+namespace CastoPet.Infrastructure.Assets;
 
 public static class BuiltInPetSkins
 {

@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Wheel;
 
 public readonly record struct RadialWheelOverlayPlacement(
     double CenterX,

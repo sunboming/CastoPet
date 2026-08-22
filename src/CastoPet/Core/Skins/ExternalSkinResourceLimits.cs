@@ -1,4 +1,4 @@
-namespace CastoPet.Core;
+namespace CastoPet.Core.Skins;
 
 public static class ExternalSkinResourceLimits
 {

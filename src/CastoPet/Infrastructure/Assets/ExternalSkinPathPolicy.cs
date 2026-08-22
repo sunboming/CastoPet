@@ -1,7 +1,9 @@
 using System.Buffers.Binary;
 using System.IO;
 
-namespace CastoPet.Core;
+using CastoPet.Core.Skins;
+
+namespace CastoPet.Infrastructure.Assets;
 
 internal static class ExternalSkinPathPolicy
 {
