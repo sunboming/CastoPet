@@ -238,7 +238,7 @@ internal static partial class TestSuite
         Assert.Equal(BuiltInPetSkins.Castorice.Expressions.Count, manifestSkin.Expressions.Count, "The embedded manifest should define every built-in expression.");
 
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "BuiltInPetSkins.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Assets", "BuiltInPetSkins.cs"));
         Assert.False(source.Contains("new PetActionDefinition", StringComparison.Ordinal), "Built-in skin metadata should not be duplicated as action constructors.");
         Assert.False(source.Contains("CreateFramePaths", StringComparison.Ordinal), "Built-in frame lists should come from the manifest.");
     }

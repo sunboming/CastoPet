@@ -770,8 +770,8 @@ internal static partial class TestSuite
         var petWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "PetWindow.xaml"));
         var settingsWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml"));
         var crashWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CrashNotificationWindow.xaml"));
-        var trayService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Core", "TrayService.cs"));
-        var iconService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Core", "ApplicationIconService.cs"));
+        var trayService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "TrayService.cs"));
+        var iconService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "ApplicationIconService.cs"));
 
         Assert.Contains(project, @"<Resource Include=""Assets\AppIcon.ico"" />", "The shared icon should be available as a WPF resource.");
         Assert.Contains(petWindow, "Icon=\"Assets/AppIcon.ico\"", "The pet taskbar surface should use the shared icon.");
@@ -787,7 +787,7 @@ internal static partial class TestSuite
     static void TrayServiceDisposesOwnedMenuResources()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "TrayService.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Platform", "TrayService.cs"));
 
         Assert.Contains(source, "Forms.ContextMenuStrip _contextMenu", "TrayService should retain ownership of its native menu component.");
         Assert.Contains(source, "_notifyIcon.ContextMenuStrip = null;", "TrayService should detach the menu before disposing native components.");
@@ -906,6 +906,18 @@ internal static partial class TestSuite
         Assert.True(Directory.Exists(System.IO.Path.Combine(artwork, "candidates", "Castorice")), "Reviewed candidate artwork should live under artwork/candidates/Castorice.");
         Assert.True(Directory.Exists(System.IO.Path.Combine(artwork, "authoring", "Castorice")), "Editable skin artwork should live under artwork/authoring/Castorice.");
         Assert.False(gitignore.Contains("/artwork/candidates/", StringComparison.Ordinal), "Reviewed candidate artwork must remain tracked by Git.");
+    }
+
+    static void ProductionCodeIsOrganizedByArchitecture()
+    {
+        var workspace = FindWorkspaceRoot();
+        var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+        var coreRoot = System.IO.Path.Combine(projectRoot, "Core");
+
+        Assert.True(File.Exists(System.IO.Path.Combine(coreRoot, "Animation", "PetAnimationController.cs")), "Pure animation behavior should live under Core/Animation.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Application", "Updates", "UpdateCoordinator.cs")), "Update orchestration should live under Application/Updates.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "WindowsInputHookService.cs")), "Windows integrations should live under Infrastructure/Platform.");
+        Assert.Equal(0, Directory.EnumerateFiles(coreRoot, "*.cs", SearchOption.TopDirectoryOnly).Count(), "Core should not retain ungrouped source files.");
     }
 
     static void VelopackRunsAtTheApplicationEntryPoint()

@@ -158,7 +158,7 @@ internal static partial class TestSuite
     {
         var workspace = FindWorkspaceRoot();
         var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
-        var readerSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "ShortcutDropDataReader.cs"));
+        var readerSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Shortcuts", "ShortcutDropDataReader.cs"));
 
         Assert.Contains(readerSource, "WpfDataFormats.FileDrop", "WPF file-drop data should be extracted into paths.");
         Assert.Contains(readerSource, "WpfDataFormats.UnicodeText", "Unicode text drops should be extracted into neutral strings.");
@@ -172,8 +172,8 @@ internal static partial class TestSuite
     {
         var workspace = FindWorkspaceRoot();
         var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
-        var selectorPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "ExpressionWheelSelector.cs");
-        var catalogSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "ExpressionWheelCatalog.cs"));
+        var selectorPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "Wheel", "ExpressionWheelSelector.cs");
+        var catalogSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "Wheel", "ExpressionWheelCatalog.cs"));
 
         Assert.False(source.Contains("ExpressionWheelSelector", StringComparison.Ordinal), "PetWindow should not use the retired expression-only selector.");
         Assert.False(source.Contains("ExpressionWheelItem", StringComparison.Ordinal), "PetWindow should resolve generic actions instead of expression-only wheel items.");
@@ -312,8 +312,8 @@ internal static partial class TestSuite
         var workspace = FindWorkspaceRoot();
         var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml"));
         var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
-        var commands = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "MenuCommandService.cs"));
-        var backdrop = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "SettingsBackdropService.cs"));
+        var commands = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Application", "Menus", "MenuCommandService.cs"));
+        var backdrop = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Presentation", "SettingsBackdropService.cs"));
 
         Assert.Contains(xaml, "AllowsTransparency=\"False\"", "Native backdrop windows should not use WPF layered transparency.");
         Assert.Contains(xaml, "SystemThemeButton", "Settings should expose a follow-system theme choice.");
