@@ -887,7 +887,7 @@ internal static partial class TestSuite
         var gitignore = File.ReadAllText(System.IO.Path.Combine(workspace, ".gitignore"));
 
         Assert.Contains(gitignore, "/.codex/", "Repository-local Codex state should remain untracked.");
-        Assert.Contains(gitignore, "/assets/references/", "Reference images should remain untracked outside the source tree.");
+        Assert.Contains(gitignore, "/artwork/references/", "Reference images should remain untracked outside the source tree.");
         Assert.Contains(gitignore, "artifacts/builds/", "Repository-local build artifacts should remain untracked.");
         Assert.Contains(gitignore, "artifacts/reports/", "Stability and archived task reports should remain untracked.");
         Assert.Contains(gitignore, "artifacts/temp/", "Temporary generated output should remain untracked.");

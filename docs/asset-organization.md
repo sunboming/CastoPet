@@ -16,9 +16,9 @@ replaces direct project ownership. Do not move them as part of general repositor
 
 ## Workspace Assets
 
-- `assets/references/`: local character and expression references used to guide artwork. It is
+- `artwork/references/`: local character and expression references used to guide artwork. It is
   not packaged into CastoPet and is ignored by Git.
-- `assets/candidates/`: optional root-level review material that has not entered the source
+- `artwork/candidates/`: optional root-level review material that has not entered the source
   asset lifecycle. It is ignored by Git and may not exist in every checkout.
 - `artifacts/generation/`: generated runs, prompts, previews, and intermediate output. It is
   working data rather than an application resource.

@@ -8,6 +8,6 @@ artifacts/packages/
 artifacts/reports/
 artifacts/temp/
 artifacts/generation/*/runs/
-/assets/candidates/
-/assets/references/
+/artwork/candidates/
+/artwork/references/
 /.codex/
