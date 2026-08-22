@@ -5,7 +5,7 @@ internal static partial class TestSuite
     static void PetWindowDefinesTwoLevelRadialOverlayAndDropSurface()
     {
         var workspace = FindWorkspaceRoot();
-        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml"));
 
         Assert.Contains(xaml, "x:Name=\"RadialWheelOverlay\"", "The wheel should expose a generic radial overlay.");
         Assert.Contains(xaml, "x:Name=\"FirstRingSurface\"", "The overlay should expose a first-level category ring.");
@@ -18,8 +18,8 @@ internal static partial class TestSuite
     static void PetWindowConsumesCentralizedRadialWheelStyling()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
-        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml"));
 
         Assert.Contains(source, "RadialWheelStyle.GetNormalFill", "Initial and restored fills should use the shared style contract.");
         Assert.Contains(source, "visual.Ring", "Selection refresh should restore the visual's original ring style.");
@@ -34,7 +34,7 @@ internal static partial class TestSuite
     static void PetWindowRoutesClassifiedPointerGestures()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
 
         Assert.Contains(source, "PetPointerGestureClassifier", "PetWindow should delegate ambiguity to the tested gesture classifier.");
         Assert.Contains(source, "SystemParameters.MinimumHorizontalDragDistance", "Left drag should respect the Windows drag threshold.");
@@ -48,8 +48,8 @@ internal static partial class TestSuite
     static void PetWindowDefinesHoldFeedbackAndPettingPlayback()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
-        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml"));
 
         Assert.Contains(xaml, "RadialWheelHoldOverlay", "Right hold should have a dedicated non-interactive progress overlay.");
         Assert.Contains(xaml, "RadialWheelHoldArc", "Hold feedback should expose an updateable circular arc.");
@@ -65,7 +65,7 @@ internal static partial class TestSuite
     static void PetWindowAppliesPerFrameActionDurations()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
 
         Assert.Contains(source, "PetFrameTiming.GetDuration(_idleAction", "Idle playback should schedule the currently displayed frame duration.");
         Assert.Contains(source, "PetFrameTiming.GetDuration(_blinkAction", "Blink playback should schedule the currently displayed frame duration.");
@@ -77,7 +77,7 @@ internal static partial class TestSuite
     static void PetWindowSchedulesDirectionalTurnsAtRenderPriority()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
 
         Assert.Contains(
             source,
@@ -88,7 +88,7 @@ internal static partial class TestSuite
     static void PetWindowCompletesActiveMovementAfterOneCursorPush()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
         const string advanceSignature = "private void AdvanceActiveMovement(TimeSpan renderingTime)";
         var advance = ExtractSourceSection(source, advanceSignature, "\n    private ");
 
@@ -106,7 +106,7 @@ internal static partial class TestSuite
     static void PetWindowReleasesRuntimeResourcesOnClose()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
         const string signature = "private void ShutdownRuntimeResources()";
         var cleanup = ExtractSourceSection(source, signature, "\n    private ");
 
@@ -131,7 +131,7 @@ internal static partial class TestSuite
     static void PetWindowDetachesContextMenuSubscriptions()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
 
         Assert.Contains(source, "Action? _menuSettingsChangedHandler", "PetWindow should retain the context-menu settings handler for unsubscription.");
         Assert.Contains(source, "DetachContextMenuSubscriptions();", "Context-menu subscriptions should be detached during replacement and shutdown.");
@@ -142,7 +142,7 @@ internal static partial class TestSuite
     static void PetWindowRoutesGenericRadialActions()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
 
         Assert.Contains(source, "RadialWheelController", "PetWindow should delegate wheel state to the generic controller.");
         Assert.Contains(source, "DateTimeOffset.UtcNow", "Category dwell should be driven by explicit timestamps.");
@@ -157,7 +157,7 @@ internal static partial class TestSuite
     static void PetWindowExtractsNeutralShortcutDropData()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
         var readerSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Shortcuts", "ShortcutDropDataReader.cs"));
 
         Assert.Contains(readerSource, "WpfDataFormats.FileDrop", "WPF file-drop data should be extracted into paths.");
@@ -171,7 +171,7 @@ internal static partial class TestSuite
     static void PetWindowRetiresExpressionOnlyWheelIntegration()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
         var selectorPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "Wheel", "ExpressionWheelSelector.cs");
         var catalogSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Core", "Wheel", "ExpressionWheelCatalog.cs"));
 
@@ -296,7 +296,7 @@ internal static partial class TestSuite
     static void SettingsWindowDefinesTheApprovedVisualStructure()
     {
         var workspace = FindWorkspaceRoot();
-        var xamlPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml");
+        var xamlPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml");
         var xaml = File.ReadAllText(xamlPath);
 
         Assert.Contains(xaml, "SettingsItemsHost", "The settings window should expose its catalog host.");
@@ -310,8 +310,8 @@ internal static partial class TestSuite
     static void SettingsWindowSupportsThemeSwitchingAndBackdrop()
     {
         var workspace = FindWorkspaceRoot();
-        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml"));
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml.cs"));
         var commands = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Application", "Menus", "MenuCommandService.cs"));
         var backdrop = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Presentation", "SettingsBackdropService.cs"));
 
@@ -331,7 +331,7 @@ internal static partial class TestSuite
     static void SettingsWindowCancelsUpdateWorkOnClose()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml.cs"));
 
         Assert.Contains(source, "CancellationTokenSource _lifetimeCancellation", "Each settings window should own cancellation for its asynchronous work.");
         Assert.Contains(source, "CheckAsync(manual: true, _lifetimeCancellation.Token)", "Manual update checks should observe window closure.");
@@ -343,7 +343,7 @@ internal static partial class TestSuite
     static void SettingsWindowExposesShortcutLauncherManagement()
     {
         var workspace = FindWorkspaceRoot();
-        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml"));
 
         Assert.Contains(xaml, "SettingsNavigation", "Settings should expose explicit segmented navigation.");
         Assert.Contains(xaml, "GeneralView", "Existing settings should remain available in a general view.");
@@ -367,7 +367,7 @@ internal static partial class TestSuite
     static void SettingsWindowSharesShortcutServicesAndLiveUpdates()
     {
         var workspace = FindWorkspaceRoot();
-        var windowSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml.cs"));
+        var windowSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml.cs"));
         var appSource = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
         var compactAppSource = string.Concat(appSource.Where(character => !char.IsWhiteSpace(character)));
 
@@ -388,9 +388,9 @@ internal static partial class TestSuite
     {
         var workspace = FindWorkspaceRoot();
         var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
-        var xaml = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml"));
-        var settingsSource = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml.cs"));
-        var petSource = File.ReadAllText(System.IO.Path.Combine(projectRoot, "PetWindow.xaml.cs"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "SettingsWindow.xaml"));
+        var settingsSource = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "SettingsWindow.xaml.cs"));
+        var petSource = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "PetWindow.xaml.cs"));
 
         Assert.Contains(xaml, "AllowDrop=\"True\"", "The shortcut list should accept external drops.");
         Assert.Contains(xaml, "DragOver=\"ShortcutList_DragOver\"", "The shortcut list should classify incoming drag data.");

@@ -622,7 +622,7 @@ internal static partial class TestSuite
     static void CrashNotificationIsLocalOnly()
     {
         var workspace = FindWorkspaceRoot();
-        var xamlPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "CrashNotificationWindow.xaml");
+        var xamlPath = System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "CrashNotificationWindow.xaml");
         var xaml = File.ReadAllText(xamlPath);
 
         Assert.Contains(xaml, "打开日志目录", "Crash notification should provide local report access.");
@@ -767,16 +767,16 @@ internal static partial class TestSuite
         var workspace = FindWorkspaceRoot();
         var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
         var project = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CastoPet.csproj"));
-        var petWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "PetWindow.xaml"));
-        var settingsWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml"));
-        var crashWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "CrashNotificationWindow.xaml"));
+        var petWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "PetWindow.xaml"));
+        var settingsWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "SettingsWindow.xaml"));
+        var crashWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "CrashNotificationWindow.xaml"));
         var trayService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "TrayService.cs"));
         var iconService = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "ApplicationIconService.cs"));
 
         Assert.Contains(project, @"<Resource Include=""Assets\AppIcon.ico"" />", "The shared icon should be available as a WPF resource.");
-        Assert.Contains(petWindow, "Icon=\"Assets/AppIcon.ico\"", "The pet taskbar surface should use the shared icon.");
-        Assert.Contains(settingsWindow, "Icon=\"Assets/AppIcon.ico\"", "Settings should use the shared icon.");
-        Assert.Contains(crashWindow, "Icon=\"Assets/AppIcon.ico\"", "Crash notifications should use the shared icon.");
+        Assert.Contains(petWindow, "Icon=\"/CastoPet;component/Assets/AppIcon.ico\"", "The pet taskbar surface should use the shared icon.");
+        Assert.Contains(settingsWindow, "Icon=\"/CastoPet;component/Assets/AppIcon.ico\"", "Settings should use the shared icon.");
+        Assert.Contains(crashWindow, "Icon=\"/CastoPet;component/Assets/AppIcon.ico\"", "Crash notifications should use the shared icon.");
         Assert.Contains(trayService, "ApplicationIconService.LoadTrayIcon()", "The notification-area icon should use the shared icon service.");
         Assert.False(trayService.Contains("SystemIcons.Application", StringComparison.Ordinal), "The notification area should not fall back to the generic Windows application icon.");
         Assert.Contains(iconService, "/CastoPet;component/Assets/AppIcon.ico", "The tray icon service should load the icon from the CastoPet assembly.");
@@ -799,7 +799,7 @@ internal static partial class TestSuite
     {
         var workspace = FindWorkspaceRoot();
         var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
-        var settingsWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "SettingsWindow.xaml"));
+        var settingsWindow = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "SettingsWindow.xaml"));
         var app = File.ReadAllText(System.IO.Path.Combine(projectRoot, "App.xaml.cs"));
 
         Assert.Contains(settingsWindow, "ShowInTaskbar=\"False\"", "Settings should remain an auxiliary window instead of creating a second taskbar button.");
@@ -917,6 +917,10 @@ internal static partial class TestSuite
         Assert.True(File.Exists(System.IO.Path.Combine(coreRoot, "Animation", "PetAnimationController.cs")), "Pure animation behavior should live under Core/Animation.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Application", "Updates", "UpdateCoordinator.cs")), "Update orchestration should live under Application/Updates.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "WindowsInputHookService.cs")), "Windows integrations should live under Infrastructure/Platform.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "PetWindow.xaml")), "Pet window markup should live under Presentation/Windows.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "SettingsWindow.xaml")), "Settings window markup should live under Presentation/Windows.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "CrashNotificationWindow.xaml")), "Crash notification markup should live under Presentation/Windows.");
+        Assert.False(File.Exists(System.IO.Path.Combine(projectRoot, "PetWindow.xaml")), "Window markup should not remain loose at the project root.");
         Assert.Equal(0, Directory.EnumerateFiles(coreRoot, "*.cs", SearchOption.TopDirectoryOnly).Count(), "Core should not retain ungrouped source files.");
     }
 
@@ -942,7 +946,7 @@ internal static partial class TestSuite
     static void SettingsWindowExposesCrashAndUpdateActions()
     {
         var workspace = FindWorkspaceRoot();
-        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "SettingsWindow.xaml"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml"));
 
         Assert.Contains(xaml, "OpenCrashReportsButton", "Settings should expose local crash reports.");
         Assert.Contains(xaml, "CheckForUpdatesButton", "Settings should expose manual update checks.");

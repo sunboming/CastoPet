@@ -887,7 +887,7 @@ internal static partial class TestSuite
     static void PetWindowDefersOptionalAnimationAssets()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
         const string constructorStart = "public PetWindow(\n        AssetService assets,";
         var constructor = ExtractSourceSection(
             source,

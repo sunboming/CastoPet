@@ -95,8 +95,8 @@ internal static partial class TestSuite
         Assert.Equal(852, devicePlacement.Top, "The native popup should be centered vertically on the device invocation point.");
 
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
-        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
+        var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml"));
         Assert.Contains(xaml, "Opened=\"OnRadialWheelOverlayOpened\"", "The wheel should correct its native position after WPF opens the popup.");
         Assert.Contains(source, "WindowsPopupPositioner.TryCenterAt", "The opened popup should bypass WPF edge flipping through its native window position.");
     }
@@ -143,7 +143,7 @@ internal static partial class TestSuite
         Assert.True(webIcon is not null, "Web shortcuts should expose the registered .url shell icon.");
         Assert.True(steamIcon is not null, "Steam shortcuts should load their persisted game icon.");
 
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
         Assert.Contains(source, "LoadShortcutWheelIcon", "Second-level shortcut items should resolve their icons.");
         Assert.Contains(source, "WpfControls.Image", "Shortcut wheel content should render icon images.");
         Assert.Contains(source, "visual.Content", "Selection scaling should apply to the combined icon-and-name content.");
@@ -370,7 +370,7 @@ internal static partial class TestSuite
     static void PetWindowFollowsLiveWheelCatalogSnapshots()
     {
         var workspace = FindWorkspaceRoot();
-        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "PetWindow.xaml.cs"));
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
 
         Assert.Contains(source, "WheelCatalogService wheelCatalogService", "PetWindow should receive the live catalog service instead of a frozen snapshot.");
         Assert.Contains(source, "_wheelCatalogService.Changed += OnWheelCatalogChanged;", "PetWindow should observe live catalog changes.");
