@@ -592,6 +592,7 @@ internal static partial class TestSuite
     {
         var workspace = FindWorkspaceRoot();
         var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+        var authoringRoot = System.IO.Path.Combine(workspace, "artwork", "authoring", "Castorice");
         var labels = new[] { "Happy", "Shy", "Sleepy", "Surprised", "Pouting", "Confused", "Proud", "Crying" };
         var idlePath = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "Idle", "Castorice.Idle.00.png");
         using var idle = new Bitmap(idlePath);
@@ -599,8 +600,8 @@ internal static partial class TestSuite
         foreach (var label in labels)
         {
             var id = label.ToLowerInvariant();
-            var targetPath = System.IO.Path.Combine(projectRoot, "Assets", "Skins", "Castorice", "expressions", "targets", $"{label}.png");
-            var projectPath = System.IO.Path.Combine(projectRoot, "Assets", "Skins", "Castorice", "actions", "expressions", $"{id}.transition.animator.json");
+            var targetPath = System.IO.Path.Combine(authoringRoot, "expressions", "targets", $"{label}.png");
+            var projectPath = System.IO.Path.Combine(authoringRoot, "actions", "expressions", $"{id}.transition.animator.json");
             var finalPath = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "Expressions", $"Castorice.Expression.{label}.png");
             var transitionRoot = System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "Expressions", label, "Transition");
             Assert.True(File.Exists(targetPath), $"{label} should keep a CastoPet-owned source target.");

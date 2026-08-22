@@ -62,6 +62,7 @@ internal static partial class TestSuite
         ("Packaging script builds traceable edition-specific installers", PackagingScriptBuildsTraceableEditionSpecificInstallers),
         ("Packaging workflow produces manual artifacts without publishing", PackagingWorkflowProducesManualArtifactsWithoutPublishing),
         ("Repository ignores local working assets", RepositoryIgnoresLocalWorkingAssets),
+        ("Repository keeps authoring artwork outside source", RepositoryKeepsAuthoringArtworkOutsideSource),
         ("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
         ("Update source points to the public releases repository", UpdateSourcePointsToThePublicReleasesRepository),
         ("Settings window exposes crash and update actions", SettingsWindowExposesCrashAndUpdateActions),

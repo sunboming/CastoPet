@@ -894,6 +894,20 @@ internal static partial class TestSuite
         Assert.Contains(gitignore, "artifacts/generation/*/runs/", "Large image-generation runs should remain untracked.");
     }
 
+    static void RepositoryKeepsAuthoringArtworkOutsideSource()
+    {
+        var workspace = FindWorkspaceRoot();
+        var sourceAssets = System.IO.Path.Combine(workspace, "src", "CastoPet", "Assets");
+        var artwork = System.IO.Path.Combine(workspace, "artwork");
+        var gitignore = File.ReadAllText(System.IO.Path.Combine(workspace, ".gitignore"));
+
+        Assert.False(Directory.Exists(System.IO.Path.Combine(sourceAssets, "CandidateSet")), "Candidate artwork should not live under the application source tree.");
+        Assert.False(Directory.Exists(System.IO.Path.Combine(sourceAssets, "Skins")), "Editable skin artwork should not live under the application source tree.");
+        Assert.True(Directory.Exists(System.IO.Path.Combine(artwork, "candidates", "Castorice")), "Reviewed candidate artwork should live under artwork/candidates/Castorice.");
+        Assert.True(Directory.Exists(System.IO.Path.Combine(artwork, "authoring", "Castorice")), "Editable skin artwork should live under artwork/authoring/Castorice.");
+        Assert.False(gitignore.Contains("/artwork/candidates/", StringComparison.Ordinal), "Reviewed candidate artwork must remain tracked by Git.");
+    }
+
     static void VelopackRunsAtTheApplicationEntryPoint()
     {
         var workspace = FindWorkspaceRoot();
