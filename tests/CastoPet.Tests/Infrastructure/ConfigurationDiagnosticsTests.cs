@@ -920,7 +920,15 @@ internal static partial class TestSuite
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "PetWindow.xaml")), "Pet window markup should live under Presentation/Windows.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "SettingsWindow.xaml")), "Settings window markup should live under Presentation/Windows.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "CrashNotificationWindow.xaml")), "Crash notification markup should live under Presentation/Windows.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Styling", "RadialWheelStyle.cs")), "Radial wheel styling should live under Presentation/Styling.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Styling", "SettingsThemePalette.cs")), "Settings colors should live under Presentation/Styling.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Shortcuts", "ShortcutIconService.cs")), "WPF shortcut icons should live under Presentation/Shortcuts.");
+        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "SettingsBackdropService.cs")), "Native Windows backdrop integration should live under Infrastructure/Platform.");
         Assert.False(File.Exists(System.IO.Path.Combine(projectRoot, "PetWindow.xaml")), "Window markup should not remain loose at the project root.");
+        var legacyPresentationRoot = System.IO.Path.Combine(projectRoot, "Infrastructure", "Presentation");
+        Assert.True(
+            !Directory.Exists(legacyPresentationRoot) || !Directory.EnumerateFiles(legacyPresentationRoot, "*.cs", SearchOption.AllDirectories).Any(),
+            "Infrastructure should not retain presentation-layer source files.");
         Assert.Equal(0, Directory.EnumerateFiles(coreRoot, "*.cs", SearchOption.TopDirectoryOnly).Count(), "Core should not retain ungrouped source files.");
 
         foreach (var layer in new[] { "Application", "Core", "Infrastructure", "Presentation" })
@@ -932,6 +940,56 @@ internal static partial class TestSuite
                 var expectedNamespace = $"namespace CastoPet.{relativeDirectory.Replace(System.IO.Path.DirectorySeparatorChar, '.')};";
                 var source = File.ReadAllText(sourcePath);
                 Assert.Contains(source, expectedNamespace, $"{System.IO.Path.GetRelativePath(projectRoot, sourcePath)} should match its architecture directory namespace.");
+            }
+        }
+    }
+
+    static void ArchitectureDependenciesPointInward()
+    {
+        var workspace = FindWorkspaceRoot();
+        var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+
+        AssertLayerDoesNotReference(
+            System.IO.Path.Combine(projectRoot, "Core"),
+            "Core",
+            "System.Windows",
+            "CastoPet.Application",
+            "CastoPet.Infrastructure",
+            "CastoPet.Presentation");
+        AssertLayerDoesNotReference(
+            System.IO.Path.Combine(projectRoot, "Application"),
+            "Application",
+            "System.Windows",
+            "CastoPet.Presentation");
+        AssertLayerDoesNotReference(
+            System.IO.Path.Combine(projectRoot, "Application", "Settings"),
+            "Application/Settings",
+            "CastoPet.Infrastructure");
+        AssertLayerDoesNotReference(
+            System.IO.Path.Combine(projectRoot, "Application", "Updates"),
+            "Application/Updates",
+            "CastoPet.Infrastructure");
+
+        var settingsContract = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Application", "Settings", "ISettingsStore.cs"));
+        var settingsImplementation = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Infrastructure", "Persistence", "SettingsService.cs"));
+        var updateContract = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Application", "Updates", "IUpdateService.cs"));
+        var updateImplementation = File.ReadAllText(System.IO.Path.Combine(projectRoot, "Infrastructure", "Updates", "VelopackUpdateService.cs"));
+        Assert.Contains(settingsContract, "interface ISettingsStore", "The settings persistence boundary should be owned by Application.");
+        Assert.Contains(settingsImplementation, ": ISettingsStore", "Infrastructure should implement the settings persistence boundary.");
+        Assert.Contains(updateContract, "interface IUpdateService", "The update boundary should be owned by Application.");
+        Assert.Contains(updateImplementation, ": IUpdateService", "Infrastructure should implement the update boundary.");
+    }
+
+    static void AssertLayerDoesNotReference(string root, string layer, params string[] forbiddenReferences)
+    {
+        foreach (var sourcePath in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            var source = File.ReadAllText(sourcePath);
+            foreach (var forbiddenReference in forbiddenReferences)
+            {
+                Assert.False(
+                    source.Contains(forbiddenReference, StringComparison.Ordinal),
+                    $"{layer} must not reference {forbiddenReference}: {System.IO.Path.GetRelativePath(root, sourcePath)}.");
             }
         }
     }

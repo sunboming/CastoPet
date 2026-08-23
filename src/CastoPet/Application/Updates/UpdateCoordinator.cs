@@ -1,5 +1,5 @@
+using CastoPet.Application.Diagnostics;
 using CastoPet.Core.Settings;
-using CastoPet.Infrastructure.Diagnostics;
 
 namespace CastoPet.Application.Updates;
 
@@ -12,7 +12,7 @@ public sealed class UpdateCoordinator
     private readonly Func<AppSettings, bool> _saveSettings;
     private readonly Func<DateOnly> _todayProvider;
     private readonly TimeSpan _timeout;
-    private readonly LoggingService? _logger;
+    private readonly IApplicationLogger? _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public UpdateCoordinator(
@@ -21,7 +21,7 @@ public sealed class UpdateCoordinator
         Func<AppSettings, bool> saveSettings,
         Func<DateOnly>? todayProvider = null,
         TimeSpan? timeout = null,
-        LoggingService? logger = null)
+        IApplicationLogger? logger = null)
     {
         _updateService = updateService;
         _settings = settings;

@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
-namespace CastoPet.Infrastructure.Presentation;
+namespace CastoPet.Infrastructure.Platform;
 
 public static class SettingsBackdropService
 {

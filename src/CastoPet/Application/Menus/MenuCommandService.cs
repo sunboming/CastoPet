@@ -1,29 +1,27 @@
-using CastoPet;
-using Wpf = System.Windows;
-
+using CastoPet.Application.Diagnostics;
 using CastoPet.Application.Settings;
 using CastoPet.Core.Settings;
-using CastoPet.Infrastructure.Diagnostics;
-using CastoPet.Infrastructure.Persistence;
-using CastoPet.Infrastructure.Platform;
-using CastoPet.Presentation.Windows;
 
 namespace CastoPet.Application.Menus;
 
 public sealed class MenuCommandService
 {
-    private readonly PetWindow _window;
-    private readonly SettingsService _settingsService;
-    private readonly StartupService _startupService;
-    private readonly LoggingService _logger;
+    private readonly IPetCommandTarget _window;
+    private readonly ISettingsStore _settingsService;
+    private readonly IStartupRegistration _startupService;
+    private readonly IApplicationLogger _logger;
+    private readonly IUserNotificationService _notifications;
+    private readonly IApplicationShutdown _applicationShutdown;
     private readonly string _executablePath;
 
     public MenuCommandService(
-        PetWindow window,
+        IPetCommandTarget window,
         AppSettings settings,
-        SettingsService settingsService,
-        StartupService startupService,
-        LoggingService logger,
+        ISettingsStore settingsService,
+        IStartupRegistration startupService,
+        IApplicationLogger logger,
+        IUserNotificationService notifications,
+        IApplicationShutdown applicationShutdown,
         string executablePath)
     {
         _window = window;
@@ -31,6 +29,8 @@ public sealed class MenuCommandService
         _settingsService = settingsService;
         _startupService = startupService;
         _logger = logger;
+        _notifications = notifications;
+        _applicationShutdown = applicationShutdown;
         _executablePath = executablePath;
     }
 
@@ -85,11 +85,9 @@ public sealed class MenuCommandService
         var target = !Settings.StartWithWindows;
         if (!_startupService.SetEnabled(target, _executablePath))
         {
-            Wpf.MessageBox.Show(
+            _notifications.ShowWarning(
                 "CastoPet 无法更新开机自启动设置。",
-                "CastoPet",
-                Wpf.MessageBoxButton.OK,
-                Wpf.MessageBoxImage.Warning);
+                "CastoPet");
             return;
         }
 
@@ -112,7 +110,7 @@ public sealed class MenuCommandService
     public void Exit()
     {
         _logger.Info("CastoPet exiting.");
-        Wpf.Application.Current.Shutdown();
+        _applicationShutdown.Shutdown();
     }
 
     private bool ApplyAndSave(
@@ -123,11 +121,9 @@ public sealed class MenuCommandService
         if (!SettingsTransaction.TryApply(Settings, mutation, _settingsService.Save))
         {
             SettingsChanged?.Invoke();
-            Wpf.MessageBox.Show(
+            _notifications.ShowWarning(
                 "CastoPet 无法保存设置，修改已撤销。",
-                "CastoPet",
-                Wpf.MessageBoxButton.OK,
-                Wpf.MessageBoxImage.Warning);
+                "CastoPet");
             return false;
         }
 

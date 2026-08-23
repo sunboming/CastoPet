@@ -2,6 +2,47 @@ namespace CastoPet.Tests;
 
 internal static partial class TestSuite
 {
+    static void MenuCommandsPreserveBehaviorThroughApplicationBoundaries()
+    {
+        var settings = AppSettings.Default;
+        settings.Topmost = false;
+        settings.StartWithWindows = false;
+        var target = new FakePetCommandTarget();
+        var store = new FakeSettingsStore();
+        var startup = new FakeStartupRegistration();
+        var logger = new FakeApplicationLogger();
+        var notifications = new FakeUserNotificationService();
+        var shutdown = new FakeApplicationShutdown();
+        var commands = new MenuCommandService(
+            target,
+            settings,
+            store,
+            startup,
+            logger,
+            notifications,
+            shutdown,
+            "CastoPet.exe");
+
+        commands.ToggleTopmost();
+        Assert.True(settings.Topmost, "Successful menu changes should mutate settings.");
+        Assert.Equal(1, store.SaveCount, "Successful menu changes should persist once.");
+        Assert.Equal(1, target.ApplyCount, "Successful visual settings should apply to the pet once.");
+
+        store.SaveResult = false;
+        commands.ToggleTopmost();
+        Assert.True(settings.Topmost, "Failed persistence should restore the prior setting value.");
+        Assert.Equal(1, notifications.WarningCount, "Failed persistence should retain the warning behavior.");
+
+        startup.SetResult = false;
+        commands.ToggleStartWithWindows();
+        Assert.False(settings.StartWithWindows, "Failed startup registration should not mutate settings.");
+        Assert.Equal(2, notifications.WarningCount, "Failed startup registration should retain the warning behavior.");
+
+        commands.Exit();
+        Assert.Equal(1, shutdown.Count, "Exit should request application shutdown once.");
+        Assert.True(logger.Messages.Contains("CastoPet exiting."), "Exit should retain its log entry.");
+    }
+
     static void PetWindowDefinesTwoLevelRadialOverlayAndDropSurface()
     {
         var workspace = FindWorkspaceRoot();
@@ -313,7 +354,7 @@ internal static partial class TestSuite
         var xaml = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml"));
         var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "SettingsWindow.xaml.cs"));
         var commands = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Application", "Menus", "MenuCommandService.cs"));
-        var backdrop = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Presentation", "SettingsBackdropService.cs"));
+        var backdrop = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Platform", "SettingsBackdropService.cs"));
 
         Assert.Contains(xaml, "AllowsTransparency=\"False\"", "Native backdrop windows should not use WPF layered transparency.");
         Assert.Contains(xaml, "SystemThemeButton", "Settings should expose a follow-system theme choice.");

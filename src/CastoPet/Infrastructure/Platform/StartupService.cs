@@ -1,11 +1,12 @@
 using System.IO;
 using Microsoft.Win32;
 
+using CastoPet.Application.Menus;
 using CastoPet.Infrastructure.Diagnostics;
 
 namespace CastoPet.Infrastructure.Platform;
 
-public sealed class StartupService
+public sealed class StartupService : IStartupRegistration
 {
     public const string ValueName = "CastoPet";
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";

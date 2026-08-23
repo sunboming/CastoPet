@@ -29,12 +29,13 @@ using CastoPet.Infrastructure.Assets;
 using CastoPet.Infrastructure.Diagnostics;
 using CastoPet.Infrastructure.Persistence;
 using CastoPet.Infrastructure.Platform;
-using CastoPet.Infrastructure.Presentation;
 using CastoPet.Infrastructure.Shortcuts;
+using CastoPet.Presentation.Shortcuts;
+using CastoPet.Presentation.Styling;
 
 namespace CastoPet.Presentation.Windows;
 
-public partial class PetWindow : Window
+public partial class PetWindow : Window, IPetCommandTarget
 {
     private static readonly TimeSpan DefaultIdleFrameInterval = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan DefaultBlinkFrameInterval = TimeSpan.FromMilliseconds(90);

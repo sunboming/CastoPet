@@ -4,7 +4,7 @@ using MediaColor = System.Windows.Media.Color;
 
 using CastoPet.Core.Settings;
 
-namespace CastoPet.Infrastructure.Presentation;
+namespace CastoPet.Presentation.Styling;
 
 public static class SettingsThemePalette
 {

@@ -8,7 +8,7 @@ using System.Windows.Media.Imaging;
 
 using CastoPet.Core.Shortcuts;
 
-namespace CastoPet.Infrastructure.Shortcuts;
+namespace CastoPet.Presentation.Shortcuts;
 
 internal static class ShortcutIconService
 {

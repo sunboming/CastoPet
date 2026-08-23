@@ -1,11 +1,12 @@
 using System.IO;
 using System.Text;
 
+using CastoPet.Application.Diagnostics;
 using CastoPet.Infrastructure.Persistence;
 
 namespace CastoPet.Infrastructure.Diagnostics;
 
-public sealed class LoggingService
+public sealed class LoggingService : IApplicationLogger
 {
     public const long DefaultMaxLogFileBytes = 2 * 1024 * 1024;
     public const int DefaultMaxArchiveFiles = 5;

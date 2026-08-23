@@ -13,8 +13,8 @@ using CastoPet.Core.Settings;
 using CastoPet.Core.Shortcuts;
 using CastoPet.Infrastructure.Diagnostics;
 using CastoPet.Infrastructure.Platform;
-using CastoPet.Infrastructure.Presentation;
 using CastoPet.Infrastructure.Shortcuts;
+using CastoPet.Presentation.Styling;
 
 namespace CastoPet.Presentation.Windows;
 

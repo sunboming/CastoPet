@@ -16,6 +16,7 @@ using CastoPet.Infrastructure.Diagnostics;
 using CastoPet.Infrastructure.Persistence;
 using CastoPet.Infrastructure.Platform;
 using CastoPet.Infrastructure.Updates;
+using CastoPet.Presentation.Services;
 using CastoPet.Presentation.Windows;
 
 namespace CastoPet;
@@ -104,6 +105,8 @@ public partial class App : System.Windows.Application
             settingsService,
             startupService,
             _logger,
+            new WpfUserNotificationService(),
+            new WpfApplicationShutdown(),
             executablePath);
 
         IUpdateService updateService = _identity.UpdatesEnabled

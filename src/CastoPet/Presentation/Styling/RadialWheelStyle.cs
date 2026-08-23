@@ -1,6 +1,6 @@
 using CastoPet.Core.Wheel;
 
-namespace CastoPet.Infrastructure.Presentation;
+namespace CastoPet.Presentation.Styling;
 
 internal readonly record struct RadialWheelColor(byte Alpha, byte Red, byte Green, byte Blue);
 

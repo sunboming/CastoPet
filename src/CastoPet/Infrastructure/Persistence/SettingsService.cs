@@ -2,12 +2,13 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
+using CastoPet.Application.Settings;
 using CastoPet.Core.Settings;
 using CastoPet.Infrastructure.Diagnostics;
 
 namespace CastoPet.Infrastructure.Persistence;
 
-public sealed class SettingsService
+public sealed class SettingsService : ISettingsStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

@@ -144,3 +144,67 @@ sealed class FakeUpdateService : IUpdateService
     {
     }
 }
+
+sealed class FakePetCommandTarget : IPetCommandTarget
+{
+    public int ApplyCount { get; private set; }
+
+    public void ShowOrRestore()
+    {
+    }
+
+    public void ApplySettings(AppSettings settings)
+    {
+        ApplyCount++;
+    }
+}
+
+sealed class FakeSettingsStore : ISettingsStore
+{
+    public bool SaveResult { get; set; } = true;
+    public int SaveCount { get; private set; }
+
+    public AppSettings Load() => AppSettings.Default;
+
+    public bool Save(AppSettings settings)
+    {
+        SaveCount++;
+        return SaveResult;
+    }
+}
+
+sealed class FakeStartupRegistration : IStartupRegistration
+{
+    public bool SetResult { get; set; } = true;
+
+    public bool SetEnabled(bool enabled, string executablePath) => SetResult;
+}
+
+sealed class FakeApplicationLogger : IApplicationLogger
+{
+    public List<string> Messages { get; } = [];
+
+    public void Info(string message) => Messages.Add(message);
+
+    public void Error(string message, Exception? exception = null) => Messages.Add(message);
+}
+
+sealed class FakeUserNotificationService : IUserNotificationService
+{
+    public int WarningCount { get; private set; }
+
+    public void ShowWarning(string message, string title)
+    {
+        WarningCount++;
+    }
+}
+
+sealed class FakeApplicationShutdown : IApplicationShutdown
+{
+    public int Count { get; private set; }
+
+    public void Shutdown()
+    {
+        Count++;
+    }
+}
