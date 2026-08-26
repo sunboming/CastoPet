@@ -2,16 +2,17 @@ namespace CastoPet.Tests;
 
 internal static partial class TestSuite
 {
-    static void PetWindowDisablesMovementTurnTransitions()
+    static void PetWindowSwitchesMovementDirectionImmediately()
     {
         var workspace = FindWorkspaceRoot();
         var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
-        Assert.Contains(source, "MovementTurnTransitionsEnabled = false", "Movement transitions should be explicitly disabled without removing skin resources.");
-        var loader = ExtractSourceSection(source, "private IReadOnlyList<ImageSource> GetTurnFrames(", "private IReadOnlyList<ImageSource> TryLoadRequiredMoveFrames(");
-        Assert.Contains(loader, "if (!MovementTurnTransitionsEnabled)", "Disabled transitions should skip loading turn images.");
-        Assert.True(loader.IndexOf("Array.Empty<ImageSource>()", StringComparison.Ordinal) < loader.IndexOf("_assets.LoadTurnLeftFrames()", StringComparison.Ordinal), "The disabled path should return before loading turn assets.");
-        var facing = ExtractSourceSection(source, "private bool EnsureMovementFacing(", "private void AdvanceTurnFrame(");
-        Assert.Contains(facing, "GetMoveFrames(direction)", "Immediate facing should display the requested walking animation without waiting for a distance tick.");
+        var facing = ExtractSourceSection(source, "private void EnsureMovementFacing(", "private void FinishDirectionalMovement(");
+        Assert.Contains(facing, "_movementDirection = direction;", "Facing should update without a turn state machine.");
+        Assert.Contains(facing, "GetMoveFrames(direction)", "Facing should display the requested clip immediately.");
+        Assert.Contains(source, "EnsureMovementFacing(requestedDirection);", "Direction changes must not block position updates.");
+        var finish = ExtractSourceSection(source, "private void FinishDirectionalMovement(", "private IReadOnlyList<ImageSource> GetMoveFrames(");
+        Assert.Contains(finish, "CancelDirectionalMovement();", "Stopping should clear the selected direction.");
+        Assert.Contains(finish, "RestoreIdleAfterDirectionalMovement();", "Stopping should restore idle immediately.");
     }
 
     static void MenuCommandsPreserveBehaviorThroughApplicationBoundaries()
@@ -127,15 +128,14 @@ internal static partial class TestSuite
         Assert.Contains(source, "PetFrameTiming.GetTotalDuration", "Petting compression should follow the authored irregular sequence duration.");
     }
 
-    static void PetWindowSchedulesDirectionalTurnsAtRenderPriority()
+    static void PetWindowHasNoTurnPlaybackResources()
     {
         var workspace = FindWorkspaceRoot();
         var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
-
-        Assert.Contains(
-            source,
-            "new DispatcherTimer(DispatcherPriority.Render) { Interval = DefaultTurnFrameInterval }",
-            "Directional turn frames should not be starved behind continuous composition rendering.");
+        foreach (var retired in new[] { "_turnFrameTimer", "GetTurnFrames", "MovementTurnTransitionsEnabled", "PetDirectionalMovementAnimator" })
+        {
+            Assert.False(source.Contains(retired, StringComparison.Ordinal), "Retired turn playback must not return: " + retired);
+        }
     }
 
     static void PetWindowCompletesActiveMovementAfterOneCursorPush()

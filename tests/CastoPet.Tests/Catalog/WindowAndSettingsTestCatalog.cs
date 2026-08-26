@@ -4,13 +4,13 @@ internal static partial class TestSuite
 {
     private static IReadOnlyList<TestCase> WindowAndSettingsTestCases { get; } =
     [
-        new("Pet window disables movement turn transitions", PetWindowDisablesMovementTurnTransitions),
+        new("Pet window switches movement direction immediately", PetWindowSwitchesMovementDirectionImmediately),
         new("Pet window defines two-level radial overlay and drop surface", PetWindowDefinesTwoLevelRadialOverlayAndDropSurface),
         new("Pet window consumes centralized radial wheel styling", PetWindowConsumesCentralizedRadialWheelStyling),
         new("Pet window routes classified pointer gestures", PetWindowRoutesClassifiedPointerGestures),
         new("Pet window defines hold feedback and petting playback", PetWindowDefinesHoldFeedbackAndPettingPlayback),
         new("Pet window applies per-frame action durations", PetWindowAppliesPerFrameActionDurations),
-        new("Pet window schedules directional turns at render priority", PetWindowSchedulesDirectionalTurnsAtRenderPriority),
+        new("Pet window has no turn playback resources", PetWindowHasNoTurnPlaybackResources),
         new("Pet window completes active movement after one cursor push", PetWindowCompletesActiveMovementAfterOneCursorPush),
         new("Pet window releases runtime resources on close", PetWindowReleasesRuntimeResourcesOnClose),
         new("Pet window detaches context menu subscriptions", PetWindowDetachesContextMenuSubscriptions),

@@ -12,12 +12,7 @@ older design decisions.
 | [Build editions](build-editions.md) | Stable and Preview feature boundaries, build commands, identities, and packaging. |
 | [Known risks](known-risks.md) | Unresolved security and stability risks plus important resolved boundaries. |
 | [Skin manifest](skin-manifest.md) | External skin timing schema, validation rules, and resource budgets. |
-
-## Proposed Changes (Not Approved)
-
-[Movement model consolidation](movement-model-plan.md) records a future shared movement
-definition with left/right animation variants. It requires explicit user approval and
-does not change the current skin manifest contract.
+| [Unified movement model](movement-model-plan.md) | Shared movement settings, directional variants, and removal of turn playback. |
 
 ## Historical Documents
 

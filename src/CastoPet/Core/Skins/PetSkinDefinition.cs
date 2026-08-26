@@ -12,6 +12,9 @@ public sealed record PetSkinDefinition(
     IReadOnlyList<PetActionDefinition> Actions,
     IReadOnlyList<PetExpressionDefinition> Expressions)
 {
+    // File-based skins retain their resolved root for relative-path manifest export.
+    public string? SourceResourceDirectory { get; init; }
+
     public bool TryGetAction(PetActionKind kind, out PetActionDefinition action)
     {
         foreach (var item in Actions)

@@ -2,6 +2,57 @@ namespace CastoPet.Tests;
 
 internal static partial class TestSuite
 {
+    static void AssetServiceLoadsUnifiedDirectionalFrames()
+    {
+        using var temp = TempDirectory.Create();
+        var skin = BuiltInPetSkins.Castorice;
+        var move = skin.GetRequiredAction(PetActionKind.Move);
+        var root = System.IO.Path.Combine(FindWorkspaceRoot(), "src", "CastoPet");
+        var movement = move.Movement! with
+        {
+            LeftFramePaths = move.Movement!.LeftFramePaths.Select(path => System.IO.Path.Combine(root, path)).ToArray(),
+            RightFramePaths = move.Movement!.RightFramePaths.Select(path => System.IO.Path.Combine(root, path)).ToArray(),
+        };
+        skin = skin with
+        {
+            Actions = skin.Actions.Select(action => action.Kind == PetActionKind.Move
+                ? move with { FramePaths = [], Movement = movement } : action).ToArray(),
+        };
+        var service = new AssetService(new LoggingService(new AppPaths(temp.Path)), skin);
+        Assert.Equal(5, service.LoadMoveFrames(PetHorizontalDirection.Left).Count, "All left frames should decode without a generic clip.");
+        Assert.Equal(7, service.LoadMoveFrames(PetHorizontalDirection.Right).Count, "All right frames should decode without a generic clip.");
+    }
+
+    static void AssetServiceFallsBackForMissingDirectionalClips()
+    {
+        using var temp = TempDirectory.Create();
+        var fallback = System.IO.Path.Combine(FindWorkspaceRoot(), "src", "CastoPet", "Assets", "Runtime", "Castorice", "Castorice.png");
+        var missing = System.IO.Path.Combine(temp.Path, "Missing.png");
+        var skin = BuiltInPetSkins.Castorice;
+        var move = skin.GetRequiredAction(PetActionKind.Move) with
+        {
+            FramePaths = [fallback],
+            Movement = new PetMovementDefinition(new PetMovementSettings(), [], [missing]),
+        };
+        skin = skin with
+        {
+            Actions = skin.Actions.Select(action => action.Kind == PetActionKind.Move ? move : action).ToArray(),
+        };
+        var logger = new LoggingService(new AppPaths(temp.Path));
+        var service = new AssetService(logger, skin);
+        foreach (var direction in Enum.GetValues<PetHorizontalDirection>())
+        {
+            var frame = (System.Windows.Media.Imaging.BitmapImage)service.LoadMoveFrames(direction).Single();
+            Assert.Equal(new Uri(fallback), frame.UriSource, "Missing or unreadable directional clips should use the generic image.");
+        }
+        skin = skin with
+        {
+            Actions = skin.Actions.Select(action => action.Kind == PetActionKind.Move ? move with { FramePaths = [missing] } : action).ToArray(),
+        };
+        service = new AssetService(logger, skin);
+        Assert.Equal(0, service.LoadMoveFrames(PetHorizontalDirection.Right).Count, "A broken fallback should leave the current visual intact, not crash.");
+    }
+
     static void AssetServiceDefaultsToBuiltInSkin()
     {
         using var temp = TempDirectory.Create();
@@ -136,7 +187,7 @@ internal static partial class TestSuite
             "Expression images and transitions should not all decode during startup.");
         Assert.False(constructor.Contains("assets.LoadPettingFrames()", StringComparison.Ordinal),
             "Petting frames should wait until the first petting action.");
-        Assert.False(constructor.Contains("assets.LoadMoveLeftFrames()", StringComparison.Ordinal),
+        Assert.False(constructor.Contains("assets.LoadMoveFrames(", StringComparison.Ordinal),
             "Directional movement frames should wait until movement is used.");
         Assert.Contains(source, "new BoundedLruCache<string, PetExpressionAsset?>",
             "Expression assets should use a bounded cache instead of permanent bulk retention.");

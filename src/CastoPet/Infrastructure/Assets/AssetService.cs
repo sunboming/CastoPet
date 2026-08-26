@@ -3,6 +3,7 @@ using System.Windows.Media;
 using System.IO;
 
 using CastoPet.Core.Animation;
+using CastoPet.Core.Movement;
 using CastoPet.Core.Skins;
 using CastoPet.Infrastructure.Diagnostics;
 
@@ -59,29 +60,23 @@ public sealed class AssetService
         return LoadActionFrames(PetActionKind.Blink, "Blink frames");
     }
 
-    public IReadOnlyList<ImageSource> LoadMoveFrames()
+    public IReadOnlyList<ImageSource> LoadMoveFrames(PetHorizontalDirection direction)
     {
-        return LoadActionFrames(PetActionKind.Move, "Move frames");
-    }
+        var action = Skin.GetRequiredAction(PetActionKind.Move);
+        var paths = action.Movement?.GetDirectionalFramePaths(direction);
+        if (paths is { Count: > 0 })
+        {
+            try
+            {
+                return paths.Select(path => (ImageSource)LoadCharacter(path, $"{direction} move frames")).ToArray();
+            }
+            catch
+            {
+                // Legacy skins can fall back when an optional directional clip cannot be decoded.
+            }
+        }
 
-    public IReadOnlyList<ImageSource> LoadMoveLeftFrames()
-    {
-        return LoadOptionalActionFrames(PetActionKind.MoveLeft, "Left move frames");
-    }
-
-    public IReadOnlyList<ImageSource> LoadMoveRightFrames()
-    {
-        return LoadOptionalActionFrames(PetActionKind.MoveRight, "Right move frames");
-    }
-
-    public IReadOnlyList<ImageSource> LoadTurnLeftFrames()
-    {
-        return LoadOptionalActionFrames(PetActionKind.TurnLeft, "Left turn frames");
-    }
-
-    public IReadOnlyList<ImageSource> LoadTurnRightFrames()
-    {
-        return LoadOptionalActionFrames(PetActionKind.TurnRight, "Right turn frames");
+        return LoadOptionalActionFrames(PetActionKind.Move, "Move fallback frames");
     }
 
     public IReadOnlyList<ImageSource> LoadPettingFrames()

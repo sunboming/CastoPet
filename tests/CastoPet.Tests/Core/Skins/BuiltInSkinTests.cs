@@ -28,6 +28,9 @@ internal static partial class TestSuite
             skin.InputReactiveBasePath,
         };
         paths.AddRange(skin.Actions.SelectMany(action => action.FramePaths));
+        var movement = skin.GetRequiredAction(PetActionKind.Move).Movement!;
+        paths.AddRange(movement.LeftFramePaths);
+        paths.AddRange(movement.RightFramePaths);
         paths.AddRange(skin.Expressions.Select(expression => expression.ResourcePath));
 
         Assert.True(paths.All(path => path.StartsWith("Assets/Runtime/Castorice/", StringComparison.Ordinal)), "Built-in runtime paths should live under Assets/Runtime/Castorice.");
@@ -48,28 +51,22 @@ internal static partial class TestSuite
         var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
 
         Assert.Equal(8, move.FramePaths.Count, "Move should keep eight frames.");
-        Assert.Equal(10d, move.DistancePerFrame, "Move distance per frame should stay compatible.");
-        Assert.Equal(90d, move.BaseSpeedPixelsPerSecond, "Move base speed should stay compatible.");
-        Assert.Equal(80d, move.MinSpeedPixelsPerSecond, "Move min speed should stay compatible.");
-        Assert.Equal(105d, move.MaxSpeedPixelsPerSecond, "Move max speed should stay compatible.");
+        Assert.Equal(10d, move.Movement!.Settings.DistancePerFrame, "Move distance per frame should stay compatible.");
+        Assert.Equal(90d, move.Movement!.Settings.BaseSpeedPixelsPerSecond, "Move base speed should stay compatible.");
+        Assert.Equal(80d, move.Movement!.Settings.MinSpeedPixelsPerSecond, "Move min speed should stay compatible.");
+        Assert.Equal(105d, move.Movement!.Settings.MaxSpeedPixelsPerSecond, "Move max speed should stay compatible.");
     }
 
-    static void BuiltInCastoriceDefinesSeparateDirectionalMovementActions()
+    static void BuiltInCastoriceDefinesUnifiedDirectionalMovement()
     {
-        var moveLeft = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.MoveLeft);
-        var moveRight = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.MoveRight);
-        var turnLeft = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.TurnLeft);
-        var turnRight = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.TurnRight);
-
-        Assert.Equal(5, moveLeft.FramePaths.Count, "Left movement should omit the two frames with inconsistent eye direction.");
-        Assert.Equal(7, moveRight.FramePaths.Count, "Right movement should omit the excessive three-quarter-view frame from playback.");
-        Assert.Equal(6, turnLeft.FramePaths.Count, "Left turning should use six separately authored frames.");
-        Assert.Equal(6, turnRight.FramePaths.Count, "Right turning should use six separately authored frames.");
-        Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.01.png", moveLeft.FramePaths[0], "Left movement should begin with the stable side-facing sequence.");
-        Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.05.png", moveLeft.FramePaths[^1], "Left movement should end before the eye direction changes.");
-        Assert.Equal("Assets/Runtime/Castorice/States/MoveRight/Castorice.MoveRight.01.png", moveRight.FramePaths[0], "Right movement should begin with the stable side-facing sequence.");
-        Assert.Equal(TimeSpan.FromMilliseconds(41.66666666666667), turnLeft.FrameInterval, "Turn timing should preserve the extracted 24 FPS cadence.");
-        Assert.Equal(TimeSpan.FromMilliseconds(41.66666666666667), turnRight.FrameInterval, "Both physical turns should use the same cadence.");
+        var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
+        var movement = move.Movement!;
+        Assert.Equal(5, movement.LeftFramePaths.Count, "Left movement should keep its five stable frames.");
+        Assert.Equal(7, movement.RightFramePaths.Count, "Right movement should keep its seven stable frames.");
+        Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.01.png", movement.LeftFramePaths[0], "Left movement should begin with the stable side-facing sequence.");
+        Assert.Equal("Assets/Runtime/Castorice/States/MoveLeft/Castorice.MoveLeft.05.png", movement.LeftFramePaths[^1], "Left movement should end before the eye direction changes.");
+        Assert.Equal("Assets/Runtime/Castorice/States/MoveRight/Castorice.MoveRight.01.png", movement.RightFramePaths[0], "Right movement should begin with the stable side-facing sequence.");
+        Assert.True(move.FrameInterval is null && move.FrameDurations is null, "Movement should remain distance-driven.");
     }
 
     static void BuiltInDirectionalFramesAreEmbeddedWpfResources()
@@ -89,8 +86,6 @@ internal static partial class TestSuite
         {
             "assets/runtime/castorice/states/moveleft/castorice.moveleft.00.png",
             "assets/runtime/castorice/states/moveright/castorice.moveright.00.png",
-            "assets/runtime/castorice/states/turnleft/castorice.turnleft.00.png",
-            "assets/runtime/castorice/states/turnright/castorice.turnright.00.png",
             "assets/runtime/castorice/states/petting/castorice.petting.00.png",
             "assets/runtime/castorice/states/inputreactive/castorice.inputreactive.base.png",
         };
@@ -110,7 +105,7 @@ internal static partial class TestSuite
             return;
         }
 
-        foreach (var path in previewOnly.Take(4))
+        foreach (var path in previewOnly.Take(2))
         {
             Assert.True(resourcePaths.Contains(path), $"Preview output should embed directional WPF resource {path}.");
         }

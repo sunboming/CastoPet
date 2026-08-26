@@ -1,3 +1,5 @@
+using CastoPet.Core.Movement;
+
 namespace CastoPet.Core.Animation;
 
 public sealed record PetActionDefinition(
@@ -5,10 +7,7 @@ public sealed record PetActionDefinition(
     PetActionKind Kind,
     IReadOnlyList<string> FramePaths,
     TimeSpan? FrameInterval = null,
-    double? DistancePerFrame = null,
     TimeSpan? MinScheduleDelay = null,
     TimeSpan? MaxScheduleDelay = null,
-    double? BaseSpeedPixelsPerSecond = null,
-    double? MinSpeedPixelsPerSecond = null,
-    double? MaxSpeedPixelsPerSecond = null,
-    IReadOnlyList<TimeSpan?>? FrameDurations = null);
+    IReadOnlyList<TimeSpan?>? FrameDurations = null,
+    PetMovementDefinition? Movement = null);

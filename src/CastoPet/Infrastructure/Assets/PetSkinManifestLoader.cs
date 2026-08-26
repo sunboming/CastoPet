@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 
 using CastoPet.Core.Animation;
+using CastoPet.Core.Movement;
 using CastoPet.Core.Skins;
 
 namespace CastoPet.Infrastructure.Assets;
@@ -48,8 +49,19 @@ public static class PetSkinManifestLoader
     {
         ValidateManifest(manifest);
 
-        var actions = manifest.Actions!
-            .Select(action => BuildAction(action, resolver))
+        var manifestActions = manifest.Actions!;
+        ValidateActionIdentities(manifestActions);
+        var left = manifestActions.SingleOrDefault(action => NormalizeKind(action.Kind!) == "move-left");
+        var right = manifestActions.SingleOrDefault(action => NormalizeKind(action.Kind!) == "move-right");
+        if (manifest.SchemaVersion == 3 && manifestActions.Any(action => IsLegacyKind(action.Kind!)))
+        {
+            throw new InvalidDataException("Schema 3 uses one move action with directional frames and does not support turn actions.");
+        }
+
+        // Retired turns are filtered before resolving paths, so their PNGs may be removed.
+        var actions = manifestActions
+            .Where(action => !IsLegacyKind(action.Kind!))
+            .Select(action => BuildAction(action, resolver, manifest.SchemaVersion, left, right))
             .ToArray();
 
         ValidateActions(actions);
@@ -76,7 +88,10 @@ public static class PetSkinManifestLoader
             DraggingCharacterPath: resolver.ResolveOptional(manifest.DraggingCharacter),
             InputReactiveBasePath: resolver.ResolveOptional(manifest.InputReactiveBase),
             Actions: actions,
-            Expressions: expressions);
+            Expressions: expressions)
+        {
+            SourceResourceDirectory = resolver.SourceResourceDirectory,
+        };
     }
 
     private static SkinManifest Deserialize(string json)
@@ -105,7 +120,7 @@ public static class PetSkinManifestLoader
 
     private static void ValidateManifest(SkinManifest manifest)
     {
-        if (manifest.SchemaVersion is not (1 or 2))
+        if (manifest.SchemaVersion is not (1 or 2 or 3))
         {
             throw new InvalidDataException($"Unsupported skin manifest schemaVersion {manifest.SchemaVersion}.");
         }
@@ -178,12 +193,34 @@ public static class PetSkinManifestLoader
             TransitionFrameInterval: MillisecondsToTimeSpan(manifest.TransitionFrameIntervalMs));
     }
 
-    private static PetActionDefinition BuildAction(ActionManifest manifest, PathResolver resolver)
+    private static PetActionDefinition BuildAction(
+        ActionManifest manifest,
+        PathResolver resolver,
+        int schemaVersion,
+        ActionManifest? left,
+        ActionManifest? right)
     {
         var id = RequiredText(manifest.Id, "action.id");
         var kind = ParseActionKind(RequiredText(manifest.Kind, $"action {id}.kind"));
-        ValidateActionMetadata(manifest, id);
-        var frames = manifest.Frames!
+        var isMovement = kind == PetActionKind.Move;
+        ValidateActionMetadata(manifest, id, allowEmptyFrames: isMovement && schemaVersion == 3);
+        if (schemaVersion < 3 && manifest.Movement is not null)
+        {
+            throw new InvalidDataException($"Action {id} movement requires schemaVersion 3.");
+        }
+
+        if (!isMovement && manifest.Movement is not null)
+        {
+            throw new InvalidDataException($"Action {id} cannot define movement settings.");
+        }
+
+        if (schemaVersion == 3 && (manifest.DistancePerFrame is not null || manifest.BaseSpeedPixelsPerSecond is not null
+            || manifest.MinSpeedPixelsPerSecond is not null || manifest.MaxSpeedPixelsPerSecond is not null))
+        {
+            throw new InvalidDataException($"Action {id} must place shared movement settings inside movement.");
+        }
+
+        var frames = (manifest.Frames ?? [])
             .Select((path, index) => resolver.Resolve(RequiredPath(path, $"action {id}.frames[{index}]")))
             .ToArray();
 
@@ -191,26 +228,134 @@ public static class PetSkinManifestLoader
             Id: id,
             Kind: kind,
             FramePaths: frames,
-            FrameInterval: MillisecondsToTimeSpan(manifest.FrameIntervalMs),
-            FrameDurations: manifest.FrameDurationsMs?
+            FrameInterval: isMovement ? null : MillisecondsToTimeSpan(manifest.FrameIntervalMs),
+            FrameDurations: isMovement ? null : manifest.FrameDurationsMs?
                 .Select(MillisecondsToTimeSpan)
                 .ToArray(),
-            DistancePerFrame: manifest.DistancePerFrame,
-            MinScheduleDelay: MillisecondsToTimeSpan(manifest.MinScheduleDelayMs),
-            MaxScheduleDelay: MillisecondsToTimeSpan(manifest.MaxScheduleDelayMs),
-            BaseSpeedPixelsPerSecond: manifest.BaseSpeedPixelsPerSecond,
-            MinSpeedPixelsPerSecond: manifest.MinSpeedPixelsPerSecond,
-            MaxSpeedPixelsPerSecond: manifest.MaxSpeedPixelsPerSecond);
+            MinScheduleDelay: isMovement ? null : MillisecondsToTimeSpan(manifest.MinScheduleDelayMs),
+            MaxScheduleDelay: isMovement ? null : MillisecondsToTimeSpan(manifest.MaxScheduleDelayMs),
+            Movement: isMovement ? BuildMovement(manifest, resolver, schemaVersion, left, right) : null);
     }
 
-    private static void ValidateActionMetadata(ActionManifest manifest, string id)
+    private static PetMovementDefinition BuildMovement(
+        ActionManifest action, PathResolver resolver, int schemaVersion, ActionManifest? left, ActionManifest? right)
     {
-        if (manifest.Frames is null || manifest.Frames.Count == 0)
+        var movement = action.Movement;
+        if (schemaVersion == 3 && movement is null)
+        {
+            throw new InvalidDataException("Schema 3 move action must define movement.");
+        }
+
+        if (schemaVersion == 3 && (action.FrameIntervalMs is not null || action.FrameDurationsMs is not null
+            || action.MinScheduleDelayMs is not null || action.MaxScheduleDelayMs is not null))
+        {
+            throw new InvalidDataException("Movement is distance-driven and cannot define frame timing or schedule delays.");
+        }
+
+        var defaults = new PetMovementSettings();
+        var settings = new PetMovementSettings(
+            movement?.DistancePerFrame ?? action.DistancePerFrame ?? defaults.DistancePerFrame,
+            movement?.BaseSpeedPixelsPerSecond ?? action.BaseSpeedPixelsPerSecond ?? defaults.BaseSpeedPixelsPerSecond,
+            movement?.MinSpeedPixelsPerSecond ?? action.MinSpeedPixelsPerSecond ?? defaults.MinSpeedPixelsPerSecond,
+            movement?.MaxSpeedPixelsPerSecond ?? action.MaxSpeedPixelsPerSecond ?? defaults.MaxSpeedPixelsPerSecond);
+        try
+        {
+            settings.Validate();
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidDataException($"Invalid movement settings for {action.Id}: {ex.Message}", ex);
+        }
+
+        ValidateLegacyDirectionalSettings(left, settings);
+        ValidateLegacyDirectionalSettings(right, settings);
+        var leftPaths = ResolveMovementFrames(movement?.LeftFrames ?? left?.Frames, "leftFrames", resolver);
+        var rightPaths = ResolveMovementFrames(movement?.RightFrames ?? right?.Frames, "rightFrames", resolver);
+        if (action.Frames is not { Count: > 0 } && (leftPaths.Count == 0 || rightPaths.Count == 0))
+        {
+            throw new InvalidDataException("Movement needs both directional clips or generic fallback frames.");
+        }
+
+        return new PetMovementDefinition(settings, leftPaths, rightPaths);
+    }
+
+    private static IReadOnlyList<string> ResolveMovementFrames(List<string>? frames, string label, PathResolver resolver)
+    {
+        if (frames?.Count > ExternalSkinResourceLimits.MaxFramesPerAction)
+        {
+            throw new InvalidDataException($"Movement {label} exceeds the frame limit.");
+        }
+
+        return (frames ?? []).Select((path, index) => resolver.Resolve(RequiredPath(path, $"movement.{label}[{index}]"))).ToArray();
+    }
+
+    private static void ValidateLegacyDirectionalSettings(ActionManifest? action, PetMovementSettings shared)
+    {
+        if (action is null)
+        {
+            return;
+        }
+
+        ValidateActionMetadata(action, action.Id!);
+        foreach (var (name, value, effective) in new (string, double?, double)[]
+        {
+            ("distancePerFrame", action.DistancePerFrame, shared.DistancePerFrame),
+            ("baseSpeedPixelsPerSecond", action.BaseSpeedPixelsPerSecond, shared.BaseSpeedPixelsPerSecond),
+            ("minSpeedPixelsPerSecond", action.MinSpeedPixelsPerSecond, shared.MinSpeedPixelsPerSecond),
+            ("maxSpeedPixelsPerSecond", action.MaxSpeedPixelsPerSecond, shared.MaxSpeedPixelsPerSecond),
+        })
+        {
+            if (value is double number && number != effective)
+            {
+                throw new InvalidDataException($"Legacy action {action.Id} {name} conflicts with shared move settings ({number} vs {effective}).");
+            }
+        }
+    }
+
+    private static string NormalizeKind(string kind) => kind.ToLowerInvariant() switch
+    {
+        "moveleft" => "move-left",
+        "moveright" => "move-right",
+        "turnleft" => "turn-left",
+        "turnright" => "turn-right",
+        _ => kind.ToLowerInvariant(),
+    };
+
+    private static bool IsLegacyKind(string kind) => NormalizeKind(kind) is "move-left" or "move-right" or "turn-left" or "turn-right";
+
+    private static void ValidateActionIdentities(IReadOnlyList<ActionManifest> actions)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var kinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var action in actions)
+        {
+            if (action is null)
+            {
+                throw new InvalidDataException("Manifest action must not be null.");
+            }
+
+            var id = RequiredText(action.Id, "action.id");
+            var kind = NormalizeKind(RequiredText(action.Kind, $"action {id}.kind"));
+            if (!ids.Add(id))
+            {
+                throw new InvalidDataException($"Duplicate action id {id}.");
+            }
+
+            if (!kinds.Add(kind))
+            {
+                throw new InvalidDataException($"Duplicate action kind {kind}.");
+            }
+        }
+    }
+
+    private static void ValidateActionMetadata(ActionManifest manifest, string id, bool allowEmptyFrames = false)
+    {
+        if (!allowEmptyFrames && (manifest.Frames is null || manifest.Frames.Count == 0))
         {
             throw new InvalidDataException($"Action {id} must define at least one frame.");
         }
 
-        if (manifest.Frames.Count > ExternalSkinResourceLimits.MaxFramesPerAction)
+        if (manifest.Frames?.Count > ExternalSkinResourceLimits.MaxFramesPerAction)
         {
             throw new InvalidDataException(
                 $"Action {id} frames exceed the {ExternalSkinResourceLimits.MaxFramesPerAction}-frame limit.");
@@ -219,7 +364,7 @@ public static class PetSkinManifestLoader
         ValidatePositive(manifest.FrameIntervalMs, $"action {id} frameIntervalMs");
         if (manifest.FrameDurationsMs is { } frameDurations)
         {
-            if (frameDurations.Count != manifest.Frames.Count)
+            if (frameDurations.Count != (manifest.Frames?.Count ?? 0))
             {
                 throw new InvalidDataException(
                     $"Action {id} frameDurationsMs must contain one entry per frame.");
@@ -306,14 +451,6 @@ public static class PetSkinManifestLoader
         {
             _ when value.Equals("idle", StringComparison.OrdinalIgnoreCase) => PetActionKind.Idle,
             _ when value.Equals("move", StringComparison.OrdinalIgnoreCase) => PetActionKind.Move,
-            _ when value.Equals("moveLeft", StringComparison.OrdinalIgnoreCase) => PetActionKind.MoveLeft,
-            _ when value.Equals("move-left", StringComparison.OrdinalIgnoreCase) => PetActionKind.MoveLeft,
-            _ when value.Equals("moveRight", StringComparison.OrdinalIgnoreCase) => PetActionKind.MoveRight,
-            _ when value.Equals("move-right", StringComparison.OrdinalIgnoreCase) => PetActionKind.MoveRight,
-            _ when value.Equals("turnLeft", StringComparison.OrdinalIgnoreCase) => PetActionKind.TurnLeft,
-            _ when value.Equals("turn-left", StringComparison.OrdinalIgnoreCase) => PetActionKind.TurnLeft,
-            _ when value.Equals("turnRight", StringComparison.OrdinalIgnoreCase) => PetActionKind.TurnRight,
-            _ when value.Equals("turn-right", StringComparison.OrdinalIgnoreCase) => PetActionKind.TurnRight,
             _ when value.Equals("blink", StringComparison.OrdinalIgnoreCase) => PetActionKind.Blink,
             _ when value.Equals("petting", StringComparison.OrdinalIgnoreCase) => PetActionKind.Petting,
             _ when value.Equals("expressionTransitionIn", StringComparison.OrdinalIgnoreCase) => PetActionKind.ExpressionTransitionIn,
@@ -378,7 +515,14 @@ public static class PetSkinManifestLoader
 
         foreach (var action in manifest.Actions!)
         {
+            if (action is null)
+            {
+                throw new InvalidDataException("Manifest action must not be null.");
+            }
+
             references += action.Frames?.Count ?? 0;
+            references += action.Movement?.LeftFrames?.Count ?? 0;
+            references += action.Movement?.RightFrames?.Count ?? 0;
         }
 
         if (manifest.Expressions is not null)
@@ -469,6 +613,8 @@ public static class PetSkinManifestLoader
         private readonly string _root;
         private readonly bool _fileSystemPaths;
 
+        public string? SourceResourceDirectory => _fileSystemPaths ? _root : null;
+
         private PathResolver(string root, bool fileSystemPaths)
         {
             _root = root;
@@ -533,6 +679,17 @@ public static class PetSkinManifestLoader
         public double? DistancePerFrame { get; set; }
         public double? MinScheduleDelayMs { get; set; }
         public double? MaxScheduleDelayMs { get; set; }
+        public double? BaseSpeedPixelsPerSecond { get; set; }
+        public double? MinSpeedPixelsPerSecond { get; set; }
+        public double? MaxSpeedPixelsPerSecond { get; set; }
+        public MovementManifest? Movement { get; set; }
+    }
+
+    private sealed class MovementManifest
+    {
+        public List<string>? LeftFrames { get; set; }
+        public List<string>? RightFrames { get; set; }
+        public double? DistancePerFrame { get; set; }
         public double? BaseSpeedPixelsPerSecond { get; set; }
         public double? MinSpeedPixelsPerSecond { get; set; }
         public double? MaxSpeedPixelsPerSecond { get; set; }

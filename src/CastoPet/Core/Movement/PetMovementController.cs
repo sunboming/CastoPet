@@ -1,5 +1,3 @@
-using CastoPet.Core.Animation;
-
 namespace CastoPet.Core.Movement;
 
 public readonly record struct PetMovementStep(
@@ -13,13 +11,9 @@ public readonly record struct PetMoveFrameAdvance(int FrameIndex, bool Changed);
 
 public sealed class PetMovementController
 {
-    private const double DefaultDistancePerFrame = 10;
-    private const double DefaultBaseSpeedPixelsPerSecond = 90;
-    private const double DefaultMinSpeedPixelsPerSecond = 80;
-    private const double DefaultMaxSpeedPixelsPerSecond = 105;
     private const double WanderRange = 160;
 
-    private readonly PetActionDefinition _moveAction;
+    private readonly PetMovementSettings _settings;
     private readonly Random _random;
     private TimeSpan? _lastRenderTime;
     private DateTime _nextWanderDecisionUtc = DateTime.MinValue;
@@ -27,9 +21,11 @@ public sealed class PetMovementController
     private double _logicalTop;
     private double _frameDistanceAccumulator;
 
-    public PetMovementController(PetActionDefinition moveAction, Random? random = null)
+    public PetMovementController(PetMovementSettings settings, Random? random = null)
     {
-        _moveAction = moveAction;
+        ArgumentNullException.ThrowIfNull(settings);
+        settings.Validate();
+        _settings = settings;
         _random = random ?? new Random();
     }
 
@@ -49,11 +45,6 @@ public sealed class PetMovementController
     public void StopRendering()
     {
         _lastRenderTime = null;
-    }
-
-    public void ResumeAfterVisualPause(double left, double top)
-    {
-        BeginRendering(left, top);
     }
 
     public void SetTarget(PetMovementTarget target)
@@ -145,7 +136,7 @@ public sealed class PetMovementController
         }
 
         _frameDistanceAccumulator += distance;
-        var distancePerFrame = _moveAction.DistancePerFrame ?? DefaultDistancePerFrame;
+        var distancePerFrame = _settings.DistancePerFrame;
         var changed = false;
         while (_frameDistanceAccumulator >= distancePerFrame)
         {
@@ -170,9 +161,9 @@ public sealed class PetMovementController
             return 0;
         }
 
-        var baseSpeed = _moveAction.BaseSpeedPixelsPerSecond ?? DefaultBaseSpeedPixelsPerSecond;
-        var minSpeed = _moveAction.MinSpeedPixelsPerSecond ?? DefaultMinSpeedPixelsPerSecond;
-        var maxSpeed = _moveAction.MaxSpeedPixelsPerSecond ?? DefaultMaxSpeedPixelsPerSecond;
+        var baseSpeed = _settings.BaseSpeedPixelsPerSecond;
+        var minSpeed = _settings.MinSpeedPixelsPerSecond;
+        var maxSpeed = _settings.MaxSpeedPixelsPerSecond;
         var speed = distanceToTarget > 240 ? maxSpeed
             : distanceToTarget < 80 ? minSpeed
             : baseSpeed;

@@ -42,7 +42,7 @@ internal static partial class TestSuite
         var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
 
         Assert.Equal(8, move.FramePaths.Count, "Move should use eight frames.");
-        Assert.Equal(10d, move.DistancePerFrame, "Move frames should advance by travel distance.");
+        Assert.Equal(10d, move.Movement!.Settings.DistancePerFrame, "Move frames should advance by travel distance.");
         Assert.Equal("Assets/Runtime/Castorice/States/Move/Castorice.Move.00.png", move.FramePaths[0], "First move frame path should be zero padded.");
         Assert.Equal("Assets/Runtime/Castorice/States/Move/Castorice.Move.07.png", move.FramePaths[^1], "Last move frame path should be zero padded.");
     }
@@ -61,8 +61,8 @@ internal static partial class TestSuite
     {
         var move = BuiltInPetSkins.Castorice.GetRequiredAction(PetActionKind.Move);
 
-        Assert.Equal(90d, move.BaseSpeedPixelsPerSecond, "Move speed should have a stable base.");
-        Assert.Equal(80d, move.MinSpeedPixelsPerSecond, "Move speed lower bound should stay near the base.");
-        Assert.Equal(105d, move.MaxSpeedPixelsPerSecond, "Move speed upper bound should stay near the base.");
+        Assert.Equal(90d, move.Movement!.Settings.BaseSpeedPixelsPerSecond, "Move speed should have a stable base.");
+        Assert.Equal(80d, move.Movement!.Settings.MinSpeedPixelsPerSecond, "Move speed lower bound should stay near the base.");
+        Assert.Equal(105d, move.Movement!.Settings.MaxSpeedPixelsPerSecond, "Move speed upper bound should stay near the base.");
     }
 }

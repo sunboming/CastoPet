@@ -4,6 +4,8 @@ internal static partial class TestSuite
 {
     private static IReadOnlyList<TestCase> AssetServiceTestCases { get; } =
     [
+        new("Asset service loads unified directional frames", AssetServiceLoadsUnifiedDirectionalFrames),
+        new("Asset service falls back for missing directional clips", AssetServiceFallsBackForMissingDirectionalClips),
         new("Asset service defaults to built-in skin", AssetServiceDefaultsToBuiltInSkin),
         new("Asset service uses configured skin paths", AssetServiceUsesConfiguredSkinPaths),
         new("Asset service loads file system skin image paths", AssetServiceLoadsFileSystemSkinImagePaths),

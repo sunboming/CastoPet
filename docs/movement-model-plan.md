@@ -1,97 +1,64 @@
-# Movement Model Consolidation Plan
+# Unified Movement Model
 
-Status: PROPOSED. Requires explicit user approval before implementation.
+Status: IMPLEMENTED after user approval. Turn playback has been permanently removed.
+See [Skin manifest](skin-manifest.md) for the supported JSON contract.
 
-This document records the movement-model discussion. It is not the current manifest
-contract and does not authorize changes to action kinds, resource layout, or skin data.
+## Model
 
-## Current Approved Change
-
-- Disable movement turn transitions when starting, switching sides, and stopping.
-- Continue playing the existing left/right walking animations with unchanged movement
-  speeds, distance-driven frame advancement, target selection, and boundary handling.
-- Preserve all turn code, action definitions, and image assets. Do not automatically
-  enable transitions again while implementing this future plan.
-- Leave blink, petting, and expression transitions unchanged.
-
-## Problem
-
-`PetActionDefinition` mixes animation resources, playback timing, movement speed, and
-trigger scheduling. Its nullable fields allow settings that an action never consumes.
-
-The current `Move` action supplies shared speed and distance-per-frame settings even
-when the renderer plays `MoveLeft` or `MoveRight`. Its images are only a fallback when
-directional images are unavailable. Directional distance-per-frame metadata is not
-independently consumed by the current movement controller.
-
-## Proposed Model
-
-Represent movement as one behavior with shared settings and directional animation
-variants, rather than separate left/right behaviors or controller classes.
+Movement is one behavior with shared settings and directional frame lists:
 
 ```text
-Movement definition
-|-- Shared movement settings
-|   |-- Base / minimum / maximum speed
-|   `-- Distance per animation frame
-`-- Animation variants
-    |-- Left walking clip
-    |-- Right walking clip
-    `-- Optional generic fallback clip
+PetActionDefinition (Kind = Move)
+|-- Movement: PetMovementDefinition
+|   |-- Settings: PetMovementSettings
+|   |   |-- Base / minimum / maximum speed
+|   |   `-- Distance per animation frame
+|   |-- LeftFramePaths
+|   `-- RightFramePaths
+`-- FramePaths: optional generic fallback
 ```
 
-- Keep `Move` as the conceptual action kind. Left/right are variant selectors, not
-  separate behavior kinds in the future internal model.
-- Keep frame paths, default frame interval, and per-frame duration overrides in an
-  animation clip definition. Do not make speed or trigger scheduling universal clip
-  properties.
-- Walking remains distance-driven. Do not silently replace it with a timer or add
-  per-direction speed overrides when both directions intentionally share settings.
-- Distinguish time-driven playback from distance-driven playback during validation;
-  do not accept timing metadata as effective when the chosen playback policy ignores it.
-- Place movement speed in movement settings and random trigger delays in scheduling
-  settings. The exact types and manifest version must be reviewed before implementation.
-- Do not remove turn or expression-transition kinds as a side effect of this change.
+- `PetActionKind.Move` is the only movement action kind. Direction is selected with
+  `PetHorizontalDirection.Left/Right`, not a separate action or movement controller.
+- Speed and distance-per-frame fields have moved out of the general action record.
+- Walking remains distance-driven. Both directions use the same settings; their frame
+  counts may differ (the built-in left/right clips retain five/seven frames).
+- Idle, blink, petting, and expression transitions retain their time-driven playback.
+  Further extraction of their clip and scheduling properties is outside this change.
 
 ## Runtime Responsibilities
 
-- `PetMovementPlanner`: target selection and common screen-boundary constraints.
-- `PetMovementController`: displacement, shared speeds, and distance-driven frame index.
-- `PetDirectionalMovementAnimator`: facing and optional turn state, kept separate from
-  movement calculations. Turns remain disabled until separately approved.
-- Presentation: choose the clip for the current direction and display its current frame.
+- `PetMovementPlanner`: common target selection and screen-boundary constraints.
+- `PetMovementController`: displacement, shared speeds, and distance-driven frame index;
+  depends on `PetMovementSettings`, not the general animation action.
+- Presentation: select direction immediately, lazily load/cache its frames, and retain
+  the existing direction during near-zero horizontal motion.
+- Stopping resets direction and restores idle; reversal does not pause movement.
+- The turn animator, turn enums, turn timers, and turn asset loaders are removed.
+  No movement flag can reactivate them.
+- Mouse approach and random wandering still differ only in target selection. Cursor
+  pushing, rendering timestamps, movement bounds, and passive-animation gates are retained.
 
-Direction comes from movement intent or displacement; near-zero horizontal movement
-retains the existing facing policy. Left/right collision handling uses common geometry,
-not duplicated movement implementations. Random wandering and mouse approach continue
-to differ in their target selection, not their walking implementation.
+## Compatibility
 
-## Compatibility and Migration
+- Schema 1/2 `move-left` and `move-right` (including camel-case aliases) are adapted
+  into a single Move definition. Shared settings come from `move`, with existing defaults.
+- Conflicting explicit directional speed/distance settings are rejected with a diagnostic.
+  The built-in Castorice metadata has no such conflict.
+- Old turn entries are ignored before resolving their PNGs. Users may delete those images
+  without breaking legacy manifests; newly exported schema 3 contains no turn entries.
+- Missing/unreadable optional directional clips fall back to generic movement frames.
+  With no decodable fallback the existing visual remains, without aborting movement.
+- New schema 3 permits directional-only movement and exports nested shared settings.
+- Existing manifests, source images, and generated animation assets are not rewritten
+  or deleted. Resource cleanup remains the user's responsibility.
 
-1. Add characterization tests for current speed, frame progression, fallback selection,
-   direction changes, arrival, and boundary behavior before migrating the model.
-2. Introduce shared movement settings and directional clip selection internally, without
-   changing the existing JSON contract or runtime behavior.
-3. Adapt legacy `move`, `move-left`, and `move-right` entries in the loader. Shared values
-   come from legacy `move`, matching current behavior. Never silently choose among
-   conflicting directional settings; report conflicts before deciding how to migrate.
-4. Remove the movement controller's dependency on the generic animation action. A new
-   skin with complete directional clips must not need unused generic movement images.
-5. Review and version the new manifest format and writer separately. Continue supporting
-   old manifests; preserve their effective settings and resources during conversion.
-6. Remove old internal directional enum entries and fixed loading wrappers only after
-   their consumers have migrated. Legacy external identifiers remain supported by the
-   compatibility adapter.
+## Verification
 
-Do not delete or move source images, rewrite existing skin manifests, or replace the
-current runtime path merely because this plan exists.
+Automated coverage includes shared left/right speed, distance accumulation across clip
+length changes, rendering restart, immediate direction routing, idle restoration,
+missing-frame fallback, legacy aliases, metadata conflicts, missing retired PNGs, schema 3
+round trips, external path safety, and unchanged non-movement tests.
 
-## Acceptance Checks
-
-- Equivalent positions, speeds, and walking frame progression for left/right movement.
-- No waiting for turn frames while transitions are disabled; stopping restores idle.
-- Generic-frame fallback remains available, with tested behavior for missing variants.
-- Old manifests load without mandatory edits; new-format round trips preserve settings.
-- Conflicting metadata is visible rather than silently discarded.
-- Debug/Release and Preview/Stable full tests and builds pass.
-- Manual verification covers start, reversal, stop, screen edges, and mouse approach.
+Run full tests and builds in Debug/Release for both Preview and Stable. Visual acceptance
+of start/reversal/stop, screen edges, DPI, and mouse approach remains a manual check.

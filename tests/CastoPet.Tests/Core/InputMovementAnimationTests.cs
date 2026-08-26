@@ -152,7 +152,7 @@ internal static partial class TestSuite
 
     static void MovementControllerAdvancesLogicalPositions()
     {
-        var controller = new PetMovementController(CreateTestMoveAction(), new Random(7));
+        var controller = new PetMovementController(CreateTestMovementSettings(), new Random(7));
         controller.BeginRendering(left: 0, top: 0);
         controller.SetTarget(new PetMovementTarget(100, 0));
 
@@ -166,35 +166,36 @@ internal static partial class TestSuite
         Assert.Equal(90d, moved.Value.Distance, "Movement output should report the traveled distance.");
     }
 
-    static void MovementControllerResumesWithoutAccumulatingVisualPause()
+    static void MovementControllerResumesWithoutAccumulatingRenderPause()
     {
-        var controller = new PetMovementController(CreateTestMoveAction(), new Random(7));
+        var controller = new PetMovementController(CreateTestMovementSettings(), new Random(7));
         controller.BeginRendering(left: 0, top: 0);
         controller.SetTarget(new PetMovementTarget(100, 0));
 
         controller.Advance(TimeSpan.Zero, currentLeft: 0, currentTop: 0);
-        var beforeTurn = controller.Advance(TimeSpan.FromMilliseconds(100), currentLeft: 0, currentTop: 0);
-        Assert.True(beforeTurn is not null, "Movement should begin before the visual turn pause.");
+        var beforePause = controller.Advance(TimeSpan.FromMilliseconds(100), currentLeft: 0, currentTop: 0);
+        Assert.True(beforePause is not null, "Movement should begin before the render pause.");
 
-        controller.ResumeAfterVisualPause(beforeTurn!.Value.NextLeft, beforeTurn.Value.NextTop);
+        controller.StopRendering();
+        controller.BeginRendering(beforePause!.Value.NextLeft, beforePause.Value.NextTop);
         var resumed = controller.Advance(
             TimeSpan.FromMilliseconds(600),
-            beforeTurn.Value.NextLeft,
-            beforeTurn.Value.NextTop);
+            beforePause.Value.NextLeft,
+            beforePause.Value.NextTop);
         var nextFrame = controller.Advance(
             TimeSpan.FromMilliseconds(700),
-            beforeTurn.Value.NextLeft,
-            beforeTurn.Value.NextTop);
+            beforePause.Value.NextLeft,
+            beforePause.Value.NextTop);
 
-        Assert.True(resumed is null, "The first sample after a visual pause should only synchronize rendering time.");
+        Assert.True(resumed is null, "The first sample after a render pause should only synchronize rendering time.");
         Assert.True(nextFrame is not null, "Movement should continue on the next rendering sample.");
         Assert.Equal(18d, nextFrame!.Value.NextLeft, "Only post-resume frame time should contribute to movement.");
-        Assert.Equal(9d, nextFrame.Value.Distance, "The visual pause must not be converted into a large catch-up step.");
+        Assert.Equal(9d, nextFrame.Value.Distance, "The render pause must not be converted into a large catch-up step.");
     }
 
     static void MovementControllerSchedulesBoundedWanderTargets()
     {
-        var controller = new PetMovementController(CreateTestMoveAction(), new Random(11));
+        var controller = new PetMovementController(CreateTestMovementSettings(), new Random(11));
         var bounds = new PetMovementBounds(0, 0, 500, 400);
         var now = new DateTime(2026, 7, 17, 12, 0, 0, DateTimeKind.Utc);
 
@@ -209,7 +210,7 @@ internal static partial class TestSuite
 
     static void MovementControllerAdvancesFramesByDistance()
     {
-        var controller = new PetMovementController(CreateTestMoveAction(), new Random(3));
+        var controller = new PetMovementController(CreateTestMovementSettings(), new Random(3));
 
         Assert.Equal(new PetMoveFrameAdvance(2, true), controller.AdvanceMoveFrame(distance: 25, frameCount: 8), "Twenty-five pixels should cross two ten-pixel frames.");
         Assert.Equal(new PetMoveFrameAdvance(3, true), controller.AdvanceMoveFrame(distance: 5, frameCount: 8), "The carried distance should advance the next frame.");
@@ -217,114 +218,63 @@ internal static partial class TestSuite
         Assert.Equal(0, controller.MoveFrameIndex, "Reset should restore movement frame zero.");
     }
 
-    static void DirectionalMovementWithoutTurnFramesFacesImmediately()
+    static void MovementDefinitionSelectsDirectionalClips()
     {
-        var animator = new PetDirectionalMovementAnimator();
-        Assert.False(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 0), "No turn frames should mean no transition to wait for.");
-        Assert.Equal(PetFacingDirection.Left, animator.Facing, "Starting movement without transitions should immediately face left.");
-        Assert.False(animator.IsTurning, "Immediate facing must not block movement.");
-
-        Assert.False(animator.RequestDirection(PetHorizontalDirection.Right, frameCount: 0), "Changing sides without transitions should not start a timer.");
-        Assert.Equal(PetFacingDirection.Right, animator.Facing, "Changing direction should immediately select the opposite side.");
-        Assert.False(animator.RequestFront(frameCount: 0), "Stopping without transitions should not start a return animation.");
-        Assert.Equal(PetFacingDirection.Front, animator.Facing, "Stopping should immediately restore the front-facing state.");
-
-        animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 3);
-        animator.Advance(frameCount: 3);
-        Assert.False(animator.RequestDirection(PetHorizontalDirection.Right, frameCount: 0), "Immediate facing should cancel any pending turn.");
-        animator.Advance(frameCount: 3);
-        Assert.Equal(PetFacingDirection.Right, animator.Facing, "A canceled turn must not overwrite the immediate facing.");
-        Assert.Equal(PetTurnPhase.None, animator.Phase, "No transition phase should remain active.");
-        Assert.Equal(0, animator.FrameIndex, "Immediate facing should clear the old turn frame index.");
+        var movement = new PetMovementDefinition(new PetMovementSettings(), ["left.png"], ["right0.png", "right1.png"]);
+        Assert.Equal("left.png", movement.GetDirectionalFramePaths(PetHorizontalDirection.Left)[0], "Left should use the authored left clip.");
+        Assert.Equal(2, movement.GetDirectionalFramePaths(PetHorizontalDirection.Right).Count, "Directional clips may have different frame counts.");
+        Assert.Throws<ArgumentOutOfRangeException>(() => movement.GetDirectionalFramePaths((PetHorizontalDirection)0));
     }
 
-    static void DirectionalMovementTurnsFromFrontBeforeWalking()
+    static void MovementControllerUsesSharedSpeedInBothDirections()
     {
-        var animator = new PetDirectionalMovementAnimator();
-
-        Assert.True(animator.RequestDirection(PetHorizontalDirection.Right, frameCount: 3), "A front-facing pet should begin the requested turn.");
-        Assert.Equal(PetTurnPhase.ToSide, animator.Phase, "The initial turn should face toward the walking side.");
-        Assert.Equal(PetHorizontalDirection.Right, animator.TurnDirection, "The right turn must use the separately authored right-facing frames.");
-        Assert.Equal(0, animator.FrameIndex, "A forward turn should begin at its first frame.");
-
-        animator.Advance(frameCount: 3);
-        animator.Advance(frameCount: 3);
-        animator.Advance(frameCount: 3);
-
-        Assert.False(animator.IsTurning, "The turn should complete after its final frame.");
-        Assert.Equal(PetFacingDirection.Right, animator.Facing, "Completing the turn should leave the pet facing right.");
+        var left = new PetMovementController(CreateTestMovementSettings());
+        var right = new PetMovementController(CreateTestMovementSettings());
+        left.BeginRendering(0, 0);
+        right.BeginRendering(0, 0);
+        left.SetTarget(new PetMovementTarget(-100, 0));
+        right.SetTarget(new PetMovementTarget(100, 0));
+        left.Advance(TimeSpan.Zero, 0, 0);
+        right.Advance(TimeSpan.Zero, 0, 0);
+        var l = left.Advance(TimeSpan.FromMilliseconds(100), 0, 0)!.Value;
+        var r = right.Advance(TimeSpan.FromMilliseconds(100), 0, 0)!.Value;
+        Assert.Equal(-r.NextLeft, l.NextLeft, "Opposite directions must have the same speed.");
+        Assert.Equal(r.Distance, l.Distance, "Distance-driven playback must be symmetric.");
     }
 
-    static void DirectionalMovementDoesNotRestartActiveTurn()
+    static void MovementSettingsRejectInvalidValues()
     {
-        var animator = new PetDirectionalMovementAnimator();
-
-        Assert.True(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 6), "The first request should start the turn timer sequence.");
-        Assert.False(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 6), "A render-loop request during the same turn must not restart its timer.");
-        Assert.True(animator.IsTurning, "The active turn should continue blocking movement until its timer advances.");
-        Assert.Equal(0, animator.FrameIndex, "Repeated render-loop requests must leave progress to the turn timer.");
-    }
-
-    static void DirectionalMovementReturnsThroughSameAuthoredFrames()
-    {
-        var animator = CreateRightFacingAnimator(frameCount: 3);
-
-        Assert.True(animator.RequestFront(frameCount: 3), "Stopping movement should begin a return to front.");
-        Assert.Equal(PetTurnPhase.ToFront, animator.Phase, "The return should reverse the current side's turn sequence.");
-        Assert.Equal(PetHorizontalDirection.Right, animator.TurnDirection, "Returning from right must preserve the authored right-side accessories.");
-        Assert.Equal(2, animator.FrameIndex, "A reverse turn should start at the last side-facing frame.");
-
-        animator.Advance(frameCount: 3);
-        Assert.Equal(1, animator.FrameIndex, "The reverse turn should step backward through authored frames.");
-        animator.Advance(frameCount: 3);
-        Assert.Equal(0, animator.FrameIndex, "The reverse turn should expose the original first frame before completing.");
-        animator.Advance(frameCount: 3);
-
-        Assert.False(animator.IsTurning, "The return should complete once frame zero has been displayed.");
-        Assert.Equal(PetFacingDirection.Front, animator.Facing, "The completed return should restore front-facing idle.");
-    }
-
-    static void DirectionalMovementChangesSidesThroughFront()
-    {
-        var animator = CreateRightFacingAnimator(frameCount: 3);
-
-        Assert.True(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 3), "Changing direction should begin by returning from the current side.");
-        Assert.Equal(PetTurnPhase.ToFront, animator.Phase, "Opposite directions must pass through front instead of mirroring.");
-        Assert.Equal(PetHorizontalDirection.Right, animator.TurnDirection, "The first half should reverse the current right-facing sequence.");
-
-        animator.Advance(frameCount: 3);
-        animator.Advance(frameCount: 3);
-        animator.Advance(frameCount: 3);
-
-        Assert.True(animator.IsTurning, "After reaching front, the pending left turn should begin automatically.");
-        Assert.Equal(PetTurnPhase.ToSide, animator.Phase, "The second half should turn from front to the new side.");
-        Assert.Equal(PetHorizontalDirection.Left, animator.TurnDirection, "The second half must use separately authored left-facing frames.");
-        Assert.Equal(0, animator.FrameIndex, "The new side's turn should begin at frame zero.");
-    }
-
-    static PetDirectionalMovementAnimator CreateRightFacingAnimator(int frameCount)
-    {
-        var animator = new PetDirectionalMovementAnimator();
-        animator.RequestDirection(PetHorizontalDirection.Right, frameCount);
-        for (var index = 0; index < frameCount; index++)
+        foreach (var settings in new[]
         {
-            animator.Advance(frameCount);
+            new PetMovementSettings(DistancePerFrame: 0),
+            new PetMovementSettings(BaseSpeedPixelsPerSecond: double.NaN),
+            new PetMovementSettings(MinSpeedPixelsPerSecond: -1),
+            new PetMovementSettings(MaxSpeedPixelsPerSecond: double.PositiveInfinity),
+            new PetMovementSettings(BaseSpeedPixelsPerSecond: 200),
+            new PetMovementSettings(MinSpeedPixelsPerSecond: 100),
+        })
+        {
+            Assert.Throws<ArgumentException>(() => new PetMovementController(settings));
         }
-
-        return animator;
     }
 
-    static PetActionDefinition CreateTestMoveAction()
+    static void MovementFramesKeepDistanceWhenChangingClipLength()
     {
-        return new PetActionDefinition(
-            Id: "test-move",
-            Kind: PetActionKind.Move,
-            FramePaths: Array.Empty<string>(),
-            DistancePerFrame: 10,
-            BaseSpeedPixelsPerSecond: 90,
-            MinSpeedPixelsPerSecond: 80,
-            MaxSpeedPixelsPerSecond: 105);
+        var controller = new PetMovementController(CreateTestMovementSettings());
+        controller.AdvanceMoveFrame(65, 7);
+        var changed = controller.AdvanceMoveFrame(5, 5);
+        Assert.Equal(2, changed.FrameIndex, "Changing clip length should wrap the current index and retain carried distance.");
+        Assert.True(changed.Changed, "Crossing a frame distance after switching direction should advance immediately.");
     }
+
+    static void MovementKindsContainNoDirectionalOrTurnActions()
+    {
+        var names = Enum.GetNames<PetActionKind>();
+        Assert.Equal(1, names.Count(name => name.StartsWith("Move", StringComparison.Ordinal)), "Movement should have exactly one action kind.");
+        Assert.False(names.Any(name => name.StartsWith("Turn", StringComparison.Ordinal)), "Retired turn kinds should not remain in the runtime model.");
+    }
+
+    static PetMovementSettings CreateTestMovementSettings() => new();
 
     static void CursorNudgePlannerNudgesNearbyCursor()
     {

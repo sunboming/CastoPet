@@ -29,34 +29,38 @@ public static class PetSkinManifestWriter
 
     public static string ToJson(PetSkinDefinition skin)
     {
+        var pathRoot = skin.SourceResourceDirectory ?? skin.ResourceRoot;
         var manifest = new SkinManifest(
-            SchemaVersion: 2,
+            SchemaVersion: 3,
             Id: skin.Id,
             DisplayName: skin.DisplayName,
             ResourceRoot: skin.ResourceRoot,
-            DefaultCharacter: ToManifestPath(skin.DefaultCharacterPath, skin.ResourceRoot),
-            DraggingCharacter: ToOptionalManifestPath(skin.DraggingCharacterPath, skin.ResourceRoot),
-            InputReactiveBase: ToOptionalManifestPath(skin.InputReactiveBasePath, skin.ResourceRoot),
+            DefaultCharacter: ToManifestPath(skin.DefaultCharacterPath, pathRoot),
+            DraggingCharacter: ToOptionalManifestPath(skin.DraggingCharacterPath, pathRoot),
+            InputReactiveBase: ToOptionalManifestPath(skin.InputReactiveBasePath, pathRoot),
             Actions: skin.Actions.Select(action => new ActionManifest(
                 Id: action.Id,
                 Kind: ToManifestKind(action.Kind),
-                Frames: action.FramePaths.Select(path => ToManifestPath(path, skin.ResourceRoot)).ToArray(),
+                Frames: action.FramePaths.Select(path => ToManifestPath(path, pathRoot)).ToArray(),
                 FrameIntervalMs: ToMilliseconds(action.FrameInterval),
                 FrameDurationsMs: action.FrameDurations is { Count: > 0 }
                     ? action.FrameDurations.Select(ToMilliseconds).ToArray()
                     : null,
-                DistancePerFrame: action.DistancePerFrame,
                 MinScheduleDelayMs: ToMilliseconds(action.MinScheduleDelay),
                 MaxScheduleDelayMs: ToMilliseconds(action.MaxScheduleDelay),
-                BaseSpeedPixelsPerSecond: action.BaseSpeedPixelsPerSecond,
-                MinSpeedPixelsPerSecond: action.MinSpeedPixelsPerSecond,
-                MaxSpeedPixelsPerSecond: action.MaxSpeedPixelsPerSecond)).ToArray(),
+                Movement: action.Movement is { } movement ? new MovementManifest(
+                    LeftFrames: movement.LeftFramePaths.Select(path => ToManifestPath(path, pathRoot)).ToArray(),
+                    RightFrames: movement.RightFramePaths.Select(path => ToManifestPath(path, pathRoot)).ToArray(),
+                    DistancePerFrame: movement.Settings.DistancePerFrame,
+                    BaseSpeedPixelsPerSecond: movement.Settings.BaseSpeedPixelsPerSecond,
+                    MinSpeedPixelsPerSecond: movement.Settings.MinSpeedPixelsPerSecond,
+                    MaxSpeedPixelsPerSecond: movement.Settings.MaxSpeedPixelsPerSecond) : null)).ToArray(),
             Expressions: skin.Expressions.ToDictionary(
                 item => item.Label,
                 item => new ExpressionManifest(
-                    Image: ToManifestPath(item.ResourcePath, skin.ResourceRoot),
+                    Image: ToManifestPath(item.ResourcePath, pathRoot),
                     TransitionFrames: item.TransitionFramePaths is { Count: > 0 }
-                        ? item.TransitionFramePaths.Select(path => ToManifestPath(path, skin.ResourceRoot)).ToArray()
+                        ? item.TransitionFramePaths.Select(path => ToManifestPath(path, pathRoot)).ToArray()
                         : null,
                     TransitionFrameIntervalMs: ToMilliseconds(item.TransitionFrameInterval)),
                 StringComparer.OrdinalIgnoreCase));
@@ -95,10 +99,6 @@ public static class PetSkinManifestWriter
         {
             PetActionKind.Idle => "idle",
             PetActionKind.Move => "move",
-            PetActionKind.MoveLeft => "move-left",
-            PetActionKind.MoveRight => "move-right",
-            PetActionKind.TurnLeft => "turn-left",
-            PetActionKind.TurnRight => "turn-right",
             PetActionKind.Blink => "blink",
             PetActionKind.Petting => "petting",
             PetActionKind.ExpressionTransitionIn => "expression-transition-in",
@@ -129,10 +129,15 @@ public static class PetSkinManifestWriter
         IReadOnlyList<string> Frames,
         double? FrameIntervalMs,
         IReadOnlyList<double?>? FrameDurationsMs,
-        double? DistancePerFrame,
         double? MinScheduleDelayMs,
         double? MaxScheduleDelayMs,
-        double? BaseSpeedPixelsPerSecond,
-        double? MinSpeedPixelsPerSecond,
-        double? MaxSpeedPixelsPerSecond);
+        MovementManifest? Movement);
+
+    private sealed record MovementManifest(
+        IReadOnlyList<string> LeftFrames,
+        IReadOnlyList<string> RightFrames,
+        double DistancePerFrame,
+        double BaseSpeedPixelsPerSecond,
+        double MinSpeedPixelsPerSecond,
+        double MaxSpeedPixelsPerSecond);
 }
