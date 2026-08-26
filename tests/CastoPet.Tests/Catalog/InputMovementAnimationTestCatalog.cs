@@ -20,6 +20,7 @@ internal static partial class TestSuite
         new("Movement controller schedules bounded wander targets", MovementControllerSchedulesBoundedWanderTargets),
         new("Movement controller advances frames by distance", MovementControllerAdvancesFramesByDistance),
         new("Directional movement turns from front before walking", DirectionalMovementTurnsFromFrontBeforeWalking),
+        new("Directional movement without turn frames faces immediately", DirectionalMovementWithoutTurnFramesFacesImmediately),
         new("Directional movement does not restart an active turn", DirectionalMovementDoesNotRestartActiveTurn),
         new("Directional movement returns through the same authored frames", DirectionalMovementReturnsThroughSameAuthoredFrames),
         new("Directional movement changes sides through front", DirectionalMovementChangesSidesThroughFront),

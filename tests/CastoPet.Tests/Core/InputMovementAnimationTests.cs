@@ -217,6 +217,27 @@ internal static partial class TestSuite
         Assert.Equal(0, controller.MoveFrameIndex, "Reset should restore movement frame zero.");
     }
 
+    static void DirectionalMovementWithoutTurnFramesFacesImmediately()
+    {
+        var animator = new PetDirectionalMovementAnimator();
+        Assert.False(animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 0), "No turn frames should mean no transition to wait for.");
+        Assert.Equal(PetFacingDirection.Left, animator.Facing, "Starting movement without transitions should immediately face left.");
+        Assert.False(animator.IsTurning, "Immediate facing must not block movement.");
+
+        Assert.False(animator.RequestDirection(PetHorizontalDirection.Right, frameCount: 0), "Changing sides without transitions should not start a timer.");
+        Assert.Equal(PetFacingDirection.Right, animator.Facing, "Changing direction should immediately select the opposite side.");
+        Assert.False(animator.RequestFront(frameCount: 0), "Stopping without transitions should not start a return animation.");
+        Assert.Equal(PetFacingDirection.Front, animator.Facing, "Stopping should immediately restore the front-facing state.");
+
+        animator.RequestDirection(PetHorizontalDirection.Left, frameCount: 3);
+        animator.Advance(frameCount: 3);
+        Assert.False(animator.RequestDirection(PetHorizontalDirection.Right, frameCount: 0), "Immediate facing should cancel any pending turn.");
+        animator.Advance(frameCount: 3);
+        Assert.Equal(PetFacingDirection.Right, animator.Facing, "A canceled turn must not overwrite the immediate facing.");
+        Assert.Equal(PetTurnPhase.None, animator.Phase, "No transition phase should remain active.");
+        Assert.Equal(0, animator.FrameIndex, "Immediate facing should clear the old turn frame index.");
+    }
+
     static void DirectionalMovementTurnsFromFrontBeforeWalking()
     {
         var animator = new PetDirectionalMovementAnimator();

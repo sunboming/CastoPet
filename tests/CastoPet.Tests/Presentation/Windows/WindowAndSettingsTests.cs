@@ -2,6 +2,18 @@ namespace CastoPet.Tests;
 
 internal static partial class TestSuite
 {
+    static void PetWindowDisablesMovementTurnTransitions()
+    {
+        var workspace = FindWorkspaceRoot();
+        var source = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Presentation", "Windows", "PetWindow.xaml.cs"));
+        Assert.Contains(source, "MovementTurnTransitionsEnabled = false", "Movement transitions should be explicitly disabled without removing skin resources.");
+        var loader = ExtractSourceSection(source, "private IReadOnlyList<ImageSource> GetTurnFrames(", "private IReadOnlyList<ImageSource> TryLoadRequiredMoveFrames(");
+        Assert.Contains(loader, "if (!MovementTurnTransitionsEnabled)", "Disabled transitions should skip loading turn images.");
+        Assert.True(loader.IndexOf("Array.Empty<ImageSource>()", StringComparison.Ordinal) < loader.IndexOf("_assets.LoadTurnLeftFrames()", StringComparison.Ordinal), "The disabled path should return before loading turn assets.");
+        var facing = ExtractSourceSection(source, "private bool EnsureMovementFacing(", "private void AdvanceTurnFrame(");
+        Assert.Contains(facing, "GetMoveFrames(direction)", "Immediate facing should display the requested walking animation without waiting for a distance tick.");
+    }
+
     static void MenuCommandsPreserveBehaviorThroughApplicationBoundaries()
     {
         var settings = AppSettings.Default;

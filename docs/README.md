@@ -13,6 +13,12 @@ older design decisions.
 | [Known risks](known-risks.md) | Unresolved security and stability risks plus important resolved boundaries. |
 | [Skin manifest](skin-manifest.md) | External skin timing schema, validation rules, and resource budgets. |
 
+## Proposed Changes (Not Approved)
+
+[Movement model consolidation](movement-model-plan.md) records a future shared movement
+definition with left/right animation variants. It requires explicit user approval and
+does not change the current skin manifest contract.
+
 ## Historical Documents
 
 [Development history](archive/development-history.md) consolidates the former dated

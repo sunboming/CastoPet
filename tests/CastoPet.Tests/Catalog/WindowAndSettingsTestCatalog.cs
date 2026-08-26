@@ -4,6 +4,7 @@ internal static partial class TestSuite
 {
     private static IReadOnlyList<TestCase> WindowAndSettingsTestCases { get; } =
     [
+        new("Pet window disables movement turn transitions", PetWindowDisablesMovementTurnTransitions),
         new("Pet window defines two-level radial overlay and drop surface", PetWindowDefinesTwoLevelRadialOverlayAndDropSurface),
         new("Pet window consumes centralized radial wheel styling", PetWindowConsumesCentralizedRadialWheelStyling),
         new("Pet window routes classified pointer gestures", PetWindowRoutesClassifiedPointerGestures),

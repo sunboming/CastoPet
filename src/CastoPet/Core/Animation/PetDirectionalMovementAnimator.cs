@@ -34,6 +34,10 @@ public sealed class PetDirectionalMovementAnimator
     {
         if (frameCount <= 0)
         {
+            _desiredDirection = null;
+            Facing = ToFacing(direction);
+            TurnDirection = direction;
+            StopTurn();
             return false;
         }
 

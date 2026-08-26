@@ -41,6 +41,7 @@ public partial class PetWindow : Window, IPetCommandTarget
     private static readonly TimeSpan DefaultBlinkFrameInterval = TimeSpan.FromMilliseconds(90);
     private static readonly TimeSpan DefaultPettingFrameInterval = TimeSpan.FromMilliseconds(80);
     private static readonly TimeSpan DefaultTurnFrameInterval = TimeSpan.FromMilliseconds(66.66666666666667);
+    private static readonly bool MovementTurnTransitionsEnabled = false;
     private static readonly TimeSpan DefaultExpressionTransitionFrameInterval = TimeSpan.FromMilliseconds(55);
     private static readonly TimeSpan DefaultBlinkMinScheduleDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan DefaultBlinkMaxScheduleDelay = TimeSpan.FromSeconds(7);
@@ -1492,15 +1493,20 @@ public partial class PetWindow : Window, IPetCommandTarget
 
     private bool EnsureMovementFacing(PetHorizontalDirection direction)
     {
+        var previousFacing = _directionalMovementAnimator.Facing;
         var turnFrames = GetTurnFrames(direction);
-        if (turnFrames.Count == 0)
-        {
-            return false;
-        }
-
         var started = _directionalMovementAnimator.RequestDirection(direction, turnFrames.Count);
         if (!_directionalMovementAnimator.IsTurning)
         {
+            if (previousFacing != _directionalMovementAnimator.Facing)
+            {
+                var moveFrames = GetMoveFrames(direction);
+                if (moveFrames.Count > 0)
+                {
+                    CharacterImage.Source = moveFrames[_movementController.MoveFrameIndex % moveFrames.Count];
+                }
+            }
+
             return false;
         }
 
@@ -1620,6 +1626,11 @@ public partial class PetWindow : Window, IPetCommandTarget
 
     private IReadOnlyList<ImageSource> GetTurnFrames(PetHorizontalDirection direction)
     {
+        if (!MovementTurnTransitionsEnabled)
+        {
+            return Array.Empty<ImageSource>();
+        }
+
         return direction == PetHorizontalDirection.Left
             ? _turnLeftFrames ??= _assets.LoadTurnLeftFrames()
             : _turnRightFrames ??= _assets.LoadTurnRightFrames();
