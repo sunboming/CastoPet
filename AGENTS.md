@@ -21,6 +21,8 @@ These instructions apply to the entire repository.
 
 ## Project Safety
 
+- Follow `.gitattributes` and `.editorconfig`: maintained text uses CRLF in the working tree and LF in Git; Unix shell scripts use LF. Preserve existing encoding/BOM and never normalize binary assets.
+- After text edits, run `pwsh -NoProfile -File eng/check-line-endings.ps1`. Use `-Fix` only for intentional line-ending normalization; it processes tracked files without staging them. Ensure new files follow the same rules before staging, then rerun the check.
 - Preserve existing project patterns and keep changes narrowly scoped.
 - Do not move, delete, or overwrite source images and generated animation assets unless the task explicitly requires it.
 - If a running `CastoPet.exe` locks the normal Debug or Release output during a requested build, terminate that CastoPet process and retry the build without asking for separate confirmation.

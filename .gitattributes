@@ -1,0 +1,31 @@
+# Store text as LF in Git; use CRLF in the Windows working tree.
+* text=auto eol=crlf
+
+# Unix shell scripts must keep LF even on Windows.
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Never perform line-ending conversion on binary assets or build artifacts.
+*.png -text -eol
+*.jpg -text -eol
+*.jpeg -text -eol
+*.gif -text -eol
+*.webp -text -eol
+*.ico -text -eol
+*.bmp -text -eol
+*.psd -text -eol
+*.mp4 -text -eol
+*.webm -text -eol
+*.wav -text -eol
+*.mp3 -text -eol
+*.zip -text -eol
+*.7z -text -eol
+*.pdf -text -eol
+*.exe -text -eol
+*.dll -text -eol
+*.pdb -text -eol
+*.woff -text -eol
+*.woff2 -text -eol
+*.ttf -text -eol
+*.otf -text -eol

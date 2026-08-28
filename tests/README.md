@@ -20,6 +20,15 @@ CastoPet.Tests/
 
 ## Adding Tests
 
+Repository-tool checks live separately under `Tooling/` and run with PowerShell 7:
+
+```powershell
+pwsh -NoProfile -File tests/Tooling/LineEndings.Tests.ps1
+```
+
+These tests use a temporary Git repository to verify the line-ending checker and its
+explicit fix mode without rewriting application fixtures or assets.
+
 - Add a test method to the module matching the behavior under test.
 - Register its stable display name in the matching file under `Catalog/`.
 - Add a new feature catalog to `TestSuite.Catalog.cs` only when introducing a new test area.

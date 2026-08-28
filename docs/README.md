@@ -13,6 +13,7 @@ older design decisions.
 | [Known risks](known-risks.md) | Unresolved security and stability risks plus important resolved boundaries. |
 | [Skin manifest](skin-manifest.md) | External skin timing schema, validation rules, and resource budgets. |
 | [Unified movement model](movement-model-plan.md) | Shared movement settings, directional variants, and removal of turn playback. |
+| [Line endings](line-endings.md) | CRLF working-tree policy, LF Git storage, editor settings, and verification commands. |
 
 ## Historical Documents
 
