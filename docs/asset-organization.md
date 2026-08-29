@@ -8,7 +8,7 @@ workspace material.
 - `src/CastoPet/Assets/Runtime/`: packaged runtime assets. The built-in Castorice skin currently lives under `Runtime/Castorice` and is referenced by WPF resource paths.
 - `src/CastoPet/Assets/AppIcon.ico`: packaged application, taskbar, window, and tray icon.
 
-The built-in app path root is `Assets/Runtime/Castorice`. New built-in animation, expression, and input-reactive PNGs should be promoted there only after they are ready to ship.
+The built-in app path root is `Assets/Runtime/Castorice`. New built-in animation and expression PNGs should be promoted there only after they are ready to ship.
 
 ## Artwork Sources
 

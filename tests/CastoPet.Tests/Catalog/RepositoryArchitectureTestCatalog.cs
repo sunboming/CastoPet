@@ -16,6 +16,7 @@ internal static partial class TestSuite
         new("Repository ignores local working assets", RepositoryIgnoresLocalWorkingAssets),
         new("Repository keeps authoring artwork outside source", RepositoryKeepsAuthoringArtworkOutsideSource),
         new("Production code is organized by architecture", ProductionCodeIsOrganizedByArchitecture),
+        new("Input reactive feature is fully removed", InputReactiveFeatureIsFullyRemoved),
         new("Architecture dependencies point inward", ArchitectureDependenciesPointInward),
         new("Velopack runs at the application entry point", VelopackRunsAtTheApplicationEntryPoint),
         new("Update source points to the public releases repository", UpdateSourcePointsToThePublicReleasesRepository),

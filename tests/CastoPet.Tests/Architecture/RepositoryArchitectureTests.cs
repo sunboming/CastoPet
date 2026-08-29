@@ -183,7 +183,6 @@ internal static partial class TestSuite
 
         Assert.True(File.Exists(System.IO.Path.Combine(coreRoot, "Animation", "PetAnimationController.cs")), "Pure animation behavior should live under Core/Animation.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Application", "Updates", "UpdateCoordinator.cs")), "Update orchestration should live under Application/Updates.");
-        Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "WindowsInputHookService.cs")), "Windows integrations should live under Infrastructure/Platform.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "PetWindow.xaml")), "Pet window markup should live under Presentation/Windows.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "SettingsWindow.xaml")), "Settings window markup should live under Presentation/Windows.");
         Assert.True(File.Exists(System.IO.Path.Combine(projectRoot, "Presentation", "Windows", "CrashNotificationWindow.xaml")), "Crash notification markup should live under Presentation/Windows.");
@@ -208,6 +207,39 @@ internal static partial class TestSuite
                 var source = File.ReadAllText(sourcePath);
                 Assert.Contains(source, expectedNamespace, $"{System.IO.Path.GetRelativePath(projectRoot, sourcePath)} should match its architecture directory namespace.");
             }
+        }
+    }
+
+    static void InputReactiveFeatureIsFullyRemoved()
+    {
+        var workspace = FindWorkspaceRoot();
+        var projectRoot = System.IO.Path.Combine(workspace, "src", "CastoPet");
+        var removedFiles = new[]
+        {
+            System.IO.Path.Combine(projectRoot, "Core", "Input", "InputKeyboardLayout.cs"),
+            System.IO.Path.Combine(projectRoot, "Core", "Input", "InputReactiveEvent.cs"),
+            System.IO.Path.Combine(projectRoot, "Core", "Input", "InputReactiveModePolicy.cs"),
+            System.IO.Path.Combine(projectRoot, "Core", "Input", "InputReactiveState.cs"),
+            System.IO.Path.Combine(projectRoot, "Infrastructure", "Platform", "WindowsInputHookService.cs"),
+        };
+
+        foreach (var path in removedFiles)
+        {
+            Assert.False(File.Exists(path), $"Removed input-reactive file should not remain: {path}.");
+        }
+
+        Assert.False(
+            Directory.Exists(System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States", "InputReactive")),
+            "Input-reactive runtime artwork should not remain packaged.");
+
+        var sourceFiles = Directory.EnumerateFiles(projectRoot, "*", SearchOption.AllDirectories)
+            .Where(path => new[] { ".cs", ".xaml", ".json", ".csproj" }
+                .Contains(System.IO.Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{System.IO.Path.DirectorySeparatorChar}obj{System.IO.Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
+        foreach (var path in sourceFiles)
+        {
+            var source = File.ReadAllText(path);
+            Assert.False(source.Contains("InputReactive", StringComparison.OrdinalIgnoreCase), $"Input-reactive production reference should be removed from {path}.");
         }
     }
 

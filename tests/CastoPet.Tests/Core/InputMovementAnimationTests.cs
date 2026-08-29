@@ -2,62 +2,6 @@ namespace CastoPet.Tests;
 
 internal static partial class TestSuite
 {
-    static void InputKeyboardLayoutMapsCommonKeys()
-    {
-        Assert.True(InputKeyboardLayout.TryGetKeyBounds("A", out var a), "A should have a key rectangle.");
-        Assert.True(InputKeyboardLayout.TryGetKeyBounds("Space", out var space), "Space should have a key rectangle.");
-        Assert.True(InputKeyboardLayout.TryGetKeyBounds("Enter", out var enter), "Enter should have a key rectangle.");
-        Assert.False(InputKeyboardLayout.TryGetKeyBounds("Unknown", out _), "Unknown keys should not map to a rectangle.");
-        Assert.True(
-            a.X >= 0 && a.Y >= 0 && a.Right <= InputKeyboardLayout.VisualWidth && a.Bottom <= InputKeyboardLayout.VisualHeight,
-            "A should fit inside the visual bounds.");
-        Assert.True(space.Width > a.Width, "Space should be wider than a letter key.");
-        Assert.True(enter.Height >= a.Height, "Enter should be at least as tall as a letter key.");
-    }
-
-    static void InputKeyboardLayoutExposesDrawableKeys()
-    {
-        Assert.True(InputKeyboardLayout.KeyIds.Contains("A"), "Drawable keys should include A.");
-        Assert.True(InputKeyboardLayout.KeyIds.Contains("Space"), "Drawable keys should include Space.");
-        Assert.True(InputKeyboardLayout.KeyIds.Contains("MouseLeft"), "Drawable keys should include mouse feedback zones.");
-    }
-
-    static void InputKeyboardLayoutExposesKeyLabels()
-    {
-        Assert.Equal("A", InputKeyboardLayout.GetDisplayLabel("A"), "Letter keys should display themselves.");
-        Assert.Equal("Space", InputKeyboardLayout.GetDisplayLabel("Space"), "Space should display a readable label.");
-        Assert.Equal("←", InputKeyboardLayout.GetDisplayLabel("Left"), "Arrow keys should display arrow glyphs.");
-        Assert.Equal("L", InputKeyboardLayout.GetDisplayLabel("MouseLeft"), "Mouse left feedback should display a compact label.");
-    }
-
-    static void InputReactiveStateExpiresHighlights()
-    {
-        var state = new InputReactiveState();
-
-        state.AddKey("A", TimeSpan.Zero);
-
-        Assert.True(state.GetActiveHighlights(TimeSpan.FromMilliseconds(100)).Contains("A"), "A should remain active before expiration.");
-        Assert.False(state.GetActiveHighlights(TimeSpan.FromMilliseconds(300)).Contains("A"), "A should expire after the highlight duration.");
-    }
-
-    static void WindowsInputHookNormalizesCommonKeys()
-    {
-        Assert.Equal("A", WindowsInputHookService.NormalizeVirtualKey(0x41), "VK_A should normalize to A.");
-        Assert.Equal("Space", WindowsInputHookService.NormalizeVirtualKey(0x20), "VK_SPACE should normalize to Space.");
-        Assert.Equal("Enter", WindowsInputHookService.NormalizeVirtualKey(0x0D), "VK_RETURN should normalize to Enter.");
-        Assert.Equal("Left", WindowsInputHookService.NormalizeVirtualKey(0x25), "VK_LEFT should normalize to Left.");
-    }
-
-    static void InputReactiveModeSuppressesPassiveAnimation()
-    {
-        Assert.False(
-            InputReactiveModePolicy.AllowsPassiveAnimation(inputReactiveModeActive: true),
-            "Input reactive mode should pause idle, blink, and active movement visuals.");
-        Assert.True(
-            InputReactiveModePolicy.AllowsPassiveAnimation(inputReactiveModeActive: false),
-            "Normal passive animation should remain available outside input reactive mode.");
-    }
-
     static void MovementPlannerClampsTargetsToWorkArea()
     {
         var bounds = new PetMovementBounds(0, 0, 500, 400);
@@ -517,26 +461,6 @@ internal static partial class TestSuite
 
         Assert.Contains(message, "Idle frames", "Asset diagnostics should include the resource group.");
         Assert.Contains(message, "Assets/Runtime/Castorice/States/Idle/Castorice.Idle.03.png", "Asset diagnostics should include the resource path.");
-    }
-
-    static void InputReactiveAssetPathUsesAppResource()
-    {
-        Assert.Equal(
-            "Assets/Runtime/Castorice/States/InputReactive/Castorice.InputReactive.Base.png",
-            BuiltInPetSkins.Castorice.InputReactiveBasePath,
-            "Input reactive base should use an app resource path.");
-    }
-
-    static void InputReactiveAssetIsPackaged()
-    {
-        var workspace = FindWorkspaceRoot();
-        var projectFile = System.IO.Path.Combine(workspace, "src", "CastoPet", "CastoPet.csproj");
-        var projectText = File.ReadAllText(projectFile);
-
-        Assert.Contains(
-            projectText,
-            @"Assets\Runtime\Castorice\**\*.png",
-            "Input reactive base should be covered by the runtime WPF resource glob.");
     }
 
     static void PackagedCharacterAssetsAreDisplaySized()

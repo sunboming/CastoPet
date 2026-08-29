@@ -6,6 +6,5 @@ internal static partial class TestSuite
     [
         new("Settings window exposes crash and update actions", SettingsWindowExposesCrashAndUpdateActions),
         new("Pet window settings snapshot copies runtime flags", PetWindowSettingsSnapshotCopiesRuntimeFlags),
-        new("Pet window settings snapshot copies input reactive mode", PetWindowSettingsSnapshotCopiesInputReactiveMode),
     ];
 }

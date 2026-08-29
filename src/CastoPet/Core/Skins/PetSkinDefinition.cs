@@ -8,7 +8,6 @@ public sealed record PetSkinDefinition(
     string ResourceRoot,
     string DefaultCharacterPath,
     string DraggingCharacterPath,
-    string InputReactiveBasePath,
     IReadOnlyList<PetActionDefinition> Actions,
     IReadOnlyList<PetExpressionDefinition> Expressions)
 {

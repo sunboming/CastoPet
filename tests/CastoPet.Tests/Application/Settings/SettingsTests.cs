@@ -27,13 +27,6 @@ internal static partial class TestSuite
         Assert.False(settings.PushCursor, "Push cursor should default to false.");
     }
 
-    static void DefaultInputReactiveModeIsDisabled()
-    {
-        var settings = AppSettings.Default;
-
-        Assert.False(settings.InputReactiveMode, "Input reactive mode should default to false.");
-    }
-
     static void DefaultThemeFollowsTheSystem()
     {
         Assert.Equal(AppThemeMode.System, AppSettings.Default.ThemeMode, "Existing users should follow the Windows app theme by default.");
@@ -105,24 +98,6 @@ internal static partial class TestSuite
         var loaded = service.Load();
 
         Assert.True(loaded.PushCursor, "PushCursor should round trip.");
-    }
-
-    static void SettingsRoundTripIncludesInputReactiveMode()
-    {
-        using var temp = TempDirectory.Create();
-        var paths = new AppPaths(temp.Path);
-        var logger = new LoggingService(paths);
-        var service = new SettingsService(paths, logger);
-
-        var settings = new AppSettings
-        {
-            InputReactiveMode = true,
-        };
-
-        service.Save(settings);
-        var loaded = service.Load();
-
-        Assert.True(loaded.InputReactiveMode, "InputReactiveMode should round trip.");
     }
 
     static void SettingsRoundTripIncludesSkinManifestPath()

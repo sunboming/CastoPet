@@ -13,7 +13,6 @@ public sealed record CastoPetFeatureProfile(
     bool ShortcutLauncher,
     bool ActiveMovement,
     bool PushCursor,
-    bool InputReactiveMode,
     bool ExternalSkins)
 {
     public static CastoPetFeatureProfile Stable { get; } = new(
@@ -23,7 +22,6 @@ public sealed record CastoPetFeatureProfile(
         ShortcutLauncher: false,
         ActiveMovement: false,
         PushCursor: false,
-        InputReactiveMode: false,
         ExternalSkins: false);
 
     public static CastoPetFeatureProfile Preview { get; } = new(
@@ -33,7 +31,6 @@ public sealed record CastoPetFeatureProfile(
         ShortcutLauncher: true,
         ActiveMovement: true,
         PushCursor: true,
-        InputReactiveMode: true,
         ExternalSkins: true);
 
     public static CastoPetFeatureProfile Current

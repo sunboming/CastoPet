@@ -5,7 +5,6 @@
   "resourceRoot": "Assets/Runtime/Castorice",
   "defaultCharacter": "Castorice.png",
   "draggingCharacter": "States/Castorice.Dragging.png",
-  "inputReactiveBase": "States/InputReactive/Castorice.InputReactive.Base.png",
   "actions": [
     {
       "id": "idle",

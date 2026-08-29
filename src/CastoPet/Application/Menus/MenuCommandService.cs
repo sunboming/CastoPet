@@ -70,11 +70,6 @@ public sealed class MenuCommandService
         ApplyAndSave(settings => settings.PushCursor = !settings.PushCursor, "Push cursor setting changed.");
     }
 
-    public void ToggleInputReactiveMode()
-    {
-        ApplyAndSave(settings => settings.InputReactiveMode = !settings.InputReactiveMode, "Input reactive mode setting changed.");
-    }
-
     public void ToggleShowInTaskbar()
     {
         ApplyAndSave(settings => settings.ShowInTaskbar = !settings.ShowInTaskbar, "Taskbar visibility setting changed.");

@@ -4,12 +4,6 @@ internal static partial class TestSuite
 {
     private static IReadOnlyList<TestCase> InputMovementAnimationTestCases { get; } =
     [
-        new("Input keyboard layout maps common keys", InputKeyboardLayoutMapsCommonKeys),
-        new("Input keyboard layout exposes drawable keys", InputKeyboardLayoutExposesDrawableKeys),
-        new("Input keyboard layout exposes key labels", InputKeyboardLayoutExposesKeyLabels),
-        new("Input reactive state expires highlights", InputReactiveStateExpiresHighlights),
-        new("Windows input hook normalizes common keys", WindowsInputHookNormalizesCommonKeys),
-        new("Input reactive mode suppresses passive animation", InputReactiveModeSuppressesPassiveAnimation),
         new("Movement planner clamps targets to work area", MovementPlannerClampsTargetsToWorkArea),
         new("Movement planner approaches mouse with cursor offset", MovementPlannerApproachesMouseWithCursorOffset),
         new("Movement planner eases toward target", MovementPlannerEasesTowardTarget),
@@ -41,8 +35,6 @@ internal static partial class TestSuite
         new("Character stationary animations are enabled", CharacterStationaryAnimationsAreEnabled),
         new("Character assets decode at pet display width", CharacterAssetsDecodeAtPetDisplayWidth),
         new("Asset diagnostics include group and resource path", AssetDiagnosticsIncludeGroupAndResourcePath),
-        new("Input reactive asset path uses app resource", InputReactiveAssetPathUsesAppResource),
-        new("Input reactive asset is packaged", InputReactiveAssetIsPackaged),
         new("Packaged character assets are display sized", PackagedCharacterAssetsAreDisplaySized),
         new("Packaged expression transitions have complete source and runtime endpoints", PackagedExpressionTransitionsHaveCompleteSourceAndRuntimeEndpoints),
     ];

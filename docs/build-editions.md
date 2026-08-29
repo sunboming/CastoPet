@@ -16,7 +16,6 @@ default for local development. Stable is the minimal public release profile.
 | Radial wheel and expressions | No | Yes |
 | Shortcut launcher and drop import | No | Yes |
 | Active movement and cursor push | No | Yes |
-| Input-reactive mode | No | Yes |
 | External skin manifests | No | Yes |
 
 Stable ignores persisted Preview-only settings without deleting them. Returning to

@@ -11,7 +11,6 @@ public sealed class AppSettings
     public bool StartWithWindows { get; set; }
     public bool ActiveMovement { get; set; }
     public bool PushCursor { get; set; }
-    public bool InputReactiveMode { get; set; }
     public AppThemeMode ThemeMode { get; set; } = AppThemeMode.System;
     public string? SkinManifestPath { get; set; }
     public string? LastAcknowledgedCrashId { get; set; }
@@ -30,7 +29,6 @@ public sealed class AppSettings
             StartWithWindows = StartWithWindows,
             ActiveMovement = ActiveMovement,
             PushCursor = PushCursor,
-            InputReactiveMode = InputReactiveMode,
             ThemeMode = ThemeMode,
             SkinManifestPath = SkinManifestPath,
             LastAcknowledgedCrashId = LastAcknowledgedCrashId,
@@ -47,7 +45,6 @@ public sealed class AppSettings
         StartWithWindows = source.StartWithWindows;
         ActiveMovement = source.ActiveMovement;
         PushCursor = source.PushCursor;
-        InputReactiveMode = source.InputReactiveMode;
         ThemeMode = source.ThemeMode;
         SkinManifestPath = source.SkinManifestPath;
         LastAcknowledgedCrashId = source.LastAcknowledgedCrashId;

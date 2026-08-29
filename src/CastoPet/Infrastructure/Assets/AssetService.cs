@@ -38,18 +38,6 @@ public sealed class AssetService
         return LoadCharacter(Skin.DraggingCharacterPath, "Dragging character");
     }
 
-    public ImageSource? TryLoadInputReactiveBase()
-    {
-        try
-        {
-            return LoadCharacter(Skin.InputReactiveBasePath, "Input reactive base");
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     public IReadOnlyList<ImageSource> LoadIdleFrames()
     {
         return LoadActionFrames(PetActionKind.Idle, "Idle frames");

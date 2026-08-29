@@ -21,14 +21,12 @@ public sealed record SettingActions(
     Action ToggleActiveMovement,
     Action ToggleClickThrough,
     Action TogglePushCursor,
-    Action ToggleInputReactiveMode,
     Action ToggleShowInTaskbar,
     Action ToggleStartWithWindows)
 {
     private static readonly Action NoOp = () => { };
 
     public static SettingActions None { get; } = new(
-        NoOp,
         NoOp,
         NoOp,
         NoOp,

@@ -84,16 +84,11 @@ public partial class PetWindow : Window, IPetCommandTarget
     private readonly ShortcutService _shortcutService;
     private readonly ShortcutDropHandler _shortcutDrops;
     private readonly ShortcutLauncher _shortcutLauncher;
-    private ImageSource? _inputReactiveBase;
-    private bool _inputReactiveBaseLoaded;
     private readonly PetActionDefinition _idleAction;
     private readonly PetActionDefinition _blinkAction;
     private readonly PetActionDefinition? _pettingAction;
     private readonly PetActionDefinition? _expressionTransitionInAction;
     private readonly PetActionDefinition? _expressionTransitionOutAction;
-    private readonly InputReactiveState _inputReactiveState = new();
-    private readonly WindowsInputHookService _inputHookService = new();
-    private readonly DispatcherTimer _inputReactiveRenderTimer;
     private readonly WindowsCursorService _cursorService = new();
     private readonly List<RadialWheelItemVisual> _firstRingVisuals = new();
     private readonly List<RadialWheelItemVisual> _secondRingVisuals = new();
@@ -110,7 +105,6 @@ public partial class PetWindow : Window, IPetCommandTarget
     private bool _hasRadialWheelPointerEntered;
     private bool _activeMovementEnabled;
     private bool _pushCursorEnabled;
-    private bool _inputReactiveModeEnabled;
     private string _secondRingContentKey = "closed";
     private PetExpressionAsset? _pendingExpressionAsset;
     private PetExpressionAsset? _activeExpressionAsset;
@@ -222,9 +216,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         _expressionTransitionFrameTimer.Tick += (_, _) => AdvanceExpressionTransitionFrame();
         _activeMovementProbeTimer = new DispatcherTimer { Interval = PetAnimationTimings.ActiveMovementProbeInterval };
         _activeMovementProbeTimer.Tick += (_, _) => ProbeActiveMovement();
-        _inputReactiveRenderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
-        _inputReactiveRenderTimer.Tick += (_, _) => RenderInputReactiveHighlights();
-        _inputHookService.InputReceived += OnInputReactiveInputReceived;
         _interactions = new PetInteractionCoordinator(
             _wheelCatalogService.Current,
             new PetPointerGestureClassifier(
@@ -265,12 +256,10 @@ public partial class PetWindow : Window, IPetCommandTarget
             WindowPlacementService.MoveToBottomRight(this);
             StartIdleAnimation();
             ScheduleNextBlink();
-            UpdateInputReactiveMode();
             UpdateActiveMovementTimer();
         };
         IsVisibleChanged += (_, _) =>
         {
-            UpdateInputReactiveMode();
             UpdateActiveMovementTimer();
         };
         Closed += (_, _) => ShutdownRuntimeResources();
@@ -300,7 +289,6 @@ public partial class PetWindow : Window, IPetCommandTarget
             _applySettingsOnSourceInitialized = false;
         }
 
-        StopInputReactiveMode(restoreIdle: false);
         CancelPendingPointerGesture();
         StopPetting(restoreIdle: false);
         CancelTemporaryExpression();
@@ -317,12 +305,9 @@ public partial class PetWindow : Window, IPetCommandTarget
         _temporaryExpressionTimer.Stop();
         _expressionTransitionFrameTimer.Stop();
         _activeMovementProbeTimer.Stop();
-        _inputReactiveRenderTimer.Stop();
 
         RadialWheelOverlay.IsOpen = false;
         RadialWheelHoldOverlay.IsOpen = false;
-        _inputHookService.InputReceived -= OnInputReactiveInputReceived;
-        _inputHookService.Dispose();
         _shortcutIconCache.Clear();
         _expressionAssetCache.Clear();
         ReleaseOptionalAnimationAssets();
@@ -330,7 +315,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         _secondRingVisuals.Clear();
         FirstRingSurface.Children.Clear();
         SecondRingSurface.Children.Clear();
-        InputReactiveOverlay.Children.Clear();
         CharacterImage.Source = null;
     }
 
@@ -358,17 +342,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         return _pettingFrames ??= _assets.LoadPettingFrames();
     }
 
-    private ImageSource? GetInputReactiveBase()
-    {
-        if (!_inputReactiveBaseLoaded)
-        {
-            _inputReactiveBase = _assets.TryLoadInputReactiveBase();
-            _inputReactiveBaseLoaded = true;
-        }
-
-        return _inputReactiveBase;
-    }
-
     private IReadOnlyList<ImageSource> GetExpressionTransitionFrames(bool entering)
     {
         if (entering)
@@ -384,7 +357,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         _draggingCharacter = null;
         _pettingFrames = null;
         ReleaseMovementAnimationAssets();
-        ReleaseInputReactiveAsset();
         _expressionTransitionInFrames = null;
         _expressionTransitionOutFrames = null;
         _activeExpressionTransitionFrames = Array.Empty<ImageSource>();
@@ -394,12 +366,6 @@ public partial class PetWindow : Window, IPetCommandTarget
     {
         _moveLeftFrames = null;
         _moveRightFrames = null;
-    }
-
-    private void ReleaseInputReactiveAsset()
-    {
-        _inputReactiveBase = null;
-        _inputReactiveBaseLoaded = false;
     }
 
     private static LegacyWheelDependencies CreateLegacyWheelDependencies(
@@ -431,13 +397,7 @@ public partial class PetWindow : Window, IPetCommandTarget
             _cursorPushGate.Reset();
         }
 
-        _inputReactiveModeEnabled = _features.InputReactiveMode && snapshot.InputReactiveMode;
-        UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
-        if (!_inputReactiveModeEnabled)
-        {
-            ReleaseInputReactiveAsset();
-        }
 
         if (!_activeMovementEnabled)
         {
@@ -554,178 +514,14 @@ public partial class PetWindow : Window, IPetCommandTarget
         }
     }
 
-    private bool CanShowInputReactiveMode()
-    {
-        return _inputReactiveModeEnabled
-            && _inputReactiveBase is not null
-            && IsVisible
-            && !_isDragging
-            && !_animationController.IsPetting
-            && !_dragRestoreTimer.IsEnabled
-            && !_interactions.IsRadialWheelOpen
-            && !_temporaryExpressionTimer.IsEnabled
-            && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None;
-    }
-
-    private bool IsInputReactiveModeBlockingPassiveAnimation()
-    {
-        return _inputReactiveModeEnabled && _inputReactiveBase is not null;
-    }
-
     private PetPassiveAnimationContext GetPassiveAnimationContext()
     {
         return new PetPassiveAnimationContext(
-            PassiveAnimationAllowed: InputReactiveModePolicy.AllowsPassiveAnimation(
-                IsInputReactiveModeBlockingPassiveAnimation()),
+            PassiveAnimationAllowed: true,
             IsDragging: _isDragging,
             HasActiveMovementTarget: _movementController.HasTarget,
             IsRadialWheelOpen: _interactions.IsRadialWheelOpen,
             HasTemporaryExpression: _temporaryExpressionTimer.IsEnabled);
-    }
-
-    private void UpdateInputReactiveMode()
-    {
-        if (_inputReactiveModeEnabled)
-        {
-            _ = GetInputReactiveBase();
-        }
-
-        if (!CanShowInputReactiveMode())
-        {
-            StopInputReactiveMode(restoreIdle: !_inputReactiveModeEnabled || _inputReactiveBase is null);
-            return;
-        }
-
-        StopActiveMovementProbe();
-        StopActiveMovementRendering();
-        _movementController.CancelTarget();
-        StopIdleAnimation();
-        StopBlinkAnimation();
-        ResetMoveFrameState();
-        ResetActiveMovementVisual();
-
-        CharacterImage.Source = _inputReactiveBase;
-        InputReactiveOverlay.Visibility = Visibility.Visible;
-        if (!_inputReactiveRenderTimer.IsEnabled)
-        {
-            _inputReactiveRenderTimer.Start();
-        }
-
-        _inputHookService.Start();
-        RenderInputReactiveHighlights();
-    }
-
-    private void StopInputReactiveMode(bool restoreIdle = true)
-    {
-        _inputHookService.Stop();
-        _inputReactiveRenderTimer.Stop();
-        _inputReactiveState.Clear();
-        InputReactiveOverlay.Children.Clear();
-        InputReactiveOverlay.Visibility = Visibility.Collapsed;
-
-        if (restoreIdle
-            && !_isDragging
-            && !_animationController.IsPetting
-            && !_interactions.IsRadialWheelOpen
-            && !_temporaryExpressionTimer.IsEnabled
-            && _animationController.ExpressionTransitionMode == PetExpressionTransitionMode.None)
-        {
-            CharacterImage.Source = GetCurrentIdleFrame();
-            StartIdleAnimation();
-            ScheduleNextBlink();
-        }
-    }
-
-    private void OnInputReactiveInputReceived(InputReactiveEvent inputEvent)
-    {
-        if (!CanShowInputReactiveMode())
-        {
-            return;
-        }
-
-        Dispatcher.BeginInvoke(() =>
-        {
-            if (!CanShowInputReactiveMode())
-            {
-                return;
-            }
-
-            _inputReactiveState.AddKey(inputEvent.Id, GetInputReactiveTime());
-            RenderInputReactiveHighlights();
-        });
-    }
-
-    private void RenderInputReactiveHighlights()
-    {
-        if (!CanShowInputReactiveMode())
-        {
-            InputReactiveOverlay.Children.Clear();
-            return;
-        }
-
-        CharacterImage.Source = _inputReactiveBase;
-        InputReactiveOverlay.Children.Clear();
-        foreach (var key in InputKeyboardLayout.KeyIds)
-        {
-            if (InputKeyboardLayout.TryGetKeyBounds(key, out var bounds))
-            {
-                AddInputReactiveKeyVisual(key, bounds, isActive: false);
-            }
-        }
-
-        foreach (var key in _inputReactiveState.GetActiveHighlights(GetInputReactiveTime()))
-        {
-            if (!InputKeyboardLayout.TryGetKeyBounds(key, out var bounds))
-            {
-                continue;
-            }
-
-            AddInputReactiveKeyVisual(key, bounds, isActive: true);
-        }
-    }
-
-    private void AddInputReactiveKeyVisual(string key, System.Drawing.RectangleF bounds, bool isActive)
-    {
-        var rectangle = new WpfShapes.Rectangle
-        {
-            Width = bounds.Width,
-            Height = bounds.Height,
-            RadiusX = 5,
-            RadiusY = 5,
-            Fill = new SolidColorBrush(isActive
-                ? WpfColor.FromArgb(190, 248, 238, 255)
-                : WpfColor.FromArgb(92, 244, 236, 255)),
-            Stroke = new SolidColorBrush(isActive
-                ? WpfColor.FromArgb(230, 119, 78, 190)
-                : WpfColor.FromArgb(132, 119, 78, 190)),
-            StrokeThickness = isActive ? 1.4 : 0.8,
-            IsHitTestVisible = false,
-        };
-        WpfControls.Canvas.SetLeft(rectangle, bounds.X);
-        WpfControls.Canvas.SetTop(rectangle, bounds.Y);
-        InputReactiveOverlay.Children.Add(rectangle);
-
-        var label = new WpfControls.TextBlock
-        {
-            Text = InputKeyboardLayout.GetDisplayLabel(key),
-            Width = bounds.Width,
-            Height = bounds.Height,
-            FontSize = bounds.Width > 34 ? 8 : 9,
-            FontWeight = isActive ? FontWeights.Bold : FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(isActive
-                ? WpfColor.FromArgb(255, 70, 38, 114)
-                : WpfColor.FromArgb(210, 80, 48, 128)),
-            TextAlignment = TextAlignment.Center,
-            IsHitTestVisible = false,
-        };
-        WpfControls.Canvas.SetLeft(label, bounds.X);
-        WpfControls.Canvas.SetTop(label, bounds.Y + 1);
-        InputReactiveOverlay.Children.Add(label);
-    }
-
-    private static TimeSpan GetInputReactiveTime()
-    {
-        return TimeSpan.FromMilliseconds(Environment.TickCount64);
     }
 
     private void OnMouseLeftButtonDown(object sender, WpfInput.MouseButtonEventArgs e)
@@ -954,7 +750,6 @@ public partial class PetWindow : Window, IPetCommandTarget
     {
         StopPetting(restoreIdle: false);
         CancelTemporaryExpression();
-        StopInputReactiveMode(restoreIdle: false);
         StopActiveMovementRendering();
         _movementController.CancelTarget();
         CancelDirectionalMovement();
@@ -977,7 +772,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         _isDragging = false;
         _dragRestoreTimer.Stop();
         _dragRestoreTimer.Start();
-        UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
     }
 
@@ -989,7 +783,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
         ScheduleNextBlink();
-        UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
     }
 
@@ -999,7 +792,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         var pettingFrames = GetPettingFrames();
         _animationController.BeginPetting(Math.Max(1, pettingFrames.Count));
         CancelTemporaryExpression();
-        StopInputReactiveMode(restoreIdle: false);
         StopActiveMovementProbe();
         StopActiveMovementRendering();
         _movementController.CancelTarget();
@@ -1114,14 +906,12 @@ public partial class PetWindow : Window, IPetCommandTarget
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
         ScheduleNextBlink();
-        UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
     }
 
     private bool CanRunActiveMovement()
     {
         return _activeMovementEnabled
-            && InputReactiveModePolicy.AllowsPassiveAnimation(IsInputReactiveModeBlockingPassiveAnimation())
             && IsVisible
             && !_isClickThrough
             && !_isDragging
@@ -2068,7 +1858,6 @@ public partial class PetWindow : Window, IPetCommandTarget
 
         StopPetting(restoreIdle: false);
         CancelTemporaryExpression();
-        StopInputReactiveMode(restoreIdle: false);
         StopIdleAnimation();
         StopBlinkAnimation();
         if (!_interactions.TryOpenRadialWheel(DateTimeOffset.UtcNow))
@@ -2116,7 +1905,6 @@ public partial class PetWindow : Window, IPetCommandTarget
             return;
         }
 
-        UpdateInputReactiveMode();
         StartIdleAnimation();
         ScheduleNextBlink();
         UpdateActiveMovementTimer();
@@ -2379,7 +2167,6 @@ public partial class PetWindow : Window, IPetCommandTarget
 
         _temporaryExpressionTimer.Stop();
         StopExpressionTransition();
-        StopInputReactiveMode(restoreIdle: false);
         StopIdleAnimation();
         StopBlinkAnimation();
         _pendingExpressionAsset = asset;
@@ -2414,7 +2201,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         _pendingExpressionAsset = null;
         StopIdleAnimation();
         StopBlinkAnimation();
-        StopInputReactiveMode(restoreIdle: false);
         PlayExpressionTransitionOut();
         UpdateActiveMovementTimer();
     }
@@ -2553,7 +2339,6 @@ public partial class PetWindow : Window, IPetCommandTarget
         CharacterImage.Source = GetCurrentIdleFrame();
         StartIdleAnimation();
         ScheduleNextBlink();
-        UpdateInputReactiveMode();
         UpdateActiveMovementTimer();
     }
 

@@ -12,7 +12,6 @@ internal static partial class TestSuite
               "resourceRoot": "Skins/Custom",
               "defaultCharacter": "Default.png",
               "draggingCharacter": "States/Dragging.png",
-              "inputReactiveBase": "Input/Base.png",
               "actions": [
                 {
                   "id": "idle",
@@ -49,7 +48,6 @@ internal static partial class TestSuite
         Assert.Equal("Skins/Custom", skin.ResourceRoot, "Manifest resource root should load.");
         Assert.Equal("Skins/Custom/Default.png", skin.DefaultCharacterPath, "JSON manifest paths should resolve under resource root.");
         Assert.Equal("Skins/Custom/States/Dragging.png", skin.DraggingCharacterPath, "Optional dragging path should resolve under resource root.");
-        Assert.Equal("Skins/Custom/Input/Base.png", skin.InputReactiveBasePath, "Optional input base path should resolve under resource root.");
         Assert.Equal("Skins/Custom/Idle/00.png", skin.GetRequiredAction(PetActionKind.Idle).FramePaths[0], "Action frames should resolve under resource root.");
         Assert.Equal(TimeSpan.FromMilliseconds(200), skin.GetRequiredAction(PetActionKind.Idle).FrameInterval, "Action frame interval should load.");
         Assert.Equal(10d, skin.GetRequiredAction(PetActionKind.Move).Movement!.Settings.DistancePerFrame, "Move distance should load.");

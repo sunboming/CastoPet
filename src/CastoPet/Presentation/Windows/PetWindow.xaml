@@ -29,12 +29,6 @@
             </Image.RenderTransform>
         </Image>
 
-        <Canvas x:Name="InputReactiveOverlay"
-                Width="320"
-                Height="420"
-                Visibility="Collapsed"
-                IsHitTestVisible="False" />
-
         <Popup x:Name="RadialWheelHoldOverlay"
                AllowsTransparency="True"
                IsHitTestVisible="False"

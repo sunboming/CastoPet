@@ -33,16 +33,4 @@ internal static partial class TestSuite
         Assert.True(snapshot.PushCursor, "Push cursor should be copied for movement runtime state.");
     }
 
-    static void PetWindowSettingsSnapshotCopiesInputReactiveMode()
-    {
-        var settings = new AppSettings
-        {
-            InputReactiveMode = true,
-        };
-
-        var snapshot = PetWindowSettingsSnapshot.FromSettings(settings);
-
-        Assert.True(snapshot.InputReactiveMode, "Input reactive mode should be copied for window runtime state.");
-    }
-
 }

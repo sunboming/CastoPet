@@ -37,7 +37,6 @@ public static class PetSkinManifestWriter
             ResourceRoot: skin.ResourceRoot,
             DefaultCharacter: ToManifestPath(skin.DefaultCharacterPath, pathRoot),
             DraggingCharacter: ToOptionalManifestPath(skin.DraggingCharacterPath, pathRoot),
-            InputReactiveBase: ToOptionalManifestPath(skin.InputReactiveBasePath, pathRoot),
             Actions: skin.Actions.Select(action => new ActionManifest(
                 Id: action.Id,
                 Kind: ToManifestKind(action.Kind),
@@ -114,7 +113,6 @@ public static class PetSkinManifestWriter
         string ResourceRoot,
         string DefaultCharacter,
         string? DraggingCharacter,
-        string? InputReactiveBase,
         IReadOnlyList<ActionManifest> Actions,
         IReadOnlyDictionary<string, ExpressionManifest> Expressions);
 

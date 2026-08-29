@@ -10,7 +10,6 @@ internal static partial class TestSuite
         Assert.Equal("Castorice", skin.DisplayName, "Built-in skin display name should be stable.");
         Assert.Equal("Assets/Runtime/Castorice/Castorice.png", skin.DefaultCharacterPath, "Default character path should use runtime root.");
         Assert.Equal("Assets/Runtime/Castorice/States/Castorice.Dragging.png", skin.DraggingCharacterPath, "Dragging path should use runtime root.");
-        Assert.Equal("Assets/Runtime/Castorice/States/InputReactive/Castorice.InputReactive.Base.png", skin.InputReactiveBasePath, "Input reactive path should use runtime root.");
         Assert.True(skin.TryGetAction(PetActionKind.Idle, out _), "Castorice should define idle.");
         Assert.True(skin.TryGetAction(PetActionKind.Move, out _), "Castorice should define move.");
         Assert.True(skin.TryGetAction(PetActionKind.Blink, out _), "Castorice should define blink.");
@@ -25,7 +24,6 @@ internal static partial class TestSuite
         {
             skin.DefaultCharacterPath,
             skin.DraggingCharacterPath,
-            skin.InputReactiveBasePath,
         };
         paths.AddRange(skin.Actions.SelectMany(action => action.FramePaths));
         var movement = skin.GetRequiredAction(PetActionKind.Move).Movement!;
@@ -87,7 +85,6 @@ internal static partial class TestSuite
             "assets/runtime/castorice/states/moveleft/castorice.moveleft.00.png",
             "assets/runtime/castorice/states/moveright/castorice.moveright.00.png",
             "assets/runtime/castorice/states/petting/castorice.petting.00.png",
-            "assets/runtime/castorice/states/inputreactive/castorice.inputreactive.base.png",
         };
 
         if (CastoPetFeatureProfile.Current.Edition == CastoPetEdition.Stable)

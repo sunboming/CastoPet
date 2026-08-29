@@ -86,7 +86,6 @@ public static class PetSkinManifestLoader
             ResourceRoot: manifest.ResourceRoot ?? string.Empty,
             DefaultCharacterPath: resolver.Resolve(RequiredPath(manifest.DefaultCharacter, "defaultCharacter")),
             DraggingCharacterPath: resolver.ResolveOptional(manifest.DraggingCharacter),
-            InputReactiveBasePath: resolver.ResolveOptional(manifest.InputReactiveBase),
             Actions: actions,
             Expressions: expressions)
         {
@@ -508,11 +507,6 @@ public static class PetSkinManifestLoader
             references++;
         }
 
-        if (!string.IsNullOrWhiteSpace(manifest.InputReactiveBase))
-        {
-            references++;
-        }
-
         foreach (var action in manifest.Actions!)
         {
             if (action is null)
@@ -664,7 +658,6 @@ public static class PetSkinManifestLoader
         public string? ResourceRoot { get; set; }
         public string? DefaultCharacter { get; set; }
         public string? DraggingCharacter { get; set; }
-        public string? InputReactiveBase { get; set; }
         public List<ActionManifest>? Actions { get; set; }
         public Dictionary<string, JsonElement>? Expressions { get; set; }
     }

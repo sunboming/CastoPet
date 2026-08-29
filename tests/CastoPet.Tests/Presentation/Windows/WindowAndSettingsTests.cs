@@ -167,7 +167,7 @@ internal static partial class TestSuite
         {
             "_idleFrameTimer", "_blinkScheduleTimer", "_blinkFrameTimer", "_pettingFrameTimer",
             "_dragRestoreTimer", "_radialWheelPointerProbeTimer", "_temporaryExpressionTimer",
-            "_expressionTransitionFrameTimer", "_activeMovementProbeTimer", "_inputReactiveRenderTimer",
+            "_expressionTransitionFrameTimer", "_activeMovementProbeTimer",
         })
         {
             Assert.Contains(cleanup, $"{timer}.Stop();", $"Runtime cleanup should stop {timer}.");
@@ -177,7 +177,6 @@ internal static partial class TestSuite
         Assert.Contains(cleanup, "StopRadialWheelHoldRendering();", "Runtime cleanup should detach hold-progress rendering.");
         Assert.Contains(cleanup, "RadialWheelOverlay.IsOpen = false;", "Runtime cleanup should close the wheel popup.");
         Assert.Contains(cleanup, "RadialWheelHoldOverlay.IsOpen = false;", "Runtime cleanup should close the hold popup.");
-        Assert.Contains(cleanup, "_inputHookService.Dispose();", "Runtime cleanup should release native input hooks.");
         Assert.Contains(cleanup, "_runtimeResourcesReleased", "Runtime cleanup should be idempotent.");
     }
 
@@ -245,11 +244,11 @@ internal static partial class TestSuite
             CastoPetFeatureProfile.Preview);
 
         Assert.Equal(
-            "topmost,active-movement,click-through,push-cursor,input-reactive-mode,show-in-taskbar,start-with-windows",
+            "topmost,active-movement,click-through,push-cursor,show-in-taskbar,start-with-windows",
             string.Join(',', definitions.Select(item => item.Id)),
             "The settings catalog should contain every boolean setting exactly once in group order.");
         Assert.Equal(
-            "Behavior,Behavior,Interaction,Interaction,Interaction,System,System",
+            "Behavior,Behavior,Interaction,Interaction,System,System",
             string.Join(',', definitions.Select(item => item.Group)),
             "Settings should remain in stable behavior, interaction, and system groups.");
     }
@@ -265,12 +264,11 @@ internal static partial class TestSuite
         Assert.False(stable.ShortcutLauncher, "Stable should not include shortcut launching.");
         Assert.False(stable.ActiveMovement, "Stable should not include autonomous movement.");
         Assert.False(stable.PushCursor, "Stable should not include cursor pushing.");
-        Assert.False(stable.InputReactiveMode, "Stable should not include input-reactive mode.");
         Assert.False(stable.ExternalSkins, "Stable should use only the built-in skin.");
 
         Assert.Equal(CastoPetEdition.Preview, preview.Edition, "The preview profile should identify its edition.");
         Assert.True(preview.Petting && preview.RadialWheel && preview.ShortcutLauncher, "Preview should retain interaction experiments.");
-        Assert.True(preview.ActiveMovement && preview.PushCursor && preview.InputReactiveMode, "Preview should retain movement and input experiments.");
+        Assert.True(preview.ActiveMovement && preview.PushCursor, "Preview should retain movement experiments.");
         Assert.True(preview.ExternalSkins, "Preview should retain external skin loading.");
     }
 

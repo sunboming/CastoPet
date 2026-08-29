@@ -47,14 +47,6 @@ public static class SettingCatalog
                 () => settings.PushCursor,
                 actions.TogglePushCursor),
             new(
-                "input-reactive-mode",
-                "输入响应模式",
-                "使用键盘与鼠标输入响应外观",
-                SettingGroup.Interaction,
-                ShowInDirectMenu: false,
-                () => settings.InputReactiveMode,
-                actions.ToggleInputReactiveMode),
-            new(
                 "show-in-taskbar",
                 "显示任务栏图标",
                 "在 Windows 任务栏中显示桌宠窗口",
@@ -88,7 +80,6 @@ public static class SettingCatalog
                 commands.ToggleActiveMovement,
                 commands.ToggleClickThrough,
                 commands.TogglePushCursor,
-                commands.ToggleInputReactiveMode,
                 commands.ToggleShowInTaskbar,
                 commands.ToggleStartWithWindows),
             features);
@@ -98,7 +89,6 @@ public static class SettingCatalog
     {
         "active-movement" => features.ActiveMovement,
         "push-cursor" => features.PushCursor,
-        "input-reactive-mode" => features.InputReactiveMode,
         _ => true,
     };
 }
