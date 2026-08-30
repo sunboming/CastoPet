@@ -1,46 +1,43 @@
 # Known Risks
 
-The following issues were identified during the 2026-08-07 security and stability review.
-Resolved items remain recorded so the implemented boundary is explicit.
+This document covers the minimal 0.1 product on `release/0.1`. Risks from archived shortcut,
+external-skin, radial-wheel, input-response, and active-movement code are not current runtime
+risks because those features are not compiled or packaged in 0.1.
 
 ## High Priority
 
-### Public updates are unsigned
+### Windows packages are unsigned
 
-The current Velopack packaging workflow produces unsigned Windows installers and update
-packages. The public GitHub release repository is therefore the primary update trust boundary.
-A compromised release account or token could distribute an untrusted package to users who
-approve the update prompt.
+The current Velopack workflow produces unsigned Windows installers and update packages.
+Windows can display an unknown-publisher warning, and users cannot verify the publisher with
+a code-signing certificate.
 
-Planned direction: add Windows code signing before broad distribution. Until then, protect
-release credentials with strong account controls and consider limiting automatic installation.
+GitHub account security is therefore part of the update trust boundary. Protect maintainers
+with strong authentication, restrict release permissions, create releases as drafts, and
+review every uploaded asset before publication. Add code signing before broad distribution
+if the warning or update trust model is unacceptable.
 
-## Medium Priority
+## Operational Risks
 
-### Shortcut file safety uses an extension blocklist
+### Updates depend on GitHub availability
 
-The file launcher blocks common scripts and installers but does not cover every Windows file
-type that can execute code through ShellExecute. Examples include control-panel applets and
-other registered executable containers.
+Installed builds read releases from `https://github.com/sunboming/CastoPet`. Users who cannot
+reach GitHub cannot receive automatic updates. Update failures are isolated from application
+startup, so the installed version continues to run and can be updated later with a manually
+downloaded installer.
 
-Planned direction: replace the incomplete blocklist with an explicit policy for intended
-document and media types, while treating programs and Windows shortcuts as executable content.
+### Crash reports remain local
 
-### Some external inputs still need resource budgets
+Unhandled failures are recorded under the local CastoPet data directory and surfaced on the
+next start. Reports are not uploaded automatically. This protects privacy but means users must
+provide a report manually when requesting support.
 
-Skin manifests and their PNG resources now have byte, item-count, frame-count, file-size,
-decoded-pixel, path-containment, and reparse-point limits. Shortcut storage, internet
-shortcuts, and drag text do not yet have equally comprehensive byte limits. Malformed or
-hostile local input can still cause avoidable UI work in those remaining surfaces.
+Crash reports can include stack traces, application log lines, operating-system information,
+and local source paths from development builds. Review a report before sharing it publicly.
 
-Planned direction: add byte and item-size limits before expanding shortcut import surfaces.
+## Development Boundary
 
-## Resolved
-
-### External skin paths and resources are bounded
-
-Resolved on 2026-08-13. External skin loading now accepts only canonical local PNG paths
-contained beneath the declared skin resource root. Rooted paths, UNC paths, traversal escapes,
-symbolic links, and directory junctions are rejected before WPF image decoding. Manifest,
-frame, file-size, dimension, decoded-pixel, and aspect-ratio budgets are enforced at the same
-boundary. See `docs/skin-manifest.md` for the current limits.
+The data-model and animation-controller concerns in `项目问题.md` affect future development on
+`main`. They are not release blockers for the minimal 0.1 feature set unless a concrete crash,
+corruption issue, or incompatible update is reproduced. Avoid broad refactors on
+`release/0.1`; fix verified release defects narrowly and port them to `main` as needed.

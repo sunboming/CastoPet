@@ -10,6 +10,7 @@ public source repository: `sunboming/CastoPet`.
 - Use an account that can push tags and create releases in `sunboming/CastoPet`.
 - Commit every intended release change. The working tree must be clean.
 - Set `VersionPrefix` in `Directory.Build.props` to the release version and commit it.
+- For a 0.1.x release, check out `release/0.1`; do not package a future `main` snapshot.
 
 ## Create A Draft Release
 
@@ -28,6 +29,13 @@ pwsh -NoProfile -File eng/release.ps1 -Version 0.1.0 -NotesFile CHANGELOG.md
 The helper verifies the repository and version, runs the existing packaging workflow,
 pushes the current branch, creates and pushes `v<version>`, and uploads every Velopack
 asset plus `build-metadata.json` to a Draft GitHub Release.
+
+The script intentionally pushes whichever named branch is currently checked out. Confirm
+the branch before running it:
+
+```powershell
+git branch --show-current
+```
 
 The command is safe to rerun after a partial failure. A matching existing draft receives
 fresh assets with replacement enabled. A tag that points to another commit or an already

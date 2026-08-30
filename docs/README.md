@@ -9,12 +9,17 @@ older design decisions.
 | Document | Purpose |
 | --- | --- |
 | [Asset organization](asset-organization.md) | Lifecycle and ownership of runtime, editable, candidate, and reference assets. |
-| [Build editions](build-editions.md) | Stable and Preview feature boundaries, build commands, identities, and packaging. |
+| [Branches and releases](branches-and-releases.md) | Responsibilities of `main`, `release/0.1`, recovery branches, and version lines. |
 | [Known risks](known-risks.md) | Unresolved security and stability risks plus important resolved boundaries. |
 | [Release process](releasing.md) | One-command packaging, tagging, and controlled Draft Release creation. |
-| [Skin manifest](skin-manifest.md) | External skin timing schema, validation rules, and resource budgets. |
-| [Unified movement model](movement-model-plan.md) | Shared movement settings, directional variants, and removal of turn playback. |
 | [Line endings](line-endings.md) | CRLF working-tree policy, LF Git storage, editor settings, and verification commands. |
+
+## Retained Design References
+
+The [skin manifest](skin-manifest.md) and [unified movement model](movement-model-plan.md)
+describe code from the archived full-featured history. They are retained for future redesign
+work on `main`, but they are not supported 0.1 runtime contracts and must not be copied back
+without reviewing the current data model.
 
 ## Historical Documents
 

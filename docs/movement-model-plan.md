@@ -1,5 +1,9 @@
 # Unified Movement Model
 
+> Historical design reference: active movement and cursor interaction are not part of the
+> minimal 0.1 runtime. The implementation described below remains available on the recovery
+> branches and must be reviewed against `项目问题.md` before any future `main` reintroduction.
+
 Status: IMPLEMENTED after user approval. Turn playback has been permanently removed.
 See [Skin manifest](skin-manifest.md) for the supported JSON contract.
 

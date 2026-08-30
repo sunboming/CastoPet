@@ -1,5 +1,9 @@
 # Skin Manifest
 
+> Historical design reference: external skin loading, movement actions, petting, and
+> expression transitions are not part of the minimal 0.1 runtime. This document is retained
+> for a future `main` redesign and does not define a supported `release/0.1` file format.
+
 ## Frame Timing
 
 Each time-driven action can define a default frame duration with `frameIntervalMs` and optional

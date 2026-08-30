@@ -1,103 +1,78 @@
-# CastoPet 项目结构
+# CastoPet
 
-CastoPet 是一个基于 .NET 10 和 WPF 的 Windows 桌面宠物应用。本文件简要说明仓库中美术资源、应用代码和测试代码的目录职责。
+CastoPet 是一个基于 .NET 10 和 WPF 的 Windows 桌面宠物应用。
 
-## 顶层目录
+当前仓库从精简的 `0.1` 基线重新开始开发。公开的 0.1 版本只保留稳定、可验证的基础桌宠能力，不包含此前实验阶段的轮盘、表情、主动移动、快捷启动和输入响应功能。
+
+## 当前功能
+
+- Castorice 内置角色资源。
+- 8 帧待机动画和 5 帧随机眨眼动画。
+- 左键移动超过系统拖动阈值后拖动桌宠；拖动期间暂停动画。
+- 桌宠右键菜单和 Windows 托盘菜单。
+- 始终置顶、鼠标穿透、任务栏图标和开机启动设置。
+- 单实例运行，重复启动时恢复已有窗口。
+- 本地日志、崩溃报告和下次启动提醒。
+- 基于 Velopack 和本仓库 GitHub Releases 的安装与更新基础设施。
+
+## 分支
+
+- `main`：后续功能开发的主分支，从 0.1 精简基线继续演进。
+- `release/0.1`：0.1.x 维护和发布分支，只接收发布所需的修复、文档和版本调整。
+- `codex/archive-main-before-0.1`：历史完整版 `main` 的只读恢复点。
+- `codex/archive-release-0.1-history`：Git 历史清理前 0.1 开发提交链的只读恢复点。
+
+分支职责、修复同步方向和版本发布规则见 [分支与发布说明](docs/branches-and-releases.md)。
+
+## 目录
 
 ```text
 CastoPet/
-├─ artwork/   美术制作、候选和参考素材
-├─ src/       应用源代码与运行时资源
-└─ tests/     自动化测试代码
+├─ artwork/                 美术工程源文件和候选资源，不直接打包
+├─ docs/                    当前开发约定与历史说明
+├─ eng/                     行尾检查、打包和发布脚本
+├─ src/CastoPet/            WPF 应用代码及正式运行时资源
+├─ tests/CastoPet.Tests/    自动化测试项目
+├─ artifacts/               本地生成的安装包、报告和临时产物
+└─ 项目问题.md              main 后续重构问题清单
 ```
 
-## artwork：美术资源
+只有 `src/CastoPet/Assets/` 中显式声明的资源会进入应用。`artwork/`、`artifacts/` 和根目录 `tmp/` 都不是运行时资源来源。
+
+## 开发验证
+
+```powershell
+dotnet run --project tests/CastoPet.Tests/CastoPet.Tests.csproj -c Debug
+dotnet build CastoPet.sln -c Debug
+
+dotnet run --project tests/CastoPet.Tests/CastoPet.Tests.csproj -c Release
+dotnet build CastoPet.sln -c Release
+```
+
+正常 Release 构建输出位于：
 
 ```text
-artwork/
-├─ authoring/                 可编辑的美术工程源文件
-│  └─ Castorice/              Castorice 的原图、拆分图层、表情目标和动画定义
-├─ candidates/                等待审查或挑选的生成候选资源
-│  └─ Castorice/              Castorice 的候选状态帧、表情图和预览图
-├─ references/                美术制作使用的本地参考资料，不直接打包
-│  ├─ character/              角色造型参考图
-│  └─ expressions/            角色表情参考图
-└─ README.md                  美术工作区的补充说明
+src/CastoPet/bin/Release/net10.0-windows/CastoPet.exe
 ```
 
-`artwork/` 不直接参与应用打包。确认采用的资源需要显式整理到 `src/CastoPet/Assets/Runtime/`。
+该目录中的 exe 是开发构建，不用于测试安装和自动更新。安装包必须通过打包脚本生成。
 
-## src：应用代码
+## 打包与发布
 
-```text
-src/
-└─ CastoPet/                  WPF 应用项目
-   ├─ Core/                   核心层：纯业务模型、状态和计算规则
-   │  ├─ Animation/           宠物动作、帧时序和动画状态切换
-   │  ├─ Diagnostics/         与技术实现无关的崩溃报告格式
-   │  ├─ Input/               输入事件、手势识别和响应状态
-   │  ├─ Movement/            宠物移动、光标推动和位置规划
-   │  ├─ Product/             产品版本、功能配置和运行状态
-   │  ├─ Settings/            设置模型、主题和设置项定义
-   │  ├─ Shortcuts/           快捷项模型、类型和 URI 规则
-   │  ├─ Skins/               皮肤、表情模型和资源限制
-   │  └─ Wheel/               径向菜单模型、布局和选择规则
-   ├─ Application/            应用层：组织用户用例和业务流程
-   │  ├─ Diagnostics/         异常捕获协调和日志抽象
-   │  ├─ Interaction/         宠物交互流程协调
-   │  ├─ Menus/               菜单命令及其契约
-   │  ├─ Settings/            设置事务、窗口设置和设置存储抽象
-   │  ├─ Shortcuts/           快捷项管理、拖放和启动流程
-   │  ├─ Skins/               当前皮肤选择流程
-   │  ├─ Updates/             更新检查、下载和应用流程
-   │  └─ Wheel/               径向菜单目录的组装与维护
-   ├─ Infrastructure/         外部层：操作系统、文件和第三方组件实现
-   │  ├─ Assets/              皮肤清单及图片资源的加载和写入
-   │  ├─ Diagnostics/         日志文件和崩溃报告存储
-   │  ├─ Persistence/         设置、应用路径和预览数据迁移
-   │  ├─ Platform/            Windows 托盘、启动、输入钩子和窗口能力
-   │  ├─ Shortcuts/           Windows 拖放数据读取
-   │  └─ Updates/             Velopack 更新服务实现
-   ├─ Presentation/           表示层：WPF 界面和界面相关服务
-   │  ├─ Services/            WPF 菜单宿主等界面适配服务
-   │  ├─ Shortcuts/           快捷项图标的界面展示支持
-   │  ├─ Styling/             设置窗口和径向菜单样式
-   │  └─ Windows/             宠物、设置和崩溃通知窗口
-   ├─ Assets/                 应用打包资源
-   │  └─ Runtime/             正式运行时皮肤清单与动画图片
-   ├─ Properties/             程序集和项目属性
-   ├─ App.xaml(.cs)           WPF 应用生命周期与依赖组装
-   ├─ Program.cs              程序入口和 Velopack 初始化
-   └─ CastoPet.csproj         .NET、WPF、依赖和资源打包配置
+在干净的 `release/0.1` 工作树中构建 0.1 安装包：
+
+```powershell
+pwsh -NoProfile -File eng/package.ps1 -Version 0.1.0
 ```
 
-`bin/` 和 `obj/` 是编译产生的输出及中间目录，不属于源代码架构。
+创建 Tag、推送当前发布分支，并在本仓库生成 Draft Release：
 
-## tests：测试代码
-
-```text
-tests/
-└─ CastoPet.Tests/            CastoPet 自动化测试项目
-   ├─ Application/            应用层流程测试
-   │  ├─ Diagnostics/         崩溃诊断流程测试
-   │  ├─ Settings/            设置流程测试
-   │  ├─ Skins/               皮肤选择流程测试
-   │  └─ Updates/             更新流程与策略测试
-   ├─ Architecture/           目录、命名空间和依赖边界测试
-   ├─ Catalog/                各测试分组的注册目录
-   ├─ Core/                   核心规则测试
-   │  ├─ Animation/           打包动画与帧配置测试
-   │  └─ Skins/               内置皮肤定义测试
-   ├─ Harness/                自定义测试用例和运行器
-   ├─ Infrastructure/         外部层实现测试
-   │  ├─ Assets/              资源服务和皮肤清单测试
-   │  └─ Platform/            平台与持久化行为测试
-   ├─ Presentation/           WPF 表示层测试
-   │  └─ Windows/             窗口结构和设置界面测试
-   ├─ Support/                测试数据及通用断言工具
-   ├─ Program.cs              测试程序入口
-   ├─ TestSuite.Catalog.cs    测试套件总目录
-   └─ CastoPet.Tests.csproj   测试项目配置
+```powershell
+pwsh -NoProfile -File eng/release.ps1 -Version 0.1.0
 ```
 
-测试目录大体对应 `src/CastoPet/` 的代码分层，方便按职责定位实现及其验证代码。
+发布脚本不会自动公开草稿。确认版本说明、Tag、安装程序、Velopack 文件和 `build-metadata.json` 后，再在 GitHub 页面手动发布。
+
+## 文档
+
+当前文档索引见 [docs/README.md](docs/README.md)。尚未解决的数据模型和动画控制器问题记录在 [项目问题.md](项目问题.md)，不应在 `release/0.1` 上进行大范围重构。

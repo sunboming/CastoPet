@@ -73,7 +73,8 @@ received light, dark, and system-following glass-inspired themes.
 Local crash reports and installer-aware update infrastructure were added with privacy and
 failure isolation in mind. Crash reports stay local unless a future reporting service is
 explicitly selected. Daily checks, manual checks, Velopack packaging, and separate update
-identities evolved into the current Stable and Preview build profiles.
+identities later supported Stable and Preview build profiles. Those profiles were retired
+when the repository restarted from the minimal 0.1 baseline.
 
 ## 2026-07-12 to 2026-07-16: Two-Level Wheel and Shortcuts
 
@@ -92,8 +93,10 @@ short right clicks from wheel gestures and short left clicks from dragging.
 Later work split minimal Stable releases from feature-rich Preview builds, hardened external
 skin path and image loading, added per-frame timing, improved crash metadata, introduced
 stability monitoring and report visualization, and organized generated data outside source
-directories. Current build boundaries and remaining risks are maintained separately in
-[Build editions](../build-editions.md) and [Known risks](../known-risks.md).
+directories. The active branches were subsequently restarted from one minimal 0.1 snapshot;
+the former implementation remains on recovery branches. Current branch boundaries and risks
+are maintained in [Branches and releases](../branches-and-releases.md) and
+[Known risks](../known-risks.md).
 
 ## Superseded Material
 
