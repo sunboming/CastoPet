@@ -1,0 +1,12 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/builds/
+artifacts/packages/
+artifacts/reports/
+artifacts/temp/
+artifacts/generation/*/runs/
+/artwork/references/
+/.codex/

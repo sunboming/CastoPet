@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CastoPet\CastoPet.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="GlobalUsings.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="TestSuite.Catalog.cs" />
+    <Compile Include="Harness\*.cs" />
+    <Compile Include="Support\*.cs" />
+    <Compile Include="Architecture\RepositoryArchitectureTests.cs" />
+    <Compile Include="Catalog\RepositoryArchitectureTestCatalog.cs" />
+    <Compile Include="Release\ReleaseBasicsTests.cs" />
+    <Compile Include="Catalog\ReleaseBasicsTestCatalog.cs" />
+  </ItemGroup>
+</Project>

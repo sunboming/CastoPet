@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "canvas": {
+    "width": 320,
+    "height": 320,
+    "previewBackground": "#f6f0fb"
+  },
+  "actions": [
+    {
+      "id": "blink",
+      "frames": 3,
+      "fps": 8,
+      "loop": true,
+      "exportName": "Castorice.Blink.{frame}.png",
+      "layers": [
+        {
+          "id": "backHair",
+          "src": "../layers/manual/backHair.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 132
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "bodyDress",
+          "src": "../layers/manual/bodyDress.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 214
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenLeftLeg",
+          "src": "../layers/manual/screenLeftLeg.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 136,
+            "y": 264
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenRightLeg",
+          "src": "../layers/manual/screenRightLeg.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 184,
+            "y": 264
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenLeftArm",
+          "src": "../layers/manual/screenLeftArm.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 116,
+            "y": 176
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "screenRightArm",
+          "src": "../layers/manual/screenRightArm.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 204,
+            "y": 176
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "face",
+          "src": "../layers/manual/face.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 116
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "frontHair",
+          "src": "../layers/manual/frontHair.png",
+          "visible": true,
+          "locked": false,
+          "pivot": {
+            "x": 160,
+            "y": 104
+          },
+          "base": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "opacity": 1
+          }
+        }
+      ],
+      "keyframes": {}
+    }
+  ]
+}
