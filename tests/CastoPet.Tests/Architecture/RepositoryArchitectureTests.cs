@@ -109,6 +109,11 @@ internal static partial class TestSuite
         Assert.Contains(project, @"States\Blink\*.png", "The release should package blink frames.");
         Assert.False(project.Contains(@"States\Castorice.Dragging.png", StringComparison.Ordinal), "The release should not package a dedicated dragging visual.");
         Assert.False(project.Contains(@"Assets\Runtime\Castorice\**\*.png", StringComparison.Ordinal), "The release must not package every experimental runtime asset.");
+        var looseStateImages = Directory.GetFiles(
+            System.IO.Path.Combine(projectRoot, "Assets", "Runtime", "Castorice", "States"),
+            "*.png",
+            SearchOption.TopDirectoryOnly);
+        Assert.Equal(0, looseStateImages.Length, "The release runtime should not retain unpackaged expression or dragging images.");
 
         foreach (var excludedFeature in new[]
                  {
