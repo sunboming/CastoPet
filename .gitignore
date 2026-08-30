@@ -10,3 +10,4 @@ artifacts/temp/
 artifacts/generation/*/runs/
 /artwork/references/
 /.codex/
+/tmp/
