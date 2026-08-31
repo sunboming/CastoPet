@@ -164,6 +164,12 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        using var workflow = _updates.TryBeginInteractiveWorkflow();
+        if (workflow is null)
+        {
+            return;
+        }
+
         try
         {
             var result = await _updates.CheckAsync(manual: true, cancellationToken);
@@ -202,6 +208,12 @@ public partial class App : System.Windows.Application
         {
             await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
             if (_updates is null)
+            {
+                return;
+            }
+
+            using var workflow = _updates.TryBeginInteractiveWorkflow();
+            if (workflow is null)
             {
                 return;
             }

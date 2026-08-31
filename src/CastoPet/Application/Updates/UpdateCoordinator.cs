@@ -14,6 +14,7 @@ public sealed class UpdateCoordinator
     private readonly TimeSpan _timeout;
     private readonly IApplicationLogger? _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private int _interactiveWorkflowActive;
 
     public UpdateCoordinator(
         IUpdateService updateService,
@@ -34,6 +35,13 @@ public sealed class UpdateCoordinator
     public string CurrentVersion => _updateService.CurrentVersion;
 
     public bool IsInstalled => _updateService.IsInstalled;
+
+    public IDisposable? TryBeginInteractiveWorkflow()
+    {
+        return Interlocked.CompareExchange(ref _interactiveWorkflowActive, 1, 0) == 0
+            ? new InteractiveWorkflowLease(this)
+            : null;
+    }
 
     public async Task<UpdateCheckResult> CheckAsync(
         bool manual,
@@ -156,6 +164,20 @@ public sealed class UpdateCoordinator
         }
         catch (Exception)
         {
+        }
+    }
+
+    private sealed class InteractiveWorkflowLease(UpdateCoordinator owner) : IDisposable
+    {
+        private UpdateCoordinator? _owner = owner;
+
+        public void Dispose()
+        {
+            var current = Interlocked.Exchange(ref _owner, null);
+            if (current is not null)
+            {
+                Volatile.Write(ref current._interactiveWorkflowActive, 0);
+            }
         }
     }
 }

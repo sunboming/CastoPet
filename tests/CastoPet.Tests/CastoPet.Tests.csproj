@@ -19,6 +19,8 @@
     <Compile Include="Support\*.cs" />
     <Compile Include="Architecture\RepositoryArchitectureTests.cs" />
     <Compile Include="Catalog\RepositoryArchitectureTestCatalog.cs" />
+    <Compile Include="Application\Updates\UpdateTests.cs" />
+    <Compile Include="Catalog\UpdatesTestCatalog.cs" />
     <Compile Include="Release\ReleaseBasicsTests.cs" />
     <Compile Include="Catalog\ReleaseBasicsTestCatalog.cs" />
   </ItemGroup>

@@ -17,18 +17,22 @@ public source repository: `sunboming/CastoPet`.
 Run the release helper from the repository root:
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.1
+pwsh -NoProfile -File eng/release.ps1 -Version 0.1.2
 ```
 
 To supply reviewed release notes:
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.1 -NotesFile CHANGELOG.md
+pwsh -NoProfile -File eng/release.ps1 -Version 0.1.2 -NotesFile CHANGELOG.md
 ```
 
 The helper verifies the repository and version, runs the existing packaging workflow,
 pushes the current branch, creates and pushes `v<version>`, and uploads four public assets
 to a Draft GitHub Release:
+
+By default, release notes come from `docs/release-notes/<version>.md`. The helper requires
+that file and passes it to both Velopack packaging and GitHub, so the in-app update prompt
+and the Release page use the same Markdown. `-NotesFile` may override the default path.
 
 - `CastoPet-win-Setup.msi` for normal installation with selectable scope and directory;
 - `CastoPet-win-Portable.zip` for portable use;

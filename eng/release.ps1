@@ -74,13 +74,13 @@ try {
         throw "Release version '$Version' must match Directory.Build.props version '$repositoryVersion'."
     }
 
-    $resolvedNotesFile = $null
-    if (![string]::IsNullOrWhiteSpace($NotesFile)) {
-        if (!(Test-Path -LiteralPath $NotesFile -PathType Leaf)) {
-            throw "Release notes file '$NotesFile' does not exist."
-        }
-        $resolvedNotesFile = (Resolve-Path -LiteralPath $NotesFile).Path
+    if ([string]::IsNullOrWhiteSpace($NotesFile)) {
+        $NotesFile = Join-Path $RepositoryRoot "docs\release-notes\$Version.md"
     }
+    if (!(Test-Path -LiteralPath $NotesFile -PathType Leaf)) {
+        throw "Release notes file '$NotesFile' does not exist."
+    }
+    $resolvedNotesFile = (Resolve-Path -LiteralPath $NotesFile).Path
 
     $gitStatus = @(& git status --porcelain --untracked-files=all)
     if ($LASTEXITCODE -ne 0) {
@@ -127,6 +127,7 @@ try {
     }
 
     $packageArguments = @("-NoProfile", "-File", (Join-Path $PSScriptRoot "package.ps1"), "-Version", $Version)
+    $packageArguments += @("-ReleaseNotesFile", $resolvedNotesFile)
     if ($SkipTests) {
         $packageArguments += "-SkipTests"
     }
@@ -167,6 +168,10 @@ try {
     }
 
     if ($null -ne $existingRelease) {
+        Invoke-Checked -FilePath "gh" -Arguments @(
+            "release", "edit", $Tag,
+            "--repo", $Repository,
+            "--notes-file", $resolvedNotesFile)
         $uploadArguments = @("release", "upload", $Tag, "--repo", $Repository, "--clobber") + $assetPaths
         Invoke-Checked -FilePath "gh" -Arguments $uploadArguments
         Write-Output "Draft release updated: $($existingRelease.url)"

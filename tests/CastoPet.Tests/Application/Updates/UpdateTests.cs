@@ -32,13 +32,13 @@ internal static partial class TestSuite
         Assert.Equal(0, service.CheckCount, "Development builds should not contact the update source.");
     }
 
-    static void PreviewUpdateServiceStaysDisabled()
+    static void DisabledUpdateServiceStaysDisabled()
     {
-        var service = new DisabledUpdateService("0.1.0-preview");
+        var service = new DisabledUpdateService("0.1.2-dev");
 
-        Assert.False(service.IsInstalled, "A disabled update service should never present Preview as updater-managed.");
-        Assert.Equal("0.1.0-preview", service.CurrentVersion, "Preview should still expose its build version.");
-        Assert.True(service.CheckForUpdatesAsync(CancellationToken.None).GetAwaiter().GetResult() is null, "Disabled updates should never return a Stable release.");
+        Assert.False(service.IsInstalled, "A disabled update service should never present a direct build as updater-managed.");
+        Assert.Equal("0.1.2-dev", service.CurrentVersion, "A disabled service should still expose its build version.");
+        Assert.True(service.CheckForUpdatesAsync(CancellationToken.None).GetAwaiter().GetResult() is null, "Disabled updates should never return a release.");
     }
 
     static void UpdateCoordinatorRecordsAutomaticAttemptsBeforeNetwork()
@@ -105,6 +105,22 @@ internal static partial class TestSuite
 
         Assert.Equal(UpdateCheckStatus.Busy, second.Status, "A second in-flight check should return busy.");
         Assert.Equal(1, service.CheckCount, "Only one source request should run concurrently.");
+    }
+
+    static void UpdateCoordinatorAllowsOnlyOneInteractiveWorkflow()
+    {
+        var service = new FakeUpdateService();
+        var coordinator = new UpdateCoordinator(service, AppSettings.Default, _ => true);
+
+        using var first = coordinator.TryBeginInteractiveWorkflow();
+        var second = coordinator.TryBeginInteractiveWorkflow();
+
+        Assert.True(first is not null, "The first update interaction should acquire the workflow lease.");
+        Assert.True(second is null, "A concurrent interaction must not open another update window.");
+
+        first!.Dispose();
+        using var third = coordinator.TryBeginInteractiveWorkflow();
+        Assert.True(third is not null, "Disposing the first lease should allow a later interaction.");
     }
 
 }
