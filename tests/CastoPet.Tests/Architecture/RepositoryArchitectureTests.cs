@@ -159,6 +159,7 @@ internal static partial class TestSuite
         Assert.False(script.Contains("[ValidateSet(\"Stable\", \"Preview\")]", StringComparison.Ordinal), "The script should package the single product without an edition selector.");
         Assert.False(script.Contains("CastoPet.Preview", StringComparison.Ordinal), "The installer should use one public package identity.");
         Assert.Contains(script, "git status --porcelain", "Release packaging should reject uncommitted inputs by default.");
+        Assert.Contains(script, "must match Directory.Build.props", "Packaging should reject a version that differs from the central source.");
         Assert.Contains(script, "AllowDirty", "Local smoke tests should be able to opt into a clearly marked dirty build.");
         Assert.Contains(script, "dotnet", "Packaging should run through the pinned .NET SDK.");
         Assert.Contains(script, "publish", "Packaging should publish the application before invoking Velopack.");
@@ -185,13 +186,13 @@ internal static partial class TestSuite
 
         foreach (var testCase in new[]
                  {
-                     (Bump: "Patch", Expected: "0.1.3"),
-                     (Bump: "Minor", Expected: "0.2.0"),
-                     (Bump: "Major", Expected: "1.0.0"),
+                     (Bump: "Patch", Branch: "release/0.1", Expected: "0.1.3"),
+                     (Bump: "Minor", Branch: "main", Expected: "0.2.0"),
+                     (Bump: "Major", Branch: "main", Expected: "1.0.0"),
                  })
         {
             using var temp = TempDirectory.Create();
-            WriteVersionFixture(temp.Path, "0.1.2");
+            WriteVersionFixture(temp.Path, "0.1.2", testCase.Branch);
 
             var result = RunReleasePreparation(script, temp.Path, testCase.Bump);
 
@@ -204,7 +205,7 @@ internal static partial class TestSuite
         }
 
         using var collision = TempDirectory.Create();
-        WriteVersionFixture(collision.Path, "0.1.2");
+        WriteVersionFixture(collision.Path, "0.1.2", "release/0.1");
         var existingNotes = System.IO.Path.Combine(collision.Path, "docs", "release-notes", "0.1.3.md");
         File.WriteAllText(existingNotes, "existing");
 
@@ -215,14 +216,47 @@ internal static partial class TestSuite
             File.ReadAllText(System.IO.Path.Combine(collision.Path, "Directory.Build.props")),
             "<VersionPrefix>0.1.2</VersionPrefix>",
             "A rejected preparation must not change the repository version.");
+
+        using var wrongLine = TempDirectory.Create();
+        WriteVersionFixture(wrongLine.Path, "0.1.2", "release/0.1");
+
+        var wrongLineResult = RunReleasePreparation(script, wrongLine.Path, "Minor");
+
+        Assert.False(wrongLineResult.ExitCode == 0, "A 0.2.0 release must not be prepared on release/0.1.");
+        Assert.Contains(
+            File.ReadAllText(System.IO.Path.Combine(wrongLine.Path, "Directory.Build.props")),
+            "<VersionPrefix>0.1.2</VersionPrefix>",
+            "A branch-policy rejection must leave the central version unchanged.");
     }
 
-    private static void WriteVersionFixture(string root, string version)
+    private static void WriteVersionFixture(string root, string version, string branch)
     {
         Directory.CreateDirectory(System.IO.Path.Combine(root, "docs", "release-notes"));
         File.WriteAllText(
             System.IO.Path.Combine(root, "Directory.Build.props"),
             $"<Project><PropertyGroup><VersionPrefix>{version}</VersionPrefix></PropertyGroup></Project>");
+        RunGit(root, "init", "-b", branch);
+    }
+
+    private static void RunGit(string root, params string[] arguments)
+    {
+        var startInfo = new System.Diagnostics.ProcessStartInfo("git")
+        {
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("-C");
+        startInfo.ArgumentList.Add(root);
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start Git fixture process.");
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.Equal(0, process.ExitCode, $"Git fixture command failed. {error}");
     }
 
     private static (int ExitCode, string Error) RunReleasePreparation(string script, string root, string bump)
@@ -262,6 +296,8 @@ internal static partial class TestSuite
         Assert.Contains(workflow, "workflow_dispatch:", "Installer generation should require an explicit manual dispatch.");
         Assert.False(workflow.Contains("type: choice", StringComparison.Ordinal), "The workflow should package the single release product without an edition choice.");
         Assert.Contains(workflow, "eng/package.ps1", "CI and local packaging should share one implementation.");
+        Assert.False(workflow.Contains("PACKAGE_VERSION", StringComparison.Ordinal), "Package CI should derive the version from Directory.Build.props.");
+        Assert.False(workflow.Contains("default: 0.1.0", StringComparison.Ordinal), "Package CI should not retain a stale hard-coded default version.");
         Assert.Contains(workflow, "actions/upload-artifact@v7", "The verified package should be exposed only as a short-lived workflow artifact.");
         Assert.Contains(workflow, "retention-days: 7", "Unsigned test packages should not be retained indefinitely.");
         Assert.False(workflow.Contains("gh release", StringComparison.OrdinalIgnoreCase), "The validation workflow must not publish a GitHub release.");
@@ -276,8 +312,10 @@ internal static partial class TestSuite
         Assert.True(File.Exists(scriptPath), "The repository should provide one command for a controlled draft release.");
         var script = File.ReadAllText(scriptPath);
         Assert.Contains(script, "Directory.Build.props", "Official releases should match the committed repository version.");
+        Assert.Contains(script, "release/$versionLine", "Official releases should require a branch matching the semantic version line.");
         Assert.Contains(script, "git status --porcelain", "Official releases should reject dirty source trees.");
         Assert.Contains(script, "package.ps1", "Release creation should reuse the verified packaging entry point.");
+        Assert.Contains(script, "verify-release-candidate.ps1", "Release creation should verify package metadata before pushing a tag.");
         Assert.Contains(script, "docs\\release-notes", "Official releases should require a versioned release-notes source file.");
         Assert.Contains(script, "-ReleaseNotesFile", "The same release notes should be passed into Velopack packaging.");
         Assert.Contains(script, "sunboming/CastoPet", "Draft releases should be created in the public source repository.");
@@ -295,6 +333,9 @@ internal static partial class TestSuite
         Assert.False(script.Contains("build-metadata.json", StringComparison.Ordinal), "Internal build traceability metadata should not be a public release asset.");
         Assert.False(script.Contains("\"RELEASES\"", StringComparison.Ordinal), "The legacy Squirrel feed should not be published for a new Velopack application.");
         Assert.False(script.Contains("--draft=false", StringComparison.OrdinalIgnoreCase), "The local helper must never publish a draft automatically.");
+
+        var verifierPath = System.IO.Path.Combine(workspace, "eng", "verify-release-candidate.ps1");
+        Assert.True(File.Exists(verifierPath), "The repository should provide a release-candidate verification command.");
     }
 
     static void RepositoryIgnoresLocalWorkingAssets()

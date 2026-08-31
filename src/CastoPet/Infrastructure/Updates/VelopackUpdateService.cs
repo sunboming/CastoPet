@@ -12,12 +12,14 @@ public sealed class VelopackUpdateService : IUpdateService
 
     private readonly UpdateManager _manager;
 
-    public VelopackUpdateService()
+    public VelopackUpdateService(string? testUpdateSource = null)
     {
-        var source = new GithubSource(
-            RepositoryUrl,
-            accessToken: null,
-            prerelease: false);
+        IUpdateSource source = string.IsNullOrWhiteSpace(testUpdateSource)
+            ? new GithubSource(
+                RepositoryUrl,
+                accessToken: null,
+                prerelease: false)
+            : new SimpleFileSource(new System.IO.DirectoryInfo(testUpdateSource));
         _manager = new UpdateManager(source);
     }
 

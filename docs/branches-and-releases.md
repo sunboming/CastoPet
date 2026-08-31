@@ -48,11 +48,16 @@ such as `0.1.0` and `0.1.1`. The public product can still be described as "Casto
 For a 0.1.x release:
 
 1. Work from `release/0.1`.
-2. Run `eng/prepare-release.ps1 -Bump Patch` (or choose `Minor`/`Major`).
+2. Run `eng/prepare-release.ps1 -Bump Patch`.
 3. Commit the version and release notes.
 4. Run Debug and Release tests and builds.
-5. Run `eng/release.ps1 -Version <version>` from a clean worktree.
+5. Read `VersionPrefix` from `Directory.Build.props` and pass it to `eng/release.ps1` from a clean worktree.
 6. Review and manually publish the generated Draft Release.
+
+`release/0.1` cannot prepare `Minor` or `Major` bumps. A new version line is prepared on a
+release-ready `main`, then continued on a matching branch such as `release/0.2` or
+`release/1.0`. The release helper rejects a branch whose name does not match the first two
+version components.
 
 Tags use `v<version>`, for example `v0.1.0`. Installation and update assets are hosted in
 GitHub Releases of `sunboming/CastoPet`.

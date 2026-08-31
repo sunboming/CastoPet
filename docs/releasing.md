@@ -19,36 +19,34 @@ Start from a clean worktree and select the semantic-version component to increme
 pwsh -NoProfile -File eng/prepare-release.ps1 -Bump Patch
 ```
 
-Use `Minor` or `Major` instead when the release scope requires it. The helper updates
-`Directory.Build.props` and creates `docs/release-notes/<version>.md`. It intentionally does
-not test, commit, tag, push, or publish. Review the generated notes, run both Debug and
-Release verification, and commit the prepared version before continuing.
+The `release/0.1` branch accepts only `Patch`. To start a new version line, run `Minor` or
+`Major` on a release-ready `main`, commit the prepared version, and create the matching
+branch such as `release/0.2` or `release/1.0`. The helper updates
+`Directory.Build.props` and creates the matching file under `docs/release-notes/`. It
+intentionally does not test, commit, tag, push, or publish. Review the generated notes,
+run both Debug and Release verification, and commit the prepared version before continuing.
 
 ## Create A Draft Release
 
 Run the release helper from the repository root:
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version <version>
-```
-
-To supply reviewed release notes:
-
-```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version <version> -NotesFile CHANGELOG.md
+$version = ([xml](Get-Content Directory.Build.props -Raw)).Project.PropertyGroup.VersionPrefix
+pwsh -NoProfile -File eng/release.ps1 -Version $version
 ```
 
 The helper verifies the repository and version, runs the existing packaging workflow,
 pushes the current branch, creates and pushes `v<version>`, and uploads four public assets
 to a Draft GitHub Release:
 
-By default, release notes come from `docs/release-notes/<version>.md`. The helper requires
-that file and passes it to both Velopack packaging and GitHub, so the in-app update prompt
-and the Release page use the same Markdown. `-NotesFile` may override the default path.
+By default, release notes come from the version-matched file under `docs/release-notes/`.
+The helper requires that file and passes it to both Velopack packaging and GitHub, so the
+in-app update prompt and the Release page use the same Markdown. A reviewed alternative can
+be supplied with `-NotesFile`, but it must be an existing repository file.
 
 - `CastoPet-win-Setup.msi` for normal installation with selectable scope and directory;
 - `CastoPet-win-Portable.zip` for portable use;
-- `CastoPet-<version>-full.nupkg` for installed-client updates;
+- the versioned `CastoPet` full nupkg for installed-client updates;
 - `releases.win.json` as the Velopack update feed.
 
 The MSI uses Velopack's `Either` installation scope. Its standard Windows Installer wizard
@@ -61,8 +59,8 @@ files are not uploaded to the public GitHub Release.
 The portable package stores settings, logs, and crash reports under `UserData` beside the
 extracted application. It does not share `%LocalAppData%\CastoPet` with the installed build.
 
-The script intentionally pushes whichever named branch is currently checked out. Confirm
-the branch before running it:
+The script requires a branch matching the version line, for example `release/0.1` for
+0.1.2. Confirm the branch before running it:
 
 ```powershell
 git branch --show-current
@@ -76,6 +74,10 @@ published release stops the operation.
 commit. Normal releases should omit it.
 
 ## Publish
+
+Complete [release candidate testing](release-candidate-testing.md), including an installed
+update from the previous public version when the previous client supports the local test
+source. Record any documented one-time exception before publishing.
 
 Review the draft on GitHub before selecting **Publish release**. Check the version, source
 tag, release notes, installer, portable archive, full update package, and

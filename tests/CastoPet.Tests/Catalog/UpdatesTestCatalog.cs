@@ -13,5 +13,6 @@ internal static partial class TestSuite
         new("Update coordinator logs network failures", UpdateCoordinatorLogsNetworkFailures),
         new("Update coordinator rejects concurrent checks", UpdateCoordinatorRejectsConcurrentChecks),
         new("Update coordinator allows only one interactive workflow", UpdateCoordinatorAllowsOnlyOneInteractiveWorkflow),
+        new("Test update source requires an explicit existing directory", TestUpdateSourceRequiresAnExplicitExistingDirectory),
     ];
 }

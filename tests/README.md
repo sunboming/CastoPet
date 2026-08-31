@@ -37,6 +37,9 @@ explicit fix mode without rewriting application fixtures or assets.
 - Keep Core tests independent of WPF, Win32, the file system, and network access when the
   production API permits it.
 
-The next migration phase may extract `Core`, `Infrastructure`, and `Presentation` into separate test
-projects after their production dependencies have been separated. Until then, this layout
-keeps the existing single command and complete test coverage intact.
+The `release/0.1` project intentionally uses an explicit compile allowlist. Its executable
+suite covers the current minimal product, update workflow, packaging contracts, settings
+persistence, diagnostics, logging, and single-instance behavior. Test source left from the
+archived full-feature product is not compiled and must not be described as current coverage.
+When a feature returns, add its maintained tests to the project explicitly as part of the
+same change.

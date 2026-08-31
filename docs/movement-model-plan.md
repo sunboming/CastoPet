@@ -4,8 +4,9 @@
 > minimal 0.1 runtime. The implementation described below remains available on the recovery
 > branches and must be reviewed against `项目问题.md` before any future `main` reintroduction.
 
-Status: IMPLEMENTED after user approval. Turn playback has been permanently removed.
-See [Skin manifest](skin-manifest.md) for the supported JSON contract.
+Historical status: implemented in the archived full-feature branch after user approval.
+Turn playback was removed from that implementation. See [Skin manifest](skin-manifest.md)
+for the historical JSON schema reference; neither document is a supported 0.1 contract.
 
 ## Model
 
@@ -64,5 +65,6 @@ length changes, rendering restart, immediate direction routing, idle restoration
 missing-frame fallback, legacy aliases, metadata conflicts, missing retired PNGs, schema 3
 round trips, external path safety, and unchanged non-movement tests.
 
-Run full tests and builds in Debug/Release for both Preview and Stable. Visual acceptance
-of start/reversal/stop, screen edges, DPI, and mouse approach remains a manual check.
+The archived implementation was verified in Debug and Release before the minimal 0.1
+restart. Any future reintroduction must define and execute a new test and visual-acceptance
+plan against the then-current `main` code instead of relying on this historical result.

@@ -54,22 +54,26 @@ function Assert-ChildPath {
 
 Push-Location $RepositoryRoot
 try {
+    [xml]$sharedProperties = Get-Content -LiteralPath "Directory.Build.props" -Raw
+    $repositoryVersion = [string]$sharedProperties.Project.PropertyGroup.VersionPrefix
     if ([string]::IsNullOrWhiteSpace($Version)) {
-        [xml]$sharedProperties = Get-Content -LiteralPath "Directory.Build.props" -Raw
-        $Version = [string]$sharedProperties.Project.PropertyGroup.VersionPrefix
+        $Version = $repositoryVersion
+    }
+    elseif ($Version -ne $repositoryVersion) {
+        throw "Package version '$Version' must match Directory.Build.props version '$repositoryVersion'."
     }
 
     if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
         throw "Version '$Version' is not a supported semantic version."
     }
 
-    $resolvedReleaseNotesFile = $null
-    if (![string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
-        if (!(Test-Path -LiteralPath $ReleaseNotesFile -PathType Leaf)) {
-            throw "Release notes file '$ReleaseNotesFile' does not exist."
-        }
-        $resolvedReleaseNotesFile = (Resolve-Path -LiteralPath $ReleaseNotesFile).Path
+    if ([string]::IsNullOrWhiteSpace($ReleaseNotesFile)) {
+        $ReleaseNotesFile = Join-Path $RepositoryRoot "docs\release-notes\$Version.md"
     }
+    if (!(Test-Path -LiteralPath $ReleaseNotesFile -PathType Leaf)) {
+        throw "Release notes file '$ReleaseNotesFile' does not exist."
+    }
+    $resolvedReleaseNotesFile = (Resolve-Path -LiteralPath $ReleaseNotesFile).Path
 
     $gitStatus = @(& git status --porcelain --untracked-files=all)
     if ($LASTEXITCODE -ne 0) {
@@ -142,9 +146,7 @@ try {
         "--instLocation", "Either",
         "--icon", (Join-Path $RepositoryRoot "src\CastoPet\Assets\AppIcon.ico"),
         "--outputDir", $OutputDirectory)
-    if ($null -ne $resolvedReleaseNotesFile) {
-        $packArguments += @("--releaseNotes", $resolvedReleaseNotesFile)
-    }
+    $packArguments += @("--releaseNotes", $resolvedReleaseNotesFile)
     Invoke-Checked -FilePath "dotnet" -Arguments $packArguments
 
     $msiPackages = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter "*.msi" -File)
@@ -178,6 +180,15 @@ try {
         files = $metadataFiles
     }
     $metadata | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $PackageRoot "build-metadata.json") -Encoding utf8NoBOM
+
+    $verificationArguments = @(
+        "-NoProfile", "-File", (Join-Path $PSScriptRoot "verify-release-candidate.ps1"),
+        "-Version", $Version,
+        "-PackageRoot", $PackageRoot)
+    if ($isDirty) {
+        $verificationArguments += "-AllowDirty"
+    }
+    Invoke-Checked -FilePath "pwsh" -Arguments $verificationArguments
 
     Write-Output "Package created: $OutputDirectory"
 }

@@ -94,6 +94,12 @@ try {
     if ([string]::IsNullOrWhiteSpace($branch)) {
         throw "Release creation requires a named branch, not a detached HEAD."
     }
+    $versionParts = $Version.Split('.')
+    $versionLine = "$($versionParts[0]).$($versionParts[1])"
+    $expectedBranch = "release/$versionLine"
+    if ($branch -ne $expectedBranch) {
+        throw "Version '$Version' must be published from branch '$expectedBranch', not '$branch'."
+    }
 
     $headCommit = Invoke-Captured -FilePath "git" -Arguments @("rev-parse", "HEAD")
     $remoteUrl = Invoke-Captured -FilePath "git" -Arguments @("remote", "get-url", $Remote)
@@ -132,6 +138,9 @@ try {
         $packageArguments += "-SkipTests"
     }
     Invoke-Checked -FilePath "pwsh" -Arguments $packageArguments
+    Invoke-Checked -FilePath "pwsh" -Arguments @(
+        "-NoProfile", "-File", (Join-Path $PSScriptRoot "verify-release-candidate.ps1"),
+        "-Version", $Version)
 
     $packageRoot = Join-Path $RepositoryRoot "artifacts\packages\$Version"
     $packageDirectory = Join-Path $packageRoot "packages"

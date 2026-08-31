@@ -60,29 +60,33 @@ src/CastoPet/bin/Release/net10.0-windows/CastoPet.exe
 
 ## 打包与发布
 
-在干净的 `release/0.1` 工作树中选择下一个版本级别：
+在干净的 `release/0.1` 工作树中准备下一个 0.1.x 修订版本：
 
 ```powershell
 pwsh -NoProfile -File eng/prepare-release.ps1 -Bump Patch
 ```
 
-`Patch`、`Minor` 和 `Major` 分别更新第三、第二和第一段版本号。命令会修改唯一版本源 `Directory.Build.props` 并创建 `docs/release-notes/<版本>.md`，但不会提交、打包或推送。
+`release/0.1` 只允许 `Patch`，以保证分支与版本线一致。`Minor` 和 `Major`
+必须在准备好发布的 `main` 上执行，随后创建对应的 `release/0.2` 或
+`release/1.0` 分支。命令会修改唯一版本源 `Directory.Build.props` 并创建对应的
+逐版本发行说明，但不会提交、打包或推送。
 
 审核发行说明并提交后，使用准备好的版本号构建安装包：
 
 ```powershell
-pwsh -NoProfile -File eng/package.ps1 -Version <版本> -ReleaseNotesFile docs/release-notes/<版本>.md
+pwsh -NoProfile -File eng/package.ps1
 ```
 
 创建 Tag、推送当前发布分支，并在本仓库生成 Draft Release：
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version <版本>
+$version = ([xml](Get-Content Directory.Build.props -Raw)).Project.PropertyGroup.VersionPrefix
+pwsh -NoProfile -File eng/release.ps1 -Version $version
 ```
 
 发布脚本不会自动公开草稿。GitHub Release 只上传 MSI 安装版、便携版、完整更新包和新版 Velopack 更新清单；内部构建元数据和 Velopack 单击安装器保留在本地打包目录。MSI 安装向导允许选择安装范围和目录，并提供 Windows 标准的修改、修复和卸载入口。确认版本说明、Tag 和四个公开附件后，再在 GitHub 页面手动发布。
 
-逐版本发行说明保存在 `docs/release-notes/`。正式发布脚本会将同一份 Markdown 同时写入 Velopack 更新包和 GitHub Release，缺少对应版本文件时会停止发布。
+逐版本发行说明保存在 `docs/release-notes/`。正式发布脚本会将同一份 Markdown 同时写入 Velopack 更新包和 GitHub Release，缺少对应版本文件时会停止发布。候选包校验和安装升级验收见 [候选版本测试](docs/release-candidate-testing.md)。
 
 ## 文档
 

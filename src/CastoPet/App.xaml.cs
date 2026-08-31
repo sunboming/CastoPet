@@ -71,7 +71,12 @@ public partial class App : System.Windows.Application
         var assets = new AssetService(_logger, BuiltInPetSkins.Castorice);
         _window = new PetWindow(assets, _logger);
         _window.Title = _identity.DisplayName;
-        IUpdateService updateService = new VelopackUpdateService();
+        var testUpdateSource = UpdateSourceOptions.Parse(e.Args);
+        if (testUpdateSource is not null)
+        {
+            _logger.Info($"Using explicit local test update source: {testUpdateSource}");
+        }
+        IUpdateService updateService = new VelopackUpdateService(testUpdateSource);
         _updates = new UpdateCoordinator(updateService, settings, settingsService.Save, logger: _logger);
         var commands = new MenuCommandService(
             _window,

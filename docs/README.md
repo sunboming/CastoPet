@@ -12,6 +12,7 @@ older design decisions.
 | [Branches and releases](branches-and-releases.md) | Responsibilities of `main`, `release/0.1`, the recovery branch, and version lines. |
 | [Known risks](known-risks.md) | Unresolved security and stability risks plus important resolved boundaries. |
 | [Release process](releasing.md) | One-command packaging, tagging, and controlled Draft Release creation. |
+| [Release candidate testing](release-candidate-testing.md) | Candidate package verification and installed-update acceptance. |
 | [Line endings](line-endings.md) | CRLF working-tree policy, LF Git storage, editor settings, and verification commands. |
 
 ## Retained Design References

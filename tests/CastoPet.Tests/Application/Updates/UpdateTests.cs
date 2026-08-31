@@ -123,4 +123,17 @@ internal static partial class TestSuite
         Assert.True(third is not null, "Disposing the first lease should allow a later interaction.");
     }
 
+    static void TestUpdateSourceRequiresAnExplicitExistingDirectory()
+    {
+        using var temp = TempDirectory.Create();
+
+        var selected = UpdateSourceOptions.Parse(["--test-update-source", temp.Path]);
+        var absent = UpdateSourceOptions.Parse([]);
+
+        Assert.Equal(System.IO.Path.GetFullPath(temp.Path), selected, "The explicit test source should resolve to an absolute directory.");
+        Assert.True(absent is null, "Normal startup should not override the public GitHub update source.");
+        Assert.Throws<ArgumentException>(() => UpdateSourceOptions.Parse(["--test-update-source"]));
+        Assert.Throws<DirectoryNotFoundException>(() => UpdateSourceOptions.Parse(["--test-update-source", System.IO.Path.Combine(temp.Path, "missing")]));
+    }
+
 }

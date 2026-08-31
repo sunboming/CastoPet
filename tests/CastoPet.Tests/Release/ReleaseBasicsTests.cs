@@ -128,4 +128,98 @@ internal static partial class TestSuite
         Assert.Contains(report, "Source commit: abc123", "Crash reports should retain source traceability.");
         Assert.False(report.Contains("edition", StringComparison.OrdinalIgnoreCase), "Crash reports should not describe a removed product edition.");
     }
+
+    static void ReleaseSettingsPersistAndRecoverFromCorruption()
+    {
+        using var temp = TempDirectory.Create();
+        var paths = new AppPaths(temp.Path);
+        var service = new SettingsService(paths, new LoggingService(paths));
+
+        Assert.True(service.Save(new AppSettings { Topmost = true, ClickThrough = false }), "The initial settings save should succeed.");
+        Assert.True(service.Save(new AppSettings
+        {
+            Topmost = false,
+            ClickThrough = true,
+            ShowInTaskbar = true,
+            StartWithWindows = true,
+        }), "The replacement settings save should succeed.");
+
+        var loaded = service.Load();
+        Assert.False(loaded.Topmost, "Topmost should round trip.");
+        Assert.True(loaded.ClickThrough, "Click-through should round trip.");
+        Assert.True(loaded.ShowInTaskbar, "Taskbar visibility should round trip.");
+        Assert.True(loaded.StartWithWindows, "Startup registration preference should round trip.");
+        Assert.True(File.Exists(paths.SettingsBackupFile), "Replacing settings should retain a valid backup.");
+
+        File.WriteAllText(paths.SettingsFile, "{broken json");
+        var recovered = service.Load();
+        Assert.True(recovered.Topmost, "A damaged current file should recover the previous valid settings.");
+        Assert.False(recovered.ClickThrough, "Recovery should use the previous valid backup values.");
+        Assert.True(Directory.EnumerateFiles(paths.DataDirectory, "settings.invalid-*.json").Any(), "The damaged file should be retained for diagnosis.");
+    }
+
+    static void ReleaseCrashReportsSanitizeAndRetainBoundedHistory()
+    {
+        using var temp = TempDirectory.Create();
+        var paths = new AppPaths(temp.Path);
+        var timestamp = new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero);
+        var sequence = -1;
+        var service = new CrashReportService(
+            paths,
+            new LoggingService(paths),
+            maxReports: 2,
+            nowProvider: () => timestamp.AddMilliseconds(Interlocked.Increment(ref sequence)));
+
+        for (var index = 0; index < 3; index++)
+        {
+            Assert.True(service.TryWriteReport(new InvalidOperationException($"failure-{index} at {Environment.UserName}"), out _), "Crash reports should be written locally.");
+        }
+
+        var reports = Directory.EnumerateFiles(paths.CrashesDirectory, "crash-*.txt").Order().ToArray();
+        Assert.Equal(2, reports.Length, "Crash report retention should enforce its configured bound.");
+        var newest = File.ReadAllText(reports[^1]);
+        Assert.Contains(newest, "failure-2", "The newest report should be retained.");
+        Assert.False(newest.Contains(Environment.UserName, StringComparison.OrdinalIgnoreCase), "Crash reports should remove the local user name.");
+        Assert.Contains(newest, "%USERNAME%", "Sanitized reports should use a neutral user-name placeholder.");
+    }
+
+    static void ReleaseLoggingRotatesBoundedArchives()
+    {
+        using var temp = TempDirectory.Create();
+        var paths = new AppPaths(temp.Path);
+        var logger = new LoggingService(paths, maxLogFileBytes: 180, maxArchiveFiles: 2);
+
+        for (var index = 0; index < 8; index++)
+        {
+            logger.Info($"entry-{index}-{new string('x', 150)}");
+        }
+
+        var logName = System.IO.Path.GetFileName(paths.LogFile);
+        var files = Directory.EnumerateFiles(paths.LogsDirectory, $"{logName}*").ToArray();
+        Assert.True(files.Length <= 3, "Logging should retain only the current file and two archives.");
+        Assert.Contains(File.ReadAllText(paths.LogFile), "entry-7", "The current log should contain the newest entry.");
+    }
+
+    static void ReleaseSingleInstanceRejectsASecondOwner()
+    {
+        using var temp = TempDirectory.Create();
+        var logger = new LoggingService(new AppPaths(temp.Path));
+        var scope = "CastoPet.Release.Tests." + Guid.NewGuid().ToString("N");
+
+        using var first = new SingleInstanceService(logger, scope);
+        using var second = new SingleInstanceService(logger, scope);
+
+        Assert.True(first.IsPrimaryInstance, "The first process should own the instance mutex.");
+        Assert.False(second.IsPrimaryInstance, "A second process should not own the same instance mutex.");
+    }
+
+    static void ReleaseStartupRegistrationMatchesTheCurrentExecutable()
+    {
+        Assert.True(
+            StartupService.MatchesExecutablePath("\"C:\\Apps\\CastoPet\\CastoPet.exe\"", "C:\\Apps\\CastoPet\\CastoPet.exe"),
+            "A quoted registration should match the current executable path.");
+        Assert.False(
+            StartupService.MatchesExecutablePath("\"C:\\Old\\CastoPet.exe\"", "C:\\Apps\\CastoPet\\CastoPet.exe"),
+            "A stale registration should not be treated as enabled.");
+    }
 }

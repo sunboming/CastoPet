@@ -20,11 +20,20 @@ if (!(Test-Path -LiteralPath $propertiesPath -PathType Leaf)) {
     throw "Version file '$propertiesPath' does not exist."
 }
 
+if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+    throw "Required command 'git' is not available."
+}
+
+$branch = (& git -C $RepositoryRoot branch --show-current).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($branch)) {
+    throw "Release preparation requires a named Git branch."
+}
+
+$status = @(& git -C $RepositoryRoot status --porcelain --untracked-files=all)
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not inspect the Git working tree at '$RepositoryRoot'."
+}
 if (!$AllowDirty) {
-    $status = @(& git -C $RepositoryRoot status --porcelain --untracked-files=all)
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not inspect the Git working tree at '$RepositoryRoot'."
-    }
     if ($status.Count -gt 0) {
         throw "Release preparation requires a clean Git working tree."
     }
@@ -53,6 +62,18 @@ switch ($Bump) {
 }
 $nextVersion = "$major.$minor.$patch"
 $notesPath = Join-Path $notesDirectory "$nextVersion.md"
+
+$releaseBranchMatch = [regex]::Match($branch, '^release/(?<major>\d+)\.(?<minor>\d+)$')
+if ($branch -ne "main" -and !$releaseBranchMatch.Success) {
+    throw "Release preparation must run on main or a release/<major>.<minor> branch."
+}
+if ($releaseBranchMatch.Success) {
+    $branchVersionLine = "$($releaseBranchMatch.Groups['major'].Value).$($releaseBranchMatch.Groups['minor'].Value)"
+    $nextVersionLine = "$major.$minor"
+    if ($branchVersionLine -ne $nextVersionLine) {
+        throw "Branch '$branch' can prepare only $branchVersionLine.x releases, not $nextVersion."
+    }
+}
 
 if (Test-Path -LiteralPath $notesPath) {
     throw "Release notes '$notesPath' already exist. No files were changed."
