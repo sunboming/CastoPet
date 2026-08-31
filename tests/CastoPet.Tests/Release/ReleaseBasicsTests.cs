@@ -25,6 +25,29 @@ internal static partial class TestSuite
         Assert.Equal("CastoPet", identity.PackageId, "The release should use one installer identity.");
     }
 
+    static void PortableDistributionKeepsUserDataBesideTheApplication()
+    {
+        var identity = CastoPetProductIdentity.Current;
+        var portableRoot = System.IO.Path.Combine("D:\\Portable", "CastoPet");
+        var localAppDataRoot = System.IO.Path.Combine("C:\\Users", "test", "AppData", "Local");
+
+        var portable = AppPaths.ForDistribution(
+            identity,
+            isPortable: true,
+            portableRoot,
+            localAppDataRoot);
+        var installed = AppPaths.ForDistribution(
+            identity,
+            isPortable: false,
+            portableRoot,
+            localAppDataRoot);
+
+        Assert.Equal(System.IO.Path.Combine(portableRoot, "UserData"), portable.DataDirectory, "Portable data should stay beside the extracted application.");
+        Assert.Equal(System.IO.Path.Combine(portableRoot, "UserData", "Crashes"), portable.CrashesDirectory, "Portable crash reports should stay in portable user data.");
+        Assert.Equal(System.IO.Path.Combine(localAppDataRoot, "CastoPet"), installed.DataDirectory, "Installed data should remain under local app data.");
+        Assert.False(portable.DataDirectory == installed.DataDirectory, "Portable and installed distributions must not share user data.");
+    }
+
     static void BuiltInSkinProvidesIdleAndBlink()
     {
         var skin = BuiltInPetSkins.Castorice;

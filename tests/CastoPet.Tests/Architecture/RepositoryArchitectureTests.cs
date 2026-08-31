@@ -8,7 +8,7 @@ internal static partial class TestSuite
         var project = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "CastoPet.csproj"));
         var sharedProperties = File.ReadAllText(System.IO.Path.Combine(workspace, "Directory.Build.props"));
 
-        Assert.Contains(sharedProperties, "<VersionPrefix>0.1.0</VersionPrefix>", "The repository should have one explicit semantic version source.");
+        Assert.Contains(sharedProperties, "<VersionPrefix>0.1.1</VersionPrefix>", "The repository should have one explicit semantic version source.");
         Assert.False(project.Contains("<Version>", StringComparison.Ordinal), "The application project should inherit the central semantic version.");
         Assert.Contains(project, "<PackageReference Include=\"Velopack\" Version=\"1.2.0\"", "Velopack should be pinned to the verified stable version.");
     }
@@ -159,6 +159,9 @@ internal static partial class TestSuite
         Assert.False(script.Contains("CastoPetEdition", StringComparison.Ordinal), "Publishing should not select an obsolete edition profile.");
         Assert.Contains(script, "tool", "Packaging should restore and invoke the local vpk tool.");
         Assert.Contains(script, "vpk", "Packaging should create a Velopack installer and update packages.");
+        Assert.Contains(script, "--msi", "Packaging should create a Windows Installer package with a maintenance wizard.");
+        Assert.Contains(script, "--instLocation", "Packaging should explicitly configure the MSI installation scope.");
+        Assert.Contains(script, "Either", "The MSI should let the user choose the installation scope and directory.");
         Assert.Contains(script, "build-metadata.json", "Every package should retain version, source commit, and file hashes.");
         Assert.False(script.Contains("vpk upload", StringComparison.OrdinalIgnoreCase), "The local packaging script must not publish releases.");
         Assert.False(script.Contains("gh release", StringComparison.OrdinalIgnoreCase), "The local packaging script must not create GitHub releases.");
@@ -196,7 +199,8 @@ internal static partial class TestSuite
         Assert.Contains(script, "create", "The script should create a release when one does not exist.");
         Assert.Contains(script, "--draft", "New releases must remain drafts until manually approved.");
         Assert.Contains(script, "--verify-tag", "Release creation should require a pushed Git tag.");
-        Assert.Contains(script, "CastoPet-win-Setup.exe", "The public release should include the installer.");
+        Assert.Contains(script, "CastoPet-win-Setup.msi", "The public release should include the configurable Windows installer.");
+        Assert.False(script.Contains("\"CastoPet-win-Setup.exe\"", StringComparison.Ordinal), "The one-click installer should not be a public release asset when MSI is the supported installation path.");
         Assert.Contains(script, "CastoPet-win-Portable.zip", "The public release should include the portable package.");
         Assert.Contains(script, "CastoPet-$Version-full.nupkg", "The public release should include the Velopack update package.");
         Assert.Contains(script, "releases.win.json", "The public release should include the Velopack update feed.");

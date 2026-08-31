@@ -17,27 +17,33 @@ public source repository: `sunboming/CastoPet`.
 Run the release helper from the repository root:
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.0
+pwsh -NoProfile -File eng/release.ps1 -Version 0.1.1
 ```
 
 To supply reviewed release notes:
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.0 -NotesFile CHANGELOG.md
+pwsh -NoProfile -File eng/release.ps1 -Version 0.1.1 -NotesFile CHANGELOG.md
 ```
 
 The helper verifies the repository and version, runs the existing packaging workflow,
 pushes the current branch, creates and pushes `v<version>`, and uploads four public assets
 to a Draft GitHub Release:
 
-- `CastoPet-win-Setup.exe` for normal installation;
+- `CastoPet-win-Setup.msi` for normal installation with selectable scope and directory;
 - `CastoPet-win-Portable.zip` for portable use;
 - `CastoPet-<version>-full.nupkg` for installed-client updates;
 - `releases.win.json` as the Velopack update feed.
 
-The packaging directory and CI artifact retain `assets.win.json`, the legacy `RELEASES`
-feed, and `build-metadata.json` for deployment tooling, diagnostics, and traceability. These
-internal files are not uploaded to the public GitHub Release.
+The MSI uses Velopack's `Either` installation scope. Its standard Windows Installer wizard
+lets the user select the installation directory and provides modify, repair, and uninstall
+maintenance flows when it is run again. The packaging directory and CI artifact retain the
+one-click `CastoPet-win-Setup.exe`, `assets.win.json`, the legacy `RELEASES` feed, and
+`build-metadata.json` for deployment tooling, diagnostics, and traceability. These internal
+files are not uploaded to the public GitHub Release.
+
+The portable package stores settings, logs, and crash reports under `UserData` beside the
+extracted application. It does not share `%LocalAppData%\CastoPet` with the installed build.
 
 The script intentionally pushes whichever named branch is currently checked out. Confirm
 the branch before running it:

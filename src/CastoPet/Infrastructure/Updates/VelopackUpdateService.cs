@@ -25,7 +25,7 @@ public sealed class VelopackUpdateService : IUpdateService
 
     public string CurrentVersion => _manager.CurrentVersion?.ToString()
         ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3)
-        ?? "0.1.0";
+        ?? "0.1.1";
 
     public async Task<UpdateAvailability?> CheckForUpdatesAsync(CancellationToken cancellationToken)
     {

@@ -135,7 +135,7 @@ try {
     $packageRoot = Join-Path $RepositoryRoot "artifacts\packages\$Version"
     $packageDirectory = Join-Path $packageRoot "packages"
     $releaseAssetNames = @(
-        "CastoPet-win-Setup.exe",
+        "CastoPet-win-Setup.msi",
         "CastoPet-win-Portable.zip",
         "CastoPet-$Version-full.nupkg",
         "releases.win.json"

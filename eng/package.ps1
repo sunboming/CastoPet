@@ -128,13 +128,21 @@ try {
         "--mainExe", "CastoPet.exe",
         "--packTitle", $identity.DisplayName,
         "--runtime", $RuntimeIdentifier,
+        "--msi",
+        "--instLocation", "Either",
         "--icon", (Join-Path $RepositoryRoot "src\CastoPet\Assets\AppIcon.ico"),
         "--outputDir", $OutputDirectory)
 
-    $packageFiles = @(Get-ChildItem -LiteralPath $OutputDirectory -File | Sort-Object Name)
-    if (!($packageFiles | Where-Object Extension -eq ".exe")) {
-        throw "Velopack did not produce an installer executable."
+    $msiPackages = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter "*.msi" -File)
+    if ($msiPackages.Count -ne 1) {
+        throw "Velopack did not produce the configurable Windows installer."
     }
+    $publicMsiPath = Join-Path $OutputDirectory "CastoPet-win-Setup.msi"
+    if ($msiPackages[0].FullName -ne $publicMsiPath) {
+        Move-Item -LiteralPath $msiPackages[0].FullName -Destination $publicMsiPath
+    }
+
+    $packageFiles = @(Get-ChildItem -LiteralPath $OutputDirectory -File | Sort-Object Name)
 
     $metadataFiles = @($packageFiles | ForEach-Object {
         $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256

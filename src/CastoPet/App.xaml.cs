@@ -34,7 +34,7 @@ public partial class App : System.Windows.Application
     public App()
     {
         _identity = CastoPetProductIdentity.Current;
-        _paths = AppPaths.ForProduct(_identity);
+        _paths = AppPaths.ForCurrentDistribution(_identity);
         _logger = new LoggingService(_paths);
         _crashReports = new CrashReportService(
             _paths,

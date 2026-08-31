@@ -6,6 +6,7 @@ internal static partial class TestSuite
     [
         new("Release settings expose only basic options", ReleaseSettingsExposeOnlyBasicOptions),
         new("Release uses one public product identity", ReleaseUsesOnePublicProductIdentity),
+        new("Portable distribution keeps user data beside the application", PortableDistributionKeepsUserDataBesideTheApplication),
         new("Built-in skin provides idle and blink", BuiltInSkinProvidesIdleAndBlink),
         new("Maintenance menu commands use shared callbacks", MaintenanceMenuCommandsUseSharedCallbacks),
         new("Pet window contains only basic interaction entry points", PetWindowContainsOnlyBasicInteractionEntryPoints),

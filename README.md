@@ -38,6 +38,8 @@ CastoPet/
 
 只有 `src/CastoPet/Assets/` 中显式声明的资源会进入应用。`artwork/`、`artifacts/` 和根目录 `tmp/` 都不是运行时资源来源。
 
+安装版将设置、日志和崩溃报告保存在 `%LocalAppData%\CastoPet`。便携版使用解压目录下的 `UserData`，不会读取或修改安装版用户数据；移动便携版时应同时移动该目录。
+
 ## 开发验证
 
 ```powershell
@@ -61,16 +63,16 @@ src/CastoPet/bin/Release/net10.0-windows/CastoPet.exe
 在干净的 `release/0.1` 工作树中构建 0.1 安装包：
 
 ```powershell
-pwsh -NoProfile -File eng/package.ps1 -Version 0.1.0
+pwsh -NoProfile -File eng/package.ps1 -Version 0.1.1
 ```
 
 创建 Tag、推送当前发布分支，并在本仓库生成 Draft Release：
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.0
+pwsh -NoProfile -File eng/release.ps1 -Version 0.1.1
 ```
 
-发布脚本不会自动公开草稿。GitHub Release 只上传安装版、便携版、完整更新包和新版 Velopack 更新清单；内部构建元数据保留在本地打包目录。确认版本说明、Tag 和四个公开附件后，再在 GitHub 页面手动发布。
+发布脚本不会自动公开草稿。GitHub Release 只上传 MSI 安装版、便携版、完整更新包和新版 Velopack 更新清单；内部构建元数据和 Velopack 单击安装器保留在本地打包目录。MSI 安装向导允许选择安装范围和目录，并提供 Windows 标准的修改、修复和卸载入口。确认版本说明、Tag 和四个公开附件后，再在 GitHub 页面手动发布。
 
 ## 文档
 

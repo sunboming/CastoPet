@@ -1,5 +1,7 @@
 using System.IO;
 
+using Velopack.Locators;
+
 using CastoPet.Core.Product;
 
 namespace CastoPet.Infrastructure.Persistence;
@@ -35,5 +37,33 @@ public sealed class AppPaths
         var root = localAppDataRoot
             ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return new AppPaths(Path.Combine(root, identity.DataDirectoryName));
+    }
+
+    public static AppPaths ForCurrentDistribution(CastoPetProductIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        var locator = VelopackLocator.Current;
+        return ForDistribution(
+            identity,
+            locator.IsPortable,
+            locator.RootAppDir);
+    }
+
+    public static AppPaths ForDistribution(
+        CastoPetProductIdentity identity,
+        bool isPortable,
+        string? portableRoot = null,
+        string? localAppDataRoot = null)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        if (!isPortable)
+        {
+            return ForProduct(identity, localAppDataRoot);
+        }
+
+        var root = string.IsNullOrWhiteSpace(portableRoot)
+            ? AppContext.BaseDirectory
+            : portableRoot;
+        return new AppPaths(Path.Combine(root, "UserData"));
     }
 }
