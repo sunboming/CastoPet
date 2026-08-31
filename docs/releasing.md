@@ -9,21 +9,33 @@ public source repository: `sunboming/CastoPet`.
 - Install GitHub CLI and authenticate with `gh auth login`.
 - Use an account that can push tags and create releases in `sunboming/CastoPet`.
 - Commit every intended release change. The working tree must be clean.
-- Set `VersionPrefix` in `Directory.Build.props` to the release version and commit it.
 - For a 0.1.x release, check out `release/0.1`; do not package a future `main` snapshot.
+
+## Prepare A Version
+
+Start from a clean worktree and select the semantic-version component to increment:
+
+```powershell
+pwsh -NoProfile -File eng/prepare-release.ps1 -Bump Patch
+```
+
+Use `Minor` or `Major` instead when the release scope requires it. The helper updates
+`Directory.Build.props` and creates `docs/release-notes/<version>.md`. It intentionally does
+not test, commit, tag, push, or publish. Review the generated notes, run both Debug and
+Release verification, and commit the prepared version before continuing.
 
 ## Create A Draft Release
 
 Run the release helper from the repository root:
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.2
+pwsh -NoProfile -File eng/release.ps1 -Version <version>
 ```
 
 To supply reviewed release notes:
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.2 -NotesFile CHANGELOG.md
+pwsh -NoProfile -File eng/release.ps1 -Version <version> -NotesFile CHANGELOG.md
 ```
 
 The helper verifies the repository and version, runs the existing packaging workflow,

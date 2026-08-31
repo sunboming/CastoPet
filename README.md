@@ -60,16 +60,24 @@ src/CastoPet/bin/Release/net10.0-windows/CastoPet.exe
 
 ## 打包与发布
 
-在干净的 `release/0.1` 工作树中构建 0.1 安装包：
+在干净的 `release/0.1` 工作树中选择下一个版本级别：
 
 ```powershell
-pwsh -NoProfile -File eng/package.ps1 -Version 0.1.2 -ReleaseNotesFile docs/release-notes/0.1.2.md
+pwsh -NoProfile -File eng/prepare-release.ps1 -Bump Patch
+```
+
+`Patch`、`Minor` 和 `Major` 分别更新第三、第二和第一段版本号。命令会修改唯一版本源 `Directory.Build.props` 并创建 `docs/release-notes/<版本>.md`，但不会提交、打包或推送。
+
+审核发行说明并提交后，使用准备好的版本号构建安装包：
+
+```powershell
+pwsh -NoProfile -File eng/package.ps1 -Version <版本> -ReleaseNotesFile docs/release-notes/<版本>.md
 ```
 
 创建 Tag、推送当前发布分支，并在本仓库生成 Draft Release：
 
 ```powershell
-pwsh -NoProfile -File eng/release.ps1 -Version 0.1.2
+pwsh -NoProfile -File eng/release.ps1 -Version <版本>
 ```
 
 发布脚本不会自动公开草稿。GitHub Release 只上传 MSI 安装版、便携版、完整更新包和新版 Velopack 更新清单；内部构建元数据和 Velopack 单击安装器保留在本地打包目录。MSI 安装向导允许选择安装范围和目录，并提供 Windows 标准的修改、修复和卸载入口。确认版本说明、Tag 和四个公开附件后，再在 GitHub 页面手动发布。

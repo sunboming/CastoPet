@@ -7,10 +7,18 @@ internal static partial class TestSuite
         var workspace = FindWorkspaceRoot();
         var project = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "CastoPet.csproj"));
         var sharedProperties = File.ReadAllText(System.IO.Path.Combine(workspace, "Directory.Build.props"));
+        var updateService = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "Infrastructure", "Updates", "VelopackUpdateService.cs"));
 
-        Assert.Contains(sharedProperties, "<VersionPrefix>0.1.2</VersionPrefix>", "The repository should have one explicit semantic version source.");
+        var parsedProperties = System.Xml.Linq.XDocument.Parse(sharedProperties);
+        var repositoryVersion = parsedProperties.Descendants("VersionPrefix").Single().Value;
+        Assert.True(
+            System.Text.RegularExpressions.Regex.IsMatch(repositoryVersion, "^\\d+\\.\\d+\\.\\d+$"),
+            "The repository should have one explicit three-part semantic version source.");
         Assert.False(project.Contains("<Version>", StringComparison.Ordinal), "The application project should inherit the central semantic version.");
         Assert.Contains(project, "<PackageReference Include=\"Velopack\" Version=\"1.2.0\"", "Velopack should be pinned to the verified stable version.");
+        Assert.False(
+            System.Text.RegularExpressions.Regex.IsMatch(updateService, "\\?\\? \\\"\\d+\\.\\d+\\.\\d+\\\""),
+            "Runtime version reporting should not duplicate the central semantic version as a fallback literal.");
     }
 
     static void ApplicationDefinesPackagedIcon()
@@ -167,6 +175,81 @@ internal static partial class TestSuite
         Assert.False(script.Contains("vpk upload", StringComparison.OrdinalIgnoreCase), "The local packaging script must not publish releases.");
         Assert.False(script.Contains("gh release", StringComparison.OrdinalIgnoreCase), "The local packaging script must not create GitHub releases.");
         Assert.Contains(ignore, "artifacts/packages/", "Generated installer payloads should remain outside source control.");
+    }
+
+    static void ReleasePreparationBumpsSemanticVersions()
+    {
+        var workspace = FindWorkspaceRoot();
+        var script = System.IO.Path.Combine(workspace, "eng", "prepare-release.ps1");
+        Assert.True(File.Exists(script), "The repository should provide a release preparation command.");
+
+        foreach (var testCase in new[]
+                 {
+                     (Bump: "Patch", Expected: "0.1.3"),
+                     (Bump: "Minor", Expected: "0.2.0"),
+                     (Bump: "Major", Expected: "1.0.0"),
+                 })
+        {
+            using var temp = TempDirectory.Create();
+            WriteVersionFixture(temp.Path, "0.1.2");
+
+            var result = RunReleasePreparation(script, temp.Path, testCase.Bump);
+
+            Assert.Equal(0, result.ExitCode, $"{testCase.Bump} preparation should succeed. {result.Error}");
+            var properties = File.ReadAllText(System.IO.Path.Combine(temp.Path, "Directory.Build.props"));
+            Assert.Contains(properties, $"<VersionPrefix>{testCase.Expected}</VersionPrefix>", $"{testCase.Bump} should calculate the expected semantic version.");
+            var notesPath = System.IO.Path.Combine(temp.Path, "docs", "release-notes", $"{testCase.Expected}.md");
+            Assert.True(File.Exists(notesPath), $"{testCase.Bump} should create a versioned release-notes file.");
+            Assert.Contains(File.ReadAllText(notesPath), testCase.Expected, "The notes template should identify its release version.");
+        }
+
+        using var collision = TempDirectory.Create();
+        WriteVersionFixture(collision.Path, "0.1.2");
+        var existingNotes = System.IO.Path.Combine(collision.Path, "docs", "release-notes", "0.1.3.md");
+        File.WriteAllText(existingNotes, "existing");
+
+        var rejected = RunReleasePreparation(script, collision.Path, "Patch");
+
+        Assert.False(rejected.ExitCode == 0, "Preparation should stop instead of overwriting existing release notes.");
+        Assert.Contains(
+            File.ReadAllText(System.IO.Path.Combine(collision.Path, "Directory.Build.props")),
+            "<VersionPrefix>0.1.2</VersionPrefix>",
+            "A rejected preparation must not change the repository version.");
+    }
+
+    private static void WriteVersionFixture(string root, string version)
+    {
+        Directory.CreateDirectory(System.IO.Path.Combine(root, "docs", "release-notes"));
+        File.WriteAllText(
+            System.IO.Path.Combine(root, "Directory.Build.props"),
+            $"<Project><PropertyGroup><VersionPrefix>{version}</VersionPrefix></PropertyGroup></Project>");
+    }
+
+    private static (int ExitCode, string Error) RunReleasePreparation(string script, string root, string bump)
+    {
+        var startInfo = new System.Diagnostics.ProcessStartInfo("pwsh")
+        {
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+        };
+        foreach (var argument in new[]
+                 {
+                     "-NoProfile", "-File", script,
+                     "-Bump", bump,
+                     "-RepositoryRoot", root,
+                     "-AllowDirty",
+                 })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start release preparation test process.");
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        return (process.ExitCode, string.Join(Environment.NewLine, output, error));
     }
 
     static void PackagingWorkflowProducesManualArtifactsWithoutPublishing()

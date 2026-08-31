@@ -48,7 +48,7 @@ such as `0.1.0` and `0.1.1`. The public product can still be described as "Casto
 For a 0.1.x release:
 
 1. Work from `release/0.1`.
-2. Update `VersionPrefix` in `Directory.Build.props`.
+2. Run `eng/prepare-release.ps1 -Bump Patch` (or choose `Minor`/`Major`).
 3. Commit the version and release notes.
 4. Run Debug and Release tests and builds.
 5. Run `eng/release.ps1 -Version <version>` from a clean worktree.
