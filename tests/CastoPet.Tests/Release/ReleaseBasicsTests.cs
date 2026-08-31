@@ -79,6 +79,17 @@ internal static partial class TestSuite
         Assert.Equal(1, updateCheckCount, "The maintenance menu should route update checks through one shared command.");
     }
 
+    static void CurrentUpdateMessageIncludesInstalledVersion()
+    {
+        var workspace = FindWorkspaceRoot();
+        var app = File.ReadAllText(System.IO.Path.Combine(workspace, "src", "CastoPet", "App.xaml.cs"));
+
+        Assert.Contains(
+            app,
+            "$\"当前已是最新版本。\\n当前版本：{result.CurrentVersion}\"",
+            "The current-version update result should tell the user which version is installed.");
+    }
+
     static void PetWindowContainsOnlyBasicInteractionEntryPoints()
     {
         var workspace = FindWorkspaceRoot();

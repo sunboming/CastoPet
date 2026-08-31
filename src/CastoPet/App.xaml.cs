@@ -179,7 +179,11 @@ public partial class App : System.Windows.Application
                     await PromptAndInstallUpdateAsync(result.AvailableUpdate, cancellationToken);
                     break;
                 case UpdateCheckStatus.Current:
-                    System.Windows.MessageBox.Show("当前已是最新版本。", "CastoPet 更新", MessageBoxButton.OK, MessageBoxImage.Information);
+                    System.Windows.MessageBox.Show(
+                        $"当前已是最新版本。\n当前版本：{result.CurrentVersion}",
+                        "CastoPet 更新",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
                     break;
                 case UpdateCheckStatus.DevelopmentBuild:
                     System.Windows.MessageBox.Show("开发构建不支持自动更新。", "CastoPet 更新", MessageBoxButton.OK, MessageBoxImage.Information);

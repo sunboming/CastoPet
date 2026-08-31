@@ -9,6 +9,7 @@ internal static partial class TestSuite
         new("Portable distribution keeps user data beside the application", PortableDistributionKeepsUserDataBesideTheApplication),
         new("Built-in skin provides idle and blink", BuiltInSkinProvidesIdleAndBlink),
         new("Maintenance menu commands use shared callbacks", MaintenanceMenuCommandsUseSharedCallbacks),
+        new("Current update message includes installed version", CurrentUpdateMessageIncludesInstalledVersion),
         new("Pet window contains only basic interaction entry points", PetWindowContainsOnlyBasicInteractionEntryPoints),
         new("Crash reports do not expose obsolete edition", CrashReportsDoNotExposeObsoleteEdition),
     ];
