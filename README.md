@@ -20,7 +20,6 @@ CastoPet 是一个基于 .NET 10 和 WPF 的 Windows 桌面宠物应用。
 - `main`：后续功能开发的主分支，从 0.1 精简基线继续演进。
 - `release/0.1`：0.1.x 维护和发布分支，只接收发布所需的修复、文档和版本调整。
 - `codex/archive-main-before-0.1`：历史完整版 `main` 的只读恢复点。
-- `codex/archive-release-0.1-history`：Git 历史清理前 0.1 开发提交链的只读恢复点。
 
 分支职责、修复同步方向和版本发布规则见 [分支与发布说明](docs/branches-and-releases.md)。
 
@@ -71,7 +70,7 @@ pwsh -NoProfile -File eng/package.ps1 -Version 0.1.0
 pwsh -NoProfile -File eng/release.ps1 -Version 0.1.0
 ```
 
-发布脚本不会自动公开草稿。确认版本说明、Tag、安装程序、Velopack 文件和 `build-metadata.json` 后，再在 GitHub 页面手动发布。
+发布脚本不会自动公开草稿。GitHub Release 只上传安装版、便携版、完整更新包和新版 Velopack 更新清单；内部构建元数据保留在本地打包目录。确认版本说明、Tag 和四个公开附件后，再在 GitHub 页面手动发布。
 
 ## 文档
 

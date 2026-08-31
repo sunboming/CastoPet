@@ -196,7 +196,13 @@ internal static partial class TestSuite
         Assert.Contains(script, "create", "The script should create a release when one does not exist.");
         Assert.Contains(script, "--draft", "New releases must remain drafts until manually approved.");
         Assert.Contains(script, "--verify-tag", "Release creation should require a pushed Git tag.");
-        Assert.Contains(script, "build-metadata.json", "The traceability metadata should be uploaded with Velopack assets.");
+        Assert.Contains(script, "CastoPet-win-Setup.exe", "The public release should include the installer.");
+        Assert.Contains(script, "CastoPet-win-Portable.zip", "The public release should include the portable package.");
+        Assert.Contains(script, "CastoPet-$Version-full.nupkg", "The public release should include the Velopack update package.");
+        Assert.Contains(script, "releases.win.json", "The public release should include the Velopack update feed.");
+        Assert.False(script.Contains("assets.win.json", StringComparison.Ordinal), "Velopack deployment metadata should remain a build artifact.");
+        Assert.False(script.Contains("build-metadata.json", StringComparison.Ordinal), "Internal build traceability metadata should not be a public release asset.");
+        Assert.False(script.Contains("\"RELEASES\"", StringComparison.Ordinal), "The legacy Squirrel feed should not be published for a new Velopack application.");
         Assert.False(script.Contains("--draft=false", StringComparison.OrdinalIgnoreCase), "The local helper must never publish a draft automatically.");
     }
 

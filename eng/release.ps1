@@ -134,12 +134,23 @@ try {
 
     $packageRoot = Join-Path $RepositoryRoot "artifacts\packages\$Version"
     $packageDirectory = Join-Path $packageRoot "packages"
-    $metadataPath = Join-Path $packageRoot "build-metadata.json"
-    $packageFiles = @(Get-ChildItem -LiteralPath $packageDirectory -File | Sort-Object Name)
-    if ($packageFiles.Count -eq 0 -or !(Test-Path -LiteralPath $metadataPath -PathType Leaf)) {
+    $releaseAssetNames = @(
+        "CastoPet-win-Setup.exe",
+        "CastoPet-win-Portable.zip",
+        "CastoPet-$Version-full.nupkg",
+        "releases.win.json"
+    )
+    $assetPaths = @($releaseAssetNames | ForEach-Object {
+        $assetPath = Join-Path $packageDirectory $_
+        if (!(Test-Path -LiteralPath $assetPath -PathType Leaf)) {
+            throw "Packaging did not produce required release asset '$assetPath'."
+        }
+
+        $assetPath
+    })
+    if ($assetPaths.Count -ne $releaseAssetNames.Count) {
         throw "Packaging did not produce the expected release assets for version $Version."
     }
-    $assetPaths = @($packageFiles.FullName) + $metadataPath
 
     Invoke-Checked -FilePath "git" -Arguments @("push", $Remote, "HEAD:refs/heads/$branch")
 

@@ -30,16 +30,14 @@ to this branch. A 0.1 fix should normally be implemented on `release/0.1`, verif
 then cherry-picked to `main` if `main` still needs it. Never merge a feature-rich future
 `main` back into `release/0.1`.
 
-## Recovery Branches
+## Recovery Branch
 
-The history restart is reversible through two read-only branches:
+The former full-featured product history remains available through one read-only branch:
 
 - `codex/archive-main-before-0.1` retains the former full-featured `main` history.
-- `codex/archive-release-0.1-history` retains the incremental commits used to prepare the
-  minimal 0.1 snapshot before they were collapsed into the new root commit.
 
-Do not develop on or merge these branches. Use them only for history inspection, comparison,
-or targeted recovery. A required old change should be reviewed and reimplemented or
+Do not develop on or merge this branch. Use it only for history inspection, comparison, or
+targeted recovery. A required old change should be reviewed and reimplemented or
 cherry-picked deliberately.
 
 ## Versioning
@@ -63,4 +61,4 @@ GitHub Releases of `sunboming/CastoPet`.
 
 The active branches were restarted from the same minimal 0.1 file snapshot. The restart
 commit intentionally has no parent so normal development history remains concise. The
-recovery branches preserve the previous ancestry when detailed investigation is needed.
+recovery branch preserves the previous product history when detailed investigation is needed.

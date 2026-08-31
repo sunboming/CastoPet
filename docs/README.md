@@ -9,7 +9,7 @@ older design decisions.
 | Document | Purpose |
 | --- | --- |
 | [Asset organization](asset-organization.md) | Lifecycle and ownership of runtime, editable, candidate, and reference assets. |
-| [Branches and releases](branches-and-releases.md) | Responsibilities of `main`, `release/0.1`, recovery branches, and version lines. |
+| [Branches and releases](branches-and-releases.md) | Responsibilities of `main`, `release/0.1`, the recovery branch, and version lines. |
 | [Known risks](known-risks.md) | Unresolved security and stability risks plus important resolved boundaries. |
 | [Release process](releasing.md) | One-command packaging, tagging, and controlled Draft Release creation. |
 | [Line endings](line-endings.md) | CRLF working-tree policy, LF Git storage, editor settings, and verification commands. |

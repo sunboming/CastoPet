@@ -27,8 +27,17 @@ pwsh -NoProfile -File eng/release.ps1 -Version 0.1.0 -NotesFile CHANGELOG.md
 ```
 
 The helper verifies the repository and version, runs the existing packaging workflow,
-pushes the current branch, creates and pushes `v<version>`, and uploads every Velopack
-asset plus `build-metadata.json` to a Draft GitHub Release.
+pushes the current branch, creates and pushes `v<version>`, and uploads four public assets
+to a Draft GitHub Release:
+
+- `CastoPet-win-Setup.exe` for normal installation;
+- `CastoPet-win-Portable.zip` for portable use;
+- `CastoPet-<version>-full.nupkg` for installed-client updates;
+- `releases.win.json` as the Velopack update feed.
+
+The packaging directory and CI artifact retain `assets.win.json`, the legacy `RELEASES`
+feed, and `build-metadata.json` for deployment tooling, diagnostics, and traceability. These
+internal files are not uploaded to the public GitHub Release.
 
 The script intentionally pushes whichever named branch is currently checked out. Confirm
 the branch before running it:
@@ -47,8 +56,8 @@ commit. Normal releases should omit it.
 ## Publish
 
 Review the draft on GitHub before selecting **Publish release**. Check the version, source
-tag, release notes, installer, Velopack metadata, package files, and `build-metadata.json`.
-CastoPet clients cannot discover the release while it remains a draft.
+tag, release notes, installer, portable archive, full update package, and
+`releases.win.json`. CastoPet clients cannot discover the release while it remains a draft.
 
 The helper never publishes a draft automatically and never modifies an existing published
 release.
